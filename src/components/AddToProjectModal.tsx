@@ -1,0 +1,269 @@
+import React, { useState, useEffect } from 'react';
+import { Plus, X, Search } from 'lucide-react';
+import Modal from './Modal';
+import { supabase } from '../lib/supabase';
+
+interface Project {
+  id: string;
+  name: string;
+  description: string | null;
+  image_url: string | null;
+}
+
+interface AddToProjectModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  subredditId: string;
+  subredditName: string;
+}
+
+function AddToProjectModal({ isOpen, onClose, subredditId, subredditName }: AddToProjectModalProps) {
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [newProjectName, setNewProjectName] = useState('');
+  const [newProjectDescription, setNewProjectDescription] = useState('');
+  const [showNewProjectForm, setShowNewProjectForm] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (isOpen) {
+      fetchProjects();
+    }
+  }, [isOpen]);
+
+  const fetchProjects = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('projects')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      setProjects(data || []);
+    } catch (err) {
+      console.error('Error fetching projects:', err);
+      setError('Failed to load projects');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleAddToProject = async (projectId: string) => {
+    setSaving(true);
+    try {
+      // Check if subreddit is already in project
+      const { data: existing, error: checkError } = await supabase
+        .from('project_subreddits')
+        .select('id')
+        .eq('project_id', projectId)
+        .eq('subreddit_id', subredditId)
+        .maybeSingle();
+
+      if (checkError) throw checkError;
+
+      if (existing) {
+        setError('This subreddit is already in the selected project');
+        return;
+      }
+
+      const { error } = await supabase
+        .from('project_subreddits')
+        .insert({
+          project_id: projectId,
+          subreddit_id: subredditId
+        });
+
+      if (error) throw error;
+      onClose();
+    } catch (err) {
+      console.error('Error adding to project:', err);
+      setError('Failed to add subreddit to project');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleCreateProject = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newProjectName.trim()) return;
+
+    setSaving(true);
+    try {
+      // Create new project
+      const { data: project, error: projectError } = await supabase
+        .from('projects')
+        .insert({
+          name: newProjectName.trim(),
+          description: newProjectDescription.trim() || null
+        })
+        .select()
+        .single();
+
+      if (projectError) throw projectError;
+      if (!project) throw new Error('Failed to create project');
+
+      // Add subreddit to the new project
+      const { error: linkError } = await supabase
+        .from('project_subreddits')
+        .insert({
+          project_id: project.id,
+          subreddit_id: subredditId
+        });
+
+      if (linkError) throw linkError;
+      onClose();
+    } catch (err) {
+      console.error('Error creating project:', err);
+      setError('Failed to create project');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const filteredProjects = projects.filter(project =>
+    project.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    (project.description?.toLowerCase() || '').includes(searchQuery.toLowerCase())
+  );
+
+  const getProjectImage = (project: Project) => {
+    if (project.image_url) return project.image_url;
+    return `https://api.dicebear.com/7.x/shapes/svg?seed=${project.name}&backgroundColor=111111`;
+  };
+
+  return (
+    <Modal isOpen={isOpen} onClose={onClose}>
+      <div className="p-6">
+        <h2 className="text-xl font-semibold mb-1">Add to Project</h2>
+        <p className="text-gray-400 text-sm mb-6">
+          Add r/{subredditName} to a project
+        </p>
+
+        {error && (
+          <div className="mb-6 p-3 bg-red-900/30 text-red-400 rounded-md text-sm">
+            {error}
+          </div>
+        )}
+
+        {showNewProjectForm ? (
+          <form onSubmit={handleCreateProject} className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium mb-1">Project Name</label>
+              <input
+                type="text"
+                value={newProjectName}
+                onChange={(e) => setNewProjectName(e.target.value)}
+                placeholder="Enter project name"
+                required
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium mb-1">Description (Optional)</label>
+              <input
+                type="text"
+                value={newProjectDescription}
+                onChange={(e) => setNewProjectDescription(e.target.value)}
+                placeholder="Enter project description"
+              />
+            </div>
+
+            <div className="flex gap-2">
+              <button 
+                type="submit" 
+                className="primary flex-1"
+                disabled={saving || !newProjectName.trim()}
+              >
+                {saving ? 'Creating...' : 'Create & Add'}
+              </button>
+              <button 
+                type="button"
+                className="secondary"
+                onClick={() => setShowNewProjectForm(false)}
+                disabled={saving}
+              >
+                Cancel
+              </button>
+            </div>
+          </form>
+        ) : (
+          <div className="space-y-4">
+            <div className="flex items-center gap-4">
+              <div className="relative flex-1">
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Search projects..."
+                  className="search-input w-full h-10 bg-[#111111] rounded-md"
+                />
+                <Search className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" size={20} />
+              </div>
+              <button
+                onClick={() => setShowNewProjectForm(true)}
+                className="h-10 px-4 rounded-md bg-[#111111] hover:bg-[#1A1A1A] text-white flex items-center gap-2 transition-colors"
+              >
+                <Plus size={20} />
+                New Project
+              </button>
+            </div>
+
+            {loading ? (
+              <div className="text-center py-8 text-gray-400">
+                Loading projects...
+              </div>
+            ) : filteredProjects.length === 0 ? (
+              <div className="text-center py-8 text-gray-400">
+                {searchQuery ? 'No matching projects found' : 'No projects found'}
+              </div>
+            ) : (
+              <div className="bg-[#111111] rounded-lg overflow-hidden">
+                <div className="divide-y divide-[#222222]">
+                  {filteredProjects.map((project) => (
+                    <div
+                      key={project.id}
+                      className="flex items-center gap-4 p-4 hover:bg-[#1A1A1A] transition-colors"
+                    >
+                      <div className="w-10 h-10 rounded-lg bg-[#1A1A1A] overflow-hidden flex-shrink-0">
+                        <img 
+                          src={getProjectImage(project)}
+                          alt={project.name}
+                          className="w-full h-full object-cover"
+                          onError={(e) => {
+                            const target = e.target as HTMLImageElement;
+                            target.src = `https://api.dicebear.com/7.x/shapes/svg?seed=${project.name}&backgroundColor=111111`;
+                          }}
+                        />
+                      </div>
+                      
+                      <div className="flex-1 min-w-0">
+                        <h3 className="font-medium text-[15px] text-white">{project.name}</h3>
+                        {project.description && (
+                          <p className="text-sm text-gray-400 truncate">
+                            {project.description}
+                          </p>
+                        )}
+                      </div>
+
+                      <button
+                        onClick={() => handleAddToProject(project.id)}
+                        disabled={saving}
+                        className="bg-[#2B543A] hover:bg-[#1F3C2A] text-white h-8 w-8 rounded-md flex items-center justify-center transition-colors flex-shrink-0"
+                        title="Add to this project"
+                      >
+                        +
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    </Modal>
+  );
+}
+
+export default AddToProjectModal;
