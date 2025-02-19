@@ -180,7 +180,7 @@ export async function analyzeSubredditData(
   try {
     // Step 1: Prepare data
     onProgress({
-      status: 'Preparing data for analysis...',
+      status: 'Initializing analysis...',
       progress: 20,
       indeterminate: false
     });
@@ -188,23 +188,41 @@ export async function analyzeSubredditData(
     const input = prepareAnalysisInput(info, posts);
     const engagement = calculateEngagementMetrics(posts);
 
+    onProgress({
+      status: 'Analyzing engagement metrics...',
+      progress: 35,
+      indeterminate: false
+    });
+
     if (!engagement) {
       throw new Error('Not enough post data for analysis');
     }
 
     // Step 2: AI Analysis
     onProgress({
-      status: 'Analyzing subreddit patterns...',
-      progress: 40,
+      status: 'Processing posting patterns...',
+      progress: 50,
       indeterminate: false
     });
 
     const aiAnalysis = await analyzeSubreddit(input);
 
+    onProgress({
+      status: 'Generating content strategy...',
+      progress: 65,
+      indeterminate: false
+    });
+
+    onProgress({
+      status: 'Finalizing recommendations...',
+      progress: 80,
+      indeterminate: false
+    });
+
     // Step 3: Transform results
     onProgress({
-      status: 'Processing results...',
-      progress: 80,
+      status: 'Compiling analysis report...',
+      progress: 90,
       indeterminate: false
     });
 

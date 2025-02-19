@@ -22,8 +22,8 @@ export interface SubredditInfo {
   description: string;
   created_utc: number;
   over18: boolean;
-  icon_img: string;
-  community_icon: string;
+  icon_img: string | null;
+  community_icon: string | null;
   rules: Array<{
     title: string;
     description: string;
@@ -33,12 +33,24 @@ export interface SubredditInfo {
 export interface SubredditPost {
   id: string;
   title: string;
+  subreddit: string;
   author: string;
   created_utc: number;
   score: number;
   num_comments: number;
   url: string;
   selftext: string;
+  thumbnail?: string;
+}
+
+export interface SubredditFrequency {
+  name: string;
+  count: number;
+  subscribers: number;
+  active_users: number;
+  icon_img: string | null;
+  community_icon: string | null;
+  lastPosts: SubredditPost[];
 }
 
 export class RedditAPIError extends Error {
@@ -58,6 +70,83 @@ class RedditAPI {
   private expiresAt: number = 0;
   private retryCount: number = 0;
   private readonly MAX_RETRIES = 3;
+
+  parseUsername(input: string): string {
+    if (!input || typeof input !== 'string') {
+      return '';
+    }
+
+    const cleaned = input.trim();
+    if (!cleaned) {
+      return '';
+    }
+
+    // Handle full Reddit profile URLs
+    const urlMatch = cleaned.match(/(?:https?:\/\/)?(?:www\.)?reddit\.com\/(?:user|u)\/([^/?#]+)/i);
+    if (urlMatch) {
+      return urlMatch[1].toLowerCase();
+    }
+
+    // Handle u/username format
+    const withoutPrefix = cleaned.replace(/^\/?(u\/)?/i, '').split(/[/?#]/)[0];
+    return withoutPrefix.toLowerCase();
+  }
+
+  async analyzePostFrequency(posts: SubredditPost[]): Promise<SubredditFrequency[]> {
+    // Group posts by subreddit
+    // Count posts per subreddit
+    const frequencies = new Map<string, {
+      count: number;
+      posts: SubredditPost[];
+    }>();
+
+    // Count posts and collect top posts for each subreddit
+    posts.forEach(post => {
+      const current = frequencies.get(post.subreddit) || { count: 0, posts: [] };
+      frequencies.set(post.subreddit, {
+        count: current.count + 1,
+        posts: [...current.posts, post]
+          .sort((a, b) => b.score - a.score)
+          .slice(0, 5)
+      });
+    });
+
+    // Sort subreddits by post count and limit to top 20
+    const sortedSubreddits = Array.from(frequencies.entries())
+      .sort((a, b) => b[1].count - a[1].count)
+      .slice(0, 20);
+
+    // Fetch subreddit info sequentially to avoid rate limits
+    const results = [];
+    for (const [subreddit, { count, posts }] of sortedSubreddits) {
+      try {
+        const data = await this.request(`/r/${subreddit}/about.json`);
+        
+        if (!data.data) {
+          throw new RedditAPIError('Invalid response from Reddit API', 0, 'about');
+        }
+
+        const info = data.data;
+        results.push({
+          name: info.display_name,
+          count,
+          subscribers: info.subscribers || 0,
+          active_users: info.active_user_count || 0,
+          icon_img: this.cleanImageUrl(info.icon_img),
+          community_icon: this.cleanImageUrl(info.community_icon),
+          lastPosts: posts
+        });
+
+        // Add a small delay between requests
+        await new Promise(resolve => setTimeout(resolve, 100));
+      } catch (error) {
+        console.error(`Error fetching info for r/${subreddit}:`, error);
+        // Continue with next subreddit
+      }
+    }
+
+    return results;
+  }
 
   async setAuth(auth: RedditAuth) {
     this.accessToken = auth.accessToken;
@@ -203,21 +292,17 @@ class RedditAPI {
       .trim();
   }
 
-  private getSubredditIcon(info: any): { icon_img: string; community_icon: string } {
-    let icon_img = '';
-    let community_icon = '';
-
-    // Try to get community icon first
-    if (info.community_icon) {
-      community_icon = info.community_icon.split('?')[0]; // Remove query parameters
-    }
-
-    // Fallback to icon_img if no community icon
-    if (info.icon_img) {
-      icon_img = info.icon_img.split('?')[0]; // Remove query parameters
-    }
-
-    return { icon_img, community_icon };
+  private cleanImageUrl(url: string | null): string | null {
+    if (!url) return null;
+    
+    // Remove query parameters
+    const cleanUrl = url.split('?')[0];
+    
+    // Handle special cases
+    if (cleanUrl.includes('reddit_default')) return null;
+    if (cleanUrl.includes('default-icon')) return null;
+    
+    return cleanUrl;
   }
 
   async getSubredditInfo(subreddit: string): Promise<SubredditInfo> {
@@ -229,7 +314,6 @@ class RedditAPI {
       }
 
       const info = data.data;
-      const { icon_img, community_icon } = this.getSubredditIcon(info);
 
       // Get subreddit rules
       const rulesData = await this.request(`/r/${subreddit}/about/rules.json`);
@@ -237,6 +321,10 @@ class RedditAPI {
         title: this.decodeHtmlEntities(rule.short_name || rule.title),
         description: this.decodeHtmlEntities(rule.description || '')
       })) || [];
+
+      // Clean and validate icons
+      const icon_img = this.cleanImageUrl(info.icon_img);
+      const community_icon = this.cleanImageUrl(info.community_icon);
 
       return {
         name: info.display_name,
@@ -307,7 +395,9 @@ class RedditAPI {
       return data.data.children
         .filter((child: any) => child.data)
         .map((child: any) => {
-          const { icon_img, community_icon } = this.getSubredditIcon(child.data);
+          const icon_img = this.cleanImageUrl(child.data.icon_img);
+          const community_icon = this.cleanImageUrl(child.data.community_icon);
+
           return {
             name: child.data.display_name,
             title: this.decodeHtmlEntities(child.data.title || child.data.display_name),
@@ -327,6 +417,46 @@ class RedditAPI {
         'Failed to search subreddits',
         0,
         'search'
+      );
+    }
+  }
+
+  async getUserPosts(username: string): Promise<UserPost[]> {
+    try {
+      const response = await fetch(`https://www.reddit.com/user/${username}/submitted.json?limit=100`);
+      
+      if (!response.ok) {
+        throw new RedditAPIError(
+          response.status === 404 ? 'User not found' : 'Failed to fetch user posts',
+          response.status,
+          'user_posts'
+        );
+      }
+
+      const data = await response.json();
+      
+      if (!data.data?.children) {
+        throw new RedditAPIError('Invalid response from Reddit API', 0, 'user_posts');
+      }
+
+      return data.data.children
+        .filter((child: any) => child.data)
+        .map((child: any) => ({
+          id: child.data.id,
+          title: this.decodeHtmlEntities(child.data.title),
+          subreddit: child.data.subreddit,
+          created_utc: child.data.created_utc,
+          score: child.data.score,
+          num_comments: child.data.num_comments,
+          url: child.data.url,
+          selftext: this.cleanMarkdown(this.decodeHtmlEntities(child.data.selftext || ''))
+        }));
+    } catch (error) {
+      if (error instanceof RedditAPIError) throw error;
+      throw new RedditAPIError(
+        'Failed to analyze user. Please check the username and try again.',
+        0,
+        'user_posts'
       );
     }
   }

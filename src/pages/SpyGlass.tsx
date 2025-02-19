@@ -1,11 +1,12 @@
-import React, { useState } from 'react';
-import { Search, Telescope, BookmarkCheck, FolderPlus, ChevronDown, ChevronUp, ExternalLink, AlertTriangle, Check, Users, MessageCircle, Calendar, Activity } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Search, Telescope, Bookmark, FolderPlus, ChevronDown, ChevronUp, ExternalLink, AlertTriangle, Check, Users, MessageCircle, Calendar, Activity } from 'lucide-react';
 import { redditApi, UserPost, SubredditFrequency } from '../lib/redditApi';
 import { supabase } from '../lib/supabase';
 import { useNavigate } from 'react-router-dom';
 import ProgressBar from '../components/ProgressBar';
 import AddToProjectModal from '../components/AddToProjectModal';
 import CreateProjectModal from '../components/CreateProjectModal';
+import { useCallback } from 'react';
 import { getSubredditInfo, getSubredditPosts } from '../lib/reddit';
 import { analyzeSubredditData } from '../lib/analysis';
 
@@ -16,9 +17,12 @@ interface AnalysisProgress {
 }
 
 interface SaveStatus {
-  type: 'success' | 'error';
-  message: string;
-  subreddit?: string;
+  subreddits: Record<string, {
+    type: 'success' | 'error';
+    message: string;
+    saving: boolean;
+    saved: boolean;
+  }>;
 }
 
 function SpyGlass() {
@@ -29,10 +33,23 @@ function SpyGlass() {
   const [frequencies, setFrequencies] = useState<SubredditFrequency[]>([]);
   const [expandedSubreddit, setExpandedSubreddit] = useState<string | null>(null);
   const [selectedSubreddit, setSelectedSubreddit] = useState<{id: string; name: string} | null>(null);
-  const [saveStatus, setSaveStatus] = useState<SaveStatus | null>(null);
+  const [saveStatus, setSaveStatus] = useState<SaveStatus>({ subreddits: {} });
   const [savingAll, setSavingAll] = useState(false);
   const [showCreateProject, setShowCreateProject] = useState(false);
+  const [notificationQueue, setNotificationQueue] = useState<string[]>([]);
   const navigate = useNavigate();
+
+  // Process notification queue
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setNotificationQueue(prev => {
+        if (prev.length === 0) return prev;
+        return prev.slice(1);
+      });
+    }, 3000);
+
+    return () => clearInterval(timer);
+  }, []);
 
   const handleAnalyze = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -42,16 +59,22 @@ function SpyGlass() {
     setError(null);
     setFrequencies([]);
     setProgress({
-      status: 'Fetching user posts...',
+      status: 'Validating username...',
       progress: 20,
       indeterminate: false
     });
 
     try {
-      const cleanUsername = redditApi.parseUsername(username);
+      const cleanUsername = redditApi.parseUsername(username.trim());
       if (!cleanUsername) {
         throw new Error('Please enter a valid Reddit username');
       }
+
+      setProgress({
+        status: 'Fetching user posts...',
+        progress: 40,
+        indeterminate: false
+      });
 
       const posts = await redditApi.getUserPosts(cleanUsername);
       if (posts.length === 0) {
@@ -60,7 +83,7 @@ function SpyGlass() {
 
       setProgress({
         status: 'Analyzing posting patterns...',
-        progress: 60,
+        progress: 80,
         indeterminate: false
       });
 
@@ -73,7 +96,6 @@ function SpyGlass() {
         indeterminate: false
       });
     } catch (err) {
-      console.error('Error analyzing user:', err);
       setError(err instanceof Error ? err.message : 'Failed to analyze user');
     } finally {
       setLoading(false);
@@ -148,44 +170,114 @@ function SpyGlass() {
     }
   };
 
+  const clearSaveStatus = useCallback((subredditName: string) => {
+    setSaveStatus(prev => ({
+      subreddits: {
+        ...prev.subreddits,
+        [subredditName]: undefined
+      }
+    }));
+  }, []);
+
   const handleSaveSubreddit = async (subredditName: string) => {
-    setSaveStatus(null);
+    if (savingAll || saveStatus.subreddits[subredditName]?.saving) return;
+
+    setSaveStatus(prev => ({
+      subreddits: {
+        ...prev.subreddits,
+        [subredditName]: {
+          type: 'success', 
+          message: 'Saving...', 
+          saving: true,
+          saved: false
+        }
+      }
+    }));
+    
     try {
       await saveSubreddit(subredditName);
-      setSaveStatus({
-        type: 'success',
-        message: 'Subreddit saved successfully',
-        subreddit: subredditName
-      });
-      setTimeout(() => setSaveStatus(null), 3000);
+      setSaveStatus(prev => ({
+        subreddits: {
+          ...prev.subreddits,
+          [subredditName]: {
+            type: 'success',
+            message: 'Saved successfully',
+            saving: false,
+            saved: true
+          }
+        }
+      }));
     } catch (err) {
-      setSaveStatus({
-        type: 'error',
-        message: 'Failed to save subreddit',
-        subreddit: subredditName
-      });
+      setSaveStatus(prev => ({
+        subreddits: {
+          ...prev.subreddits,
+          [subredditName]: {
+            type: 'error',
+            message: 'Failed to save',
+            saving: false,
+            saved: false
+          }
+        }
+      }));
+      
+      // Clear error status after 3 seconds
+      setTimeout(() => clearSaveStatus(subredditName), 3000);
     }
   };
 
   const handleAddToProject = async (subredditName: string) => {
-    setSaveStatus(null);
+    if (savingAll || saveStatus.subreddits[subredditName]?.saving) return;
+
+    // Clear any existing error for this subreddit
+    setSaveStatus(prev => ({
+      subreddits: {
+        ...prev.subreddits,
+        [subredditName]: {
+          saving: true,
+          saved: false
+        }
+      }
+    }));
+    
     try {
       const subreddit = await saveSubreddit(subredditName);
       setSelectedSubreddit({
         id: subreddit.id,
         name: subreddit.name
       });
+
+      setSaveStatus(prev => ({
+        subreddits: {
+          ...prev.subreddits,
+          [subredditName]: {
+            type: 'success',
+            message: 'Added to project',
+            saving: false,
+            saved: true
+          }
+        }
+      }));
     } catch (err) {
-      setSaveStatus({
-        type: 'error',
-        message: 'Failed to add to project',
-        subreddit: subredditName
-      });
+      setSaveStatus(prev => ({
+        subreddits: {
+          ...prev.subreddits,
+          [subredditName]: {
+            type: 'error',
+            message: 'Failed to add to project',
+            saving: false,
+            saved: false
+          }
+        }
+      }));
+
+      // Clear error status after 3 seconds
+      setTimeout(() => clearSaveStatus(subredditName), 3000);
     }
   };
 
   const handleSaveAll = async () => {
     if (savingAll) return;
+    setSavingAll(true);
     setShowCreateProject(true);
   };
 
@@ -194,8 +286,8 @@ function SpyGlass() {
     description: string | null; 
     image_url: string | null 
   }) => {
-    setSavingAll(true);
-    setSaveStatus(null);
+    setSaveStatus({ subreddits: {} });
+    setShowCreateProject(false);
     
     try {
       // Create new project
@@ -214,36 +306,49 @@ function SpyGlass() {
       if (!project) throw new Error('Failed to create project');
 
       // Save all subreddits
-      const savedSubreddits = await Promise.all(
-        frequencies.map(async (freq) => {
-          const subreddit = await saveSubreddit(freq.name);
-          
-          // Add to project
-          await supabase
-            .from('project_subreddits')
-            .insert({
-              project_id: project.id,
-              subreddit_id: subreddit.id
-            });
+      // Save subreddits sequentially to avoid overwhelming the API
+      const savedSubreddits = [];
+      for (const freq of frequencies) {
+        const subreddit = await saveSubreddit(freq.name);
+        
+        // Add to project
+        await supabase
+          .from('project_subreddits')
+          .insert({
+            project_id: project.id,
+            subreddit_id: subreddit.id
+          });
 
-          return subreddit;
-        })
-      );
+        savedSubreddits.push(subreddit);
+      }
 
       setSaveStatus({
-        type: 'success',
-        message: `Saved ${savedSubreddits.length} subreddits to new project`
+        subreddits: {
+          all: {
+            type: 'success',
+            message: `Saved ${savedSubreddits.length} subreddits to new project`,
+            saving: false,
+            saved: true
+          }
+        }
       });
 
       // Navigate to new project
       navigate(`/projects/${project.id}`);
     } catch (err) {
       setSaveStatus({
-        type: 'error',
-        message: 'Failed to save subreddits to project'
+        subreddits: {
+          all: {
+            type: 'error',
+            message: 'Failed to save subreddits to project',
+            saving: false,
+            saved: false
+          }
+        }
       });
     } finally {
       setSavingAll(false);
+      setShowCreateProject(false);
     }
   };
 
@@ -321,29 +426,38 @@ function SpyGlass() {
         </div>
       )}
 
-      {saveStatus && (
-        <div className={`p-4 ${
-          saveStatus.type === 'success' 
-            ? 'bg-green-900/30 text-green-400' 
-            : 'bg-red-900/30 text-red-400'
-        } rounded-lg flex items-center gap-2`}>
-          {saveStatus.type === 'success' ? (
-            <Check size={20} className="shrink-0" />
-          ) : (
-            <AlertTriangle size={20} className="shrink-0" />
-          )}
-          <p>
-            {saveStatus.subreddit ? (
-              <>
-                <span className="font-medium">r/{saveStatus.subreddit}:</span>{' '}
-                {saveStatus.message}
-              </>
-            ) : (
-              saveStatus.message
-            )}
-          </p>
-        </div>
-      )}
+      <div className="fixed top-4 right-4 z-50 pointer-events-none">
+        {Object.entries(saveStatus.subreddits)
+          .filter(([_, status]) => status && !status.saving)
+          .sort((a, b) => b[1].timestamp - a[1].timestamp)
+          .slice(0, 1)
+          .map(([key, status]) => (
+            <div 
+              key={key}
+              className={`p-4 ${
+                status.type === 'success' 
+                  ? 'bg-green-900/30 text-green-400' 
+                  : 'bg-red-900/30 text-red-400'
+              } rounded-lg flex items-center gap-2 backdrop-blur-sm shadow-lg animate-fade-in`}
+            >
+              {status.type === 'success' ? (
+                <Check size={20} className="shrink-0" />
+              ) : (
+                <AlertTriangle size={20} className="shrink-0" />
+              )}
+              <p>
+                {key !== 'all' ? (
+                  <>
+                    <span className="font-medium">r/{key}:</span>{' '}
+                    {status.message}
+                  </>
+                ) : (
+                  status.message
+                )}
+              </p>
+            </div>
+          ))}
+      </div>
 
       {progress && (
         <div className="bg-[#111111] p-4 rounded-lg">
@@ -420,26 +534,40 @@ function SpyGlass() {
                     <div className="flex items-center gap-2">
                       <button
                         onClick={() => handleSaveSubreddit(freq.name)}
-                        className="secondary flex items-center gap-2 h-8 px-3 text-sm"
-                        disabled={savingAll}
+                        className={`secondary flex items-center gap-2 h-8 px-3 text-sm disabled:opacity-50 ${
+                          saveStatus.subreddits[freq.name]?.saved ? 'saved' : ''
+                        }`}
+                        title={saveStatus.subreddits[freq.name]?.saved ? 'Saved to List' : 'Save to List'}
+                        disabled={savingAll || saveStatus.subreddits[freq.name]?.saving}
                       >
-                        <BookmarkCheck size={16} />
-                        Save
+                        <div className="w-5 flex justify-center">
+                          {saveStatus.subreddits[freq.name]?.saved ? (
+                            <Check size={16} />
+                          ) : (
+                            <Bookmark size={16} />
+                          )}
+                        </div>
+                        <span className="w-8 text-center">Save</span>
                       </button>
                       <button
                         onClick={() => handleAddToProject(freq.name)}
-                        className="secondary flex items-center gap-2 h-8 px-3 text-sm"
-                        disabled={savingAll}
+                        className={`secondary flex items-center gap-2 h-8 px-3 text-sm disabled:opacity-50 ${
+                          saveStatus.subreddits[freq.name]?.saved ? 'added' : ''
+                        }`}
+                        title={saveStatus.subreddits[freq.name]?.saved ? 'Added to Project' : 'Add to Project'}
+                        disabled={savingAll || saveStatus.subreddits[freq.name]?.saving}
                       >
-                        <FolderPlus size={16} />
-                        Add to Project
+                        <div className="w-5 flex justify-center">
+                          <FolderPlus size={16} />
+                        </div>
+                        <span className="w-20 text-center">Add to Project</span>
                       </button>
                       <button
                         onClick={() => setExpandedSubreddit(
                           expandedSubreddit === freq.name ? null : freq.name
                         )}
-                        className="text-gray-400 hover:text-white p-2 rounded-full hover:bg-white/10"
-                        disabled={savingAll}
+                        className="text-gray-400 hover:text-white p-2 rounded-full hover:bg-white/10 disabled:opacity-50 disabled:hover:bg-transparent transition-colors"
+                        disabled={savingAll || saveStatus.subreddits[freq.name]?.saving}
                       >
                         {expandedSubreddit === freq.name ? (
                           <ChevronUp size={20} />

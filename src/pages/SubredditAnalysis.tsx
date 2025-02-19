@@ -51,7 +51,7 @@ function SubredditAnalysis({ analysis }: SubredditAnalysisProps) {
       link: "bg-[#4A3B69] text-white",
       video: "bg-[#1E3A5F] text-white"
     };
-    return styles[type.toLowerCase()] || "bg-gray-600 text-white";
+    return `${styles[type.toLowerCase()] || "bg-gray-600"} px-2.5 py-0.5 rounded-full text-xs font-medium`;
   };
 
   const getMarketingImpactStyle = (impact: 'high' | 'medium' | 'low') => {
@@ -236,24 +236,24 @@ function SubredditAnalysis({ analysis }: SubredditAnalysisProps) {
   return (
     <div className="bg-[#111111] rounded-lg shadow-xl overflow-hidden">
       {/* Header */}
-      <div className="p-6 border-b border-gray-800">
+      <div className="p-4 md:p-6 border-b border-gray-800">
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <h1 className="text-2xl font-semibold">r/{info.name}</h1>
-            <div className="flex items-center gap-2 text-gray-400">
+          <div className="flex flex-col md:flex-row md:items-center gap-2 md:gap-4">
+            <h1 className="text-xl md:text-2xl font-semibold">r/{info.name}</h1>
+            <div className="flex items-center gap-2 text-sm md:text-base text-gray-400">
               <Users className="h-4 w-4" />
               <span>{formatNumber(info.subscribers)}</span>
               <Activity className="h-4 w-4 ml-2" />
               <span>{formatNumber(info.active_users)} online</span>
             </div>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 ml-4 flex-shrink-0">
             <span className="px-3 py-1 rounded-full bg-gradient-to-r from-[#C69B7B] to-[#E6B17E] text-white text-sm font-medium">
               {marketingFriendliness.score}% Marketing-Friendly
             </span>
             <button 
               onClick={toggleSaved}
-              className="secondary flex items-center gap-2 h-9 px-3"
+              className="secondary flex items-center gap-2 h-9 px-3 text-sm md:text-base"
               disabled={savingState === 'saving'}
             >
               {isSaved ? (
@@ -272,7 +272,7 @@ function SubredditAnalysis({ analysis }: SubredditAnalysisProps) {
         </div>
       </div>
 
-      <div className="p-6 space-y-8">
+      <div className="p-4 md:p-6 space-y-8">
         {/* Marketing Friendliness Meter */}
         <div>
           <div className="flex justify-between text-sm text-gray-400 mb-2">
@@ -280,10 +280,12 @@ function SubredditAnalysis({ analysis }: SubredditAnalysisProps) {
             <span>Marketing Friendly</span>
           </div>
           <div className="h-2 bg-[#1A1A1A] rounded-full overflow-hidden">
-            <div 
-              className="h-full bg-gradient-to-r from-[#C69B7B] via-[#E6B17E] to-[#4CAF50] transition-all duration-500"
-              style={{ width: `${marketingFriendliness.score}%` }}
-            />
+            <div className="h-full transition-all duration-500" style={{
+              width: `${marketingFriendliness.score}%`,
+              backgroundColor: marketingFriendliness.score >= 80 ? '#4CAF50' :
+                             marketingFriendliness.score >= 60 ? '#FFA726' :
+                             '#EF5350'
+            }} />
           </div>
           <div className="mt-2 text-sm text-gray-400">
             {marketingFriendliness.reasons[0]}
@@ -291,7 +293,7 @@ function SubredditAnalysis({ analysis }: SubredditAnalysisProps) {
         </div>
 
         {/* Main Grid */}
-        <div className="grid grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {/* Posting Requirements */}
           <div className="space-y-3">
             <div className="flex items-center gap-2">
@@ -360,7 +362,7 @@ function SubredditAnalysis({ analysis }: SubredditAnalysisProps) {
         </div>
 
         {/* Game Plan */}
-        <div className="bg-[#0A0A0A] rounded-lg overflow-hidden border border-gray-800">
+        <div className="bg-[#0A0A0A] rounded-lg overflow-hidden border border-gray-800 text-sm md:text-base">
           <div className="p-4 border-b border-gray-800">
             <div className="flex items-center gap-2">
               <Brain className="h-5 w-5 text-[#C69B7B]" />
@@ -386,7 +388,7 @@ function SubredditAnalysis({ analysis }: SubredditAnalysisProps) {
             </div>
 
             {/* Action Items */}
-            <div className="grid grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
                 <h4 className="text-sm text-gray-400 mb-3">Immediate Actions</h4>
                 <ul className="space-y-2 text-gray-300 text-sm">
@@ -412,7 +414,7 @@ function SubredditAnalysis({ analysis }: SubredditAnalysisProps) {
             </div>
 
             {/* Do's and Don'ts */}
-            <div className="grid grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
                 <h4 className="text-sm text-gray-400 mb-3">Do's</h4>
                 <ul className="space-y-2 text-gray-300 text-sm">

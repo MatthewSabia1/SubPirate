@@ -9,12 +9,12 @@ interface ProgressBarProps {
 function ProgressBar({ progress, status, indeterminate = false }: ProgressBarProps) {
   return (
     <div className="space-y-2">
-      <div className="h-1 bg-[#111111] rounded-full overflow-hidden">
+      <div className="h-2 bg-[#111111] rounded-full overflow-hidden">
         <div 
           className={`h-full transition-all duration-500 ease-out ${
             indeterminate 
-              ? 'bg-gradient-to-r from-[#C69B7B] via-[#E6B17E] to-[#C69B7B] bg-[length:200%_100%] animate-gradient'
-              : 'bg-[#C69B7B]'
+              ? 'bg-gradient-to-r from-[#2B543A] via-[#4CAF50] to-[#2B543A] bg-[length:200%_100%] animate-gradient'
+              : 'bg-[#4CAF50]'
           }`}
           style={{ 
             width: `${indeterminate ? '100' : progress}%`,
@@ -24,7 +24,7 @@ function ProgressBar({ progress, status, indeterminate = false }: ProgressBarPro
       <div className="flex justify-between items-center text-sm">
         <span className="text-gray-400">{status}</span>
         {!indeterminate && (
-          <span className="text-[#C69B7B] font-medium">{Math.round(progress)}%</span>
+          <span className="text-[#4CAF50] font-medium">{Math.round(progress)}%</span>
         )}
       </div>
     </div>

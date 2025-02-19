@@ -33,6 +33,25 @@ export function parseSubredditName(input: string): string {
   return withoutPrefix.toLowerCase();
 }
 
+export function cleanRedditImageUrl(url: string | null): string | null {
+  if (!url) return null;
+  
+  // Handle Reddit's special URL formats
+  if (url.includes('?')) {
+    // Keep the first query parameter for Reddit image URLs that require it
+    const [baseUrl, query] = url.split('?');
+    const firstParam = query.split('&')[0];
+    return `${baseUrl}?${firstParam}`;
+  }
+  
+  // Handle special cases
+  if (url.includes('reddit_default')) return null;
+  if (url.includes('default-icon')) return null;
+  if (url.includes('styles/')) return null;
+  
+  return url;
+}
+
 export async function getSubredditInfo(subreddit: string): Promise<SubredditInfo> {
   const cleanSubreddit = parseSubredditName(subreddit);
   

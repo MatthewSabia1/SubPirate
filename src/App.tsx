@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import Sidebar from './components/Sidebar';
@@ -10,9 +10,11 @@ import Projects from './pages/Projects';
 import ProjectView from './pages/ProjectView';
 import SavedList from './pages/SavedList';
 import SpyGlass from './pages/SpyGlass';
+import { Menu } from 'lucide-react';
 
 function PrivateRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   if (loading) {
     return <div>Loading...</div>;
@@ -24,8 +26,27 @@ function PrivateRoute({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="flex">
-      <Sidebar />
-      <main className="flex-1 ml-[240px] p-8">
+      <Sidebar isMobileOpen={isSidebarOpen} onMobileClose={() => setIsSidebarOpen(false)} />
+      
+      {/* Mobile overlay */}
+      {isSidebarOpen && (
+        <div 
+          className="fixed inset-0 bg-black/50 md:hidden z-20"
+          onClick={() => setIsSidebarOpen(false)}
+        />
+      )}
+      
+      {/* Mobile header */}
+      <div className="fixed top-0 left-0 right-0 h-16 bg-[#111111] border-b border-[#333333] md:hidden z-10 flex items-center px-4">
+        <button
+          onClick={() => setIsSidebarOpen(true)}
+          className="text-gray-400 hover:text-white p-2 -ml-2 rounded-full hover:bg-white/10"
+        >
+          <Menu size={24} />
+        </button>
+      </div>
+      
+      <main className="flex-1 md:ml-[240px] p-4 md:p-8 mt-16 md:mt-0">
         {children}
       </main>
     </div>

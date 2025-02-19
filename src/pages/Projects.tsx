@@ -93,10 +93,11 @@ function Projects() {
   return (
     <div className="p-8">
       <div className="flex items-center justify-between mb-8">
-        <h1 className="text-4xl font-bold">Projects</h1>
-        <button className="primary flex items-center gap-2">
+        <h1 className="text-2xl md:text-4xl font-bold">Projects</h1>
+        <button className="primary flex items-center gap-2 text-sm md:text-base">
           <Plus size={20} />
-          New Project
+          <span className="hidden md:inline">New Project</span>
+          <span className="md:hidden">New</span>
         </button>
       </div>
 
@@ -146,31 +147,31 @@ function Projects() {
                   )}
                 </div>
 
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1 md:gap-2">
                   <button 
                     onClick={() => openShareModal(project)}
-                    className="text-gray-400 hover:text-white p-2 rounded-full hover:bg-white/10"
+                    className="text-gray-400 hover:text-white p-1.5 md:p-2 rounded-full hover:bg-white/10"
                     title="Share Project"
                   >
                     <Share2 size={20} />
                   </button>
                   <button 
                     onClick={() => openSettingsModal(project)}
-                    className="text-gray-400 hover:text-white p-2 rounded-full hover:bg-white/10"
+                    className="text-gray-400 hover:text-white p-1.5 md:p-2 rounded-full hover:bg-white/10"
                     title="Project Settings"
                   >
                     <Settings size={20} />
                   </button>
                   <button 
                     onClick={() => deleteProject(project.id)}
-                    className="text-gray-400 hover:text-white p-2 rounded-full hover:bg-white/10"
+                    className="text-gray-400 hover:text-white p-1.5 md:p-2 rounded-full hover:bg-white/10"
                     title="Delete Project"
                   >
                     <Trash2 size={20} />
                   </button>
                   <button 
                     onClick={() => navigate(`/projects/${project.id}`)}
-                    className="text-gray-400 hover:text-white p-2 rounded-full hover:bg-white/10"
+                    className="text-gray-400 hover:text-white p-1.5 md:p-2 rounded-full hover:bg-white/10"
                     title="View Project"
                   >
                     <ChevronRight size={20} />

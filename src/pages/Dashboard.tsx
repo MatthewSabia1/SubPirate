@@ -137,7 +137,7 @@ function Dashboard() {
     <div className="max-w-[1200px] mx-auto px-8 space-y-8">
       {/* Analyze Specific Subreddit */}
       <div>
-        <h2 className="text-2xl font-semibold mb-6">Analyze Specific Subreddit</h2>
+        <h2 className="text-xl md:text-2xl font-semibold mb-6">Analyze Specific Subreddit</h2>
         <form onSubmit={handleAnalyzeSubreddit} className="space-y-4">
           <div className="relative">
             <input 
@@ -145,7 +145,7 @@ function Dashboard() {
               value={subredditInput}
               onChange={(e) => setSubredditInput(e.target.value)}
               placeholder="Enter subreddit name (with or without r/)"
-              className="w-full h-[52px] bg-[#111111] rounded-lg pl-4 pr-[120px] text-white placeholder-gray-500 border-none focus:ring-1 focus:ring-[#C69B7B]"
+              className="w-full h-12 md:h-[52px] bg-[#111111] rounded-lg pl-4 pr-[120px] text-white placeholder-gray-500 border-none focus:ring-1 focus:ring-[#C69B7B]"
               disabled={analyzing}
             />
             <div className="absolute right-2 top-1/2 -translate-y-1/2">
@@ -188,7 +188,7 @@ function Dashboard() {
 
       {/* Discover Subreddits */}
       <div>
-        <h2 className="text-2xl font-semibold mb-6">Discover Subreddits</h2>
+        <h2 className="text-xl md:text-2xl font-semibold mb-6">Discover Subreddits</h2>
         <div className="space-y-6">
           <form onSubmit={handleSearch}>
             <div className="relative">
@@ -197,7 +197,7 @@ function Dashboard() {
                 value={searchInput}
                 onChange={(e) => setSearchInput(e.target.value)}
                 placeholder="Search subreddits by keywords..."
-                className="w-full h-[52px] bg-[#111111] rounded-lg pl-4 pr-[120px] text-white placeholder-gray-500 border-none focus:ring-1 focus:ring-[#C69B7B]"
+                className="w-full h-12 md:h-[52px] bg-[#111111] rounded-lg pl-4 pr-[120px] text-white placeholder-gray-500 border-none focus:ring-1 focus:ring-[#C69B7B]"
                 disabled={loading}
               />
               <div className="absolute right-2 top-1/2 -translate-y-1/2">

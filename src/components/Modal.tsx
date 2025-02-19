@@ -11,12 +11,12 @@ function Modal({ isOpen, onClose, children }: ModalProps) {
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div 
         className="fixed inset-0 bg-black/70 backdrop-blur-sm"
         onClick={onClose}
       />
-      <div className="relative z-50 w-full max-w-md bg-[#111111] rounded-lg shadow-xl">
+      <div className="relative z-50 w-full max-w-md bg-[#111111] rounded-lg shadow-xl max-h-[90vh] overflow-y-auto">
         <button 
           onClick={onClose}
           className="absolute right-4 top-4 text-gray-400 hover:text-white"

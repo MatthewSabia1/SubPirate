@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { 
   Search, 
   Telescope, 
@@ -10,23 +10,36 @@ import {
   Settings, 
   LogOut,
   Upload,
-  X
+  X,
+  Menu,
+  ChevronLeft
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
 import Logo from './Logo';
+
+interface SidebarProps {
+  isMobileOpen?: boolean;
+  onMobileClose?: () => void;
+}
 
 interface Profile {
   display_name: string | null;
   image_url: string | null;
 }
 
-function Sidebar() {
+function Sidebar({ isMobileOpen, onMobileClose }: SidebarProps) {
   const location = useLocation();
+  const navigate = useNavigate();
   const { user, signOut } = useAuth();
   const [profile, setProfile] = useState<Profile | null>(null);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const handleNavigation = (path: string) => {
+    navigate(path);
+    onMobileClose?.();
+  };
 
   useEffect(() => {
     if (user) {
@@ -152,36 +165,62 @@ function Sidebar() {
   };
 
   return (
-    <div className="sidebar">
+    <div className={`sidebar ${isMobileOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}`}>
       <div className="p-4">
-        <Logo />
+        <div className="flex items-center justify-between">
+          <Logo />
+          <button
+            onClick={onMobileClose}
+            className="md:hidden text-gray-400 hover:text-white p-2 -mr-2 rounded-full hover:bg-white/10"
+          >
+            <ChevronLeft size={24} />
+          </button>
+        </div>
       </div>
       
       <nav className="mt-4">
-        <Link to="/" className={`sidebar-link ${location.pathname === '/' ? 'active' : ''}`}>
+        <button 
+          onClick={() => handleNavigation('/')}
+          className={`sidebar-link w-full text-left ${location.pathname === '/' ? 'active' : ''}`}
+        >
           <Search size={20} />
           Analyze
-        </Link>
-        <Link to="/spyglass" className={`sidebar-link ${location.pathname === '/spyglass' ? 'active' : ''}`}>
+        </button>
+        <button
+          onClick={() => handleNavigation('/spyglass')}
+          className={`sidebar-link w-full text-left ${location.pathname === '/spyglass' ? 'active' : ''}`}
+        >
           <Telescope size={20} />
           SpyGlass
-        </Link>
-        <Link to="/saved" className={`sidebar-link ${location.pathname === '/saved' ? 'active' : ''}`}>
+        </button>
+        <button
+          onClick={() => handleNavigation('/saved')}
+          className={`sidebar-link w-full text-left ${location.pathname === '/saved' ? 'active' : ''}`}
+        >
           <BookmarkCheck size={20} />
           Saved List
-        </Link>
-        <Link to="/calendar" className={`sidebar-link ${location.pathname === '/calendar' ? 'active' : ''}`}>
+        </button>
+        <button
+          onClick={() => handleNavigation('/calendar')}
+          className={`sidebar-link w-full text-left ${location.pathname === '/calendar' ? 'active' : ''}`}
+        >
           <Calendar size={20} />
           Calendar
-        </Link>
-        <Link to="/projects" className={`sidebar-link ${location.pathname === '/projects' ? 'active' : ''}`}>
+        </button>
+        <button
+          onClick={() => handleNavigation('/projects')}
+          className={`sidebar-link w-full text-left ${location.pathname === '/projects' ? 'active' : ''}`}
+        >
           <FolderKanban size={20} />
           Projects
-        </Link>
-        <Link to="/accounts" className={`sidebar-link ${location.pathname === '/accounts' ? 'active' : ''}`}>
+        </button>
+        <button
+          onClick={() => handleNavigation('/accounts')}
+          className={`sidebar-link w-full text-left ${location.pathname === '/accounts' ? 'active' : ''}`}
+        >
           <Users size={20} />
           Reddit Accounts
-        </Link>
+        </button>
       </nav>
 
       <div className="absolute bottom-0 left-0 w-full border-t border-[#333333]">
@@ -234,10 +273,13 @@ function Sidebar() {
             )}
           </div>
         </div>
-        <Link to="/settings" className={`sidebar-link ${location.pathname === '/settings' ? 'active' : ''}`}>
+        <button
+          onClick={() => handleNavigation('/settings')}
+          className={`sidebar-link w-full text-left ${location.pathname === '/settings' ? 'active' : ''}`}
+        >
           <Settings size={20} />
           Settings
-        </Link>
+        </button>
         <button onClick={handleLogout} className="sidebar-link w-full text-left">
           <LogOut size={20} />
           Logout
