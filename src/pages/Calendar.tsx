@@ -1,15 +1,26 @@
 import React, { useState, useEffect } from 'react';
-import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, List, Grid, User, ChevronDown, Globe, FolderKanban, Check, AlertCircle } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, List, Grid, User, ChevronDown, Globe, FolderKanban, Check, AlertCircle, X } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { useClickOutside } from '../hooks/useClickOutside';
+import axios from 'axios';
 
+// Define the RedditPost interface based on the database schema
 interface RedditPost {
   id: string;
   post_id: string;
   created_at: string;
-  reddit_accounts: { username: string };
+  reddit_accounts: { username: string; avatar_url: string | null };
   subreddits: { name: string };
+}
+
+// Define the RedditPostDetails interface for detailed post information from Reddit API
+interface RedditPostDetails {
+  title: string;
+  url: string;
+  selftext: string;
+  score: number;
+  num_comments: number;
 }
 
 interface DayPost {
@@ -31,23 +42,75 @@ interface FilterOption {
   image?: string;
 }
 
-const PostItem = React.memo(({ post }: { post: RedditPost }) => (
-  <div className="bg-[#1A1A1A] p-3 rounded-lg shadow-sm hover:shadow-md hover:bg-[#252525] transition-all duration-200 flex flex-col gap-2">
-    <div className="flex items-center gap-2">
-      <img
-        src={`https://api.dicebear.com/7.x/initials/svg?seed=${post.reddit_accounts.username}&backgroundColor=333333`}
-        alt={post.reddit_accounts.username}
-        className="w-8 h-8 rounded-full"
-      />
-      <div className="flex-1">
-        <span className="text-sm font-semibold text-gray-200 truncate block">u/{post.reddit_accounts.username}</span>
-        <span className="text-sm text-[#C69B7B] truncate block">r/{post.subreddits.name}</span>
+// PostItem component for compact post preview
+const PostItem = React.memo(({ post }: { post: RedditPost }) => {
+  const avatarSrc = post.reddit_accounts.avatar_url || 
+    `https://api.dicebear.com/7.x/initials/svg?seed=${post.reddit_accounts.username}&backgroundColor=333333`;
+  return (
+    <div className="bg-[#1A1A1A] p-3 rounded-lg shadow-sm hover:shadow-md hover:bg-[#252525] transition-all duration-200 flex flex-col gap-2">
+      <div className="flex items-center gap-2">
+        <img src={avatarSrc} alt={post.reddit_accounts.username} className="w-8 h-8 rounded-full" />
+        <div className="flex-1">
+          <span className="text-sm font-semibold text-gray-200 truncate block">u/{post.reddit_accounts.username}</span>
+          <span className="text-sm text-[#C69B7B] truncate block">r/{post.subreddits.name}</span>
+        </div>
       </div>
+      <div className="text-xs italic text-gray-500">{new Date(post.created_at).toLocaleTimeString()}</div>
     </div>
-    <div className="text-xs italic text-gray-500">{new Date(post.created_at).toLocaleTimeString()}</div>
-  </div>
-));
+  );
+});
 
+// ExpandablePostItem component for detailed post view in the modal
+const ExpandablePostItem = ({ post, isExpanded, onToggle, details }: { 
+  post: RedditPost; 
+  isExpanded: boolean; 
+  onToggle: () => void; 
+  details: RedditPostDetails | null 
+}) => {
+  const avatarSrc = post.reddit_accounts.avatar_url || 
+    `https://api.dicebear.com/7.x/initials/svg?seed=${post.reddit_accounts.username}&backgroundColor=333333`;
+  return (
+    <div className="bg-[#1A1A1A] p-3 rounded-lg shadow-sm hover:shadow-md hover:bg-[#252525] transition-all duration-200">
+      <div className="flex items-center gap-2 cursor-pointer" onClick={onToggle}>
+        <img src={avatarSrc} alt={post.reddit_accounts.username} className="w-8 h-8 rounded-full" />
+        <div className="flex-1">
+          <span className="text-sm font-semibold text-gray-200 truncate block">u/{post.reddit_accounts.username}</span>
+          <span className="text-sm text-[#C69B7B] truncate block">r/{post.subreddits.name}</span>
+        </div>
+        <div className="text-xs italic text-gray-500">{new Date(post.created_at).toLocaleTimeString()}</div>
+      </div>
+      {isExpanded && details && (
+        <div className="mt-2 p-2 bg-[#111111] rounded-md">
+          <a
+            href={`https://reddit.com/r/${post.subreddits.name}/comments/${post.post_id}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-md font-bold text-white hover:underline"
+          >
+            {details.title}
+          </a>
+          {details.selftext ? (
+            <p className="text-sm text-gray-300 mt-1">{details.selftext}</p>
+          ) : (
+            <a href={details.url} target="_blank" rel="noopener noreferrer" className="text-sm text-[#C69B7B] hover:underline">
+              {details.url}
+            </a>
+          )}
+          <div className="mt-2 text-xs text-gray-400">
+            <span>Score: {details.score}</span> | <span>Comments: {details.num_comments}</span>
+          </div>
+        </div>
+      )}
+      {isExpanded && !details && (
+        <div className="mt-2 p-2 bg-[#111111] rounded-md">
+          <p className="text-sm text-gray-300">Loading post details...</p>
+        </div>
+      )}
+    </div>
+  );
+};
+
+// Main Calendar component
 function Calendar() {
   const { user } = useAuth();
   const [currentDate, setCurrentDate] = useState(new Date());
@@ -59,53 +122,75 @@ function Calendar() {
   const [subreddits, setSubreddits] = useState<FilterOption[]>([]);
   const [projects, setProjects] = useState<FilterOption[]>([]);
   const [openDropdown, setOpenDropdown] = useState<keyof Filter | null>(null);
+  const [modalDate, setModalDate] = useState<Date | null>(null);
+  const [expandedPostId, setExpandedPostId] = useState<string | null>(null);
+  const [postDetails, setPostDetails] = useState<Record<string, RedditPostDetails>>({});
   const dropdownRef = useClickOutside(() => setOpenDropdown(null));
   const [filters, setFilters] = useState<Filter>(() => {
     const savedFilters = localStorage.getItem('calendarFilters');
     return savedFilters ? JSON.parse(savedFilters) : { accounts: [], subreddits: [], projects: [] };
   });
-  const [expandedDay, setExpandedDay] = useState<string | null>(null);
 
+  // Fetch data when user, date, view, or filters change
   useEffect(() => {
     if (user) {
-      fetchAccounts();
+      fetchRedditAccounts();
       fetchSubreddits();
       fetchProjects();
       fetchPosts();
     }
   }, [user, currentDate, view, filters]);
 
+  // Persist filters to localStorage
   useEffect(() => {
     localStorage.setItem('calendarFilters', JSON.stringify(filters));
   }, [filters]);
 
-  // Fetch Functions
-  const fetchAccounts = async () => {
+  // Fetch post details when modal opens or expandedPostId changes
+  useEffect(() => {
+    if (modalDate) {
+      const postsForDate = getPostsForDate(modalDate);
+      postsForDate.forEach(post => {
+        if (!postDetails[post.id] && !loadingDetails[post.id]) {
+          fetchPostDetails(post);
+        }
+      });
+    }
+  }, [modalDate, expandedPostId]);
+
+  // Track loading state for each post to avoid duplicate fetches
+  const [loadingDetails, setLoadingDetails] = useState<Record<string, boolean>>({});
+
+  // Fetch Reddit accounts
+  const fetchRedditAccounts = async () => {
     try {
       const { data, error } = await supabase
-        .from('profiles')
-        .select('id, display_name, image_url')
+        .from('reddit_accounts')
+        .select('id, username, avatar_url')
         .eq('user_id', user?.id);
+
       if (error) throw error;
-      setAccounts((data || []).map(profile => ({
-        id: profile.id,
-        name: profile.display_name || 'Unnamed User',
-        image: profile.image_url || `https://api.dicebear.com/7.x/initials/svg?seed=${profile.display_name}&backgroundColor=111111`
+      setAccounts((data || []).map(account => ({
+        id: account.id,
+        name: account.username,
+        image: account.avatar_url || `https://api.dicebear.com/7.x/initials/svg?seed=${account.username}&backgroundColor=111111`
       })));
     } catch (err) {
-      console.error('Error fetching accounts:', err);
+      console.error('Error fetching reddit accounts:', err);
     }
   };
 
+  // Fetch subreddits
   const fetchSubreddits = async () => {
     try {
       const { data, error } = await supabase
         .from('saved_subreddits_with_icons')
-        .select('id, name, icon_img, community_icon')
+        .select('subreddit_id, name, icon_img, community_icon')
         .order('name');
+
       if (error) throw error;
       setSubreddits((data || []).map(subreddit => ({
-        id: subreddit.id,
+        id: subreddit.subreddit_id,
         name: subreddit.name,
         image: subreddit.community_icon || subreddit.icon_img || `https://api.dicebear.com/7.x/shapes/svg?seed=${subreddit.name}&backgroundColor=111111`
       })));
@@ -114,6 +199,7 @@ function Calendar() {
     }
   };
 
+  // Fetch projects
   const fetchProjects = async () => {
     try {
       const { data, error } = await supabase
@@ -121,6 +207,7 @@ function Calendar() {
         .select('id, name, image_url')
         .eq('user_id', user?.id)
         .order('name');
+
       if (error) throw error;
       setProjects((data || []).map(project => ({
         id: project.id,
@@ -132,6 +219,7 @@ function Calendar() {
     }
   };
 
+  // Fetch posts from Supabase
   const fetchPosts = async () => {
     setLoading(true);
     try {
@@ -153,19 +241,30 @@ function Calendar() {
 
       let query = supabase
         .from('reddit_posts')
-        .select('id, post_id, created_at, reddit_accounts (username), subreddits (name)')
+        .select(`
+          id,
+          post_id,
+          created_at,
+          reddit_accounts (username, avatar_url),
+          subreddits (name)
+        `)
         .gte('created_at', startDate.toISOString())
         .lt('created_at', endDate.toISOString())
         .order('created_at', { ascending: true });
 
-      if (filters.accounts.length > 0) query = query.in('reddit_accounts.username', filters.accounts);
-      if (filters.subreddits.length > 0) query = query.in('subreddits.name', filters.subreddits);
+      if (filters.accounts.length > 0) {
+        query = query.in('reddit_account_id', filters.accounts);
+      }
+      if (filters.subreddits.length > 0) {
+        query = query.in('subreddit_id', filters.subreddits);
+      }
       if (filters.projects.length > 0) {
         const { data: projectSubreddits } = await supabase
           .from('project_subreddits')
           .select('subreddit_id')
           .in('project_id', filters.projects);
-        query = query.in('subreddits.id', projectSubreddits?.map(ps => ps.subreddit_id) || []);
+        const subredditIds = projectSubreddits?.map(ps => ps.subreddit_id) || [];
+        query = query.in('subreddit_id', subredditIds);
       }
 
       const { data, error } = await query;
@@ -189,7 +288,36 @@ function Calendar() {
     }
   };
 
-  // Navigation and Filter Functions
+  // Fetch post details from Reddit API with deep cloning
+  const fetchPostDetails = async (post: RedditPost) => {
+    setLoadingDetails(prev => ({ ...prev, [post.id]: true }));
+    try {
+      const response = await axios.get(`https://www.reddit.com/r/${post.subreddits.name}/comments/${post.post_id}.json`, {
+        headers: { 'User-Agent': 'Mozilla/5.0' } // Reddit requires a User-Agent
+      });
+      const postData = response.data[0].data.children[0].data;
+      const details: RedditPostDetails = {
+        title: postData.title || 'Untitled',
+        url: postData.url || '',
+        selftext: postData.selftext || '',
+        score: postData.score || 0,
+        num_comments: postData.num_comments || 0,
+      };
+      // Use structuredClone to ensure only serializable data is passed
+      const clonedDetails = structuredClone(details);
+      setPostDetails(prev => ({ ...prev, [post.id]: clonedDetails }));
+    } catch (err) {
+      console.error(`Error fetching details for post ${post.post_id}:`, err);
+      setPostDetails(prev => ({
+        ...prev,
+        [post.id]: { title: 'Error loading post', url: '', selftext: '', score: 0, num_comments: 0 }
+      }));
+    } finally {
+      setLoadingDetails(prev => ({ ...prev, [post.id]: false }));
+    }
+  };
+
+  // Navigation functions
   const navigateDate = (direction: 'prev' | 'next') => {
     const newDate = new Date(currentDate);
     switch (view) {
@@ -202,8 +330,7 @@ function Calendar() {
 
   const goToToday = () => setCurrentDate(new Date());
 
-  const clearFilters = () => setFilters({ accounts: [], subreddits: [], projects: [] });
-
+  // Filter toggle function
   const toggleFilter = (type: keyof Filter, value: string) => {
     setFilters(prev => ({
       ...prev,
@@ -211,7 +338,7 @@ function Calendar() {
     }));
   };
 
-  // Calendar Utilities
+  // Get days for month view
   const getDaysInMonth = (date: Date) => {
     const year = date.getFullYear();
     const month = date.getMonth();
@@ -227,6 +354,7 @@ function Calendar() {
     return days;
   };
 
+  // Get days for week view
   const getDaysInWeek = (date: Date) => {
     const days: Date[] = [];
     const sunday = new Date(date);
@@ -235,24 +363,26 @@ function Calendar() {
     return days;
   };
 
+  // Get posts for a specific date
   const getPostsForDate = (date: Date) => {
     const dayPosts = posts.find(p => p.date.toDateString() === date.toDateString());
     return dayPosts?.posts || [];
   };
 
-  const toggleDayExpansion = (date: Date) => {
-    const dateStr = date.toISOString();
-    setExpandedDay(expandedDay === dateStr ? null : dateStr);
+  // Close modal and reset expanded post
+  const closeModal = () => {
+    setModalDate(null);
+    setExpandedPostId(null);
   };
 
-  // Render Functions
+  // Render month view
   const renderMonthView = () => {
     const days = getDaysInMonth(currentDate);
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
     return (
-      <div className="grid grid-cols-7 gap-px bg-[#222222]">
+      <div className="grid grid-cols-7 gap-px bg-[#222222] relative">
         {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
           <div key={day} className="bg-[#111111] p-2 text-center text-sm text-gray-300 font-semibold sticky top-0 z-10">
             {day}
@@ -262,7 +392,6 @@ function Calendar() {
           const isToday = date.toDateString() === today.toDateString();
           const isCurrentMonth = date.getMonth() === currentDate.getMonth();
           const dayPosts = getPostsForDate(date);
-          const isExpanded = expandedDay === date.toISOString();
           const postsByAccount = dayPosts.reduce<Record<string, number>>((acc, post) => {
             const username = post.reddit_accounts.username;
             acc[username] = (acc[username] || 0) + 1;
@@ -272,7 +401,11 @@ function Calendar() {
           return (
             <div
               key={date.toISOString()}
-              onClick={() => toggleDayExpansion(date)}
+              onClick={() => {
+                if (getPostsForDate(date).length > 0) {
+                  setModalDate(date);
+                }
+              }}
               className={`bg-[#111111] p-2 min-h-[120px] cursor-pointer transition-all duration-200 hover:bg-[#1A1A1A] ${
                 isCurrentMonth ? 'text-white' : 'text-gray-600'
               } ${isToday ? 'shadow-inner ring-2 ring-[#C69B7B] ring-inset' : ''}`}
@@ -285,27 +418,17 @@ function Calendar() {
                   </span>
                 )}
               </div>
-              {!isExpanded && (
-                <div className="space-y-2">
-                  {Object.entries(postsByAccount).slice(0, 2).map(([username, count]) => (
-                    <div key={username} className="flex items-center justify-between bg-[#1A1A1A] p-1.5 rounded-md shadow-sm">
-                      <span className="text-xs text-gray-200 truncate">u/{username}</span>
-                      <span className="text-xs text-[#2B543A]">{count}</span>
-                    </div>
-                  ))}
-                  {Object.keys(postsByAccount).length > 2 && (
-                    <span className="text-xs text-gray-400">+{Object.keys(postsByAccount).length - 2} more</span>
-                  )}
-                </div>
-              )}
-              {isExpanded && (
-                <div className="space-y-2 mt-2">
-                  <div className="text-sm font-medium text-gray-300 border-b border-[#333333] pb-1">
-                    Posts for {date.toLocaleDateString()}
+              <div className="space-y-2">
+                {Object.entries(postsByAccount).slice(0, 2).map(([username, count]) => (
+                  <div key={username} className="flex items-center justify-between bg-[#1A1A1A] p-1.5 rounded-md shadow-sm">
+                    <span className="text-xs text-gray-200 truncate">u/{username}</span>
+                    <span className="text-xs text-[#2B543A]">{count}</span>
                   </div>
-                  {dayPosts.map(post => <PostItem key={post.id} post={post} />)}
-                </div>
-              )}
+                ))}
+                {Object.keys(postsByAccount).length > 2 && (
+                  <span className="text-xs text-gray-400">+{Object.keys(postsByAccount).length - 2} more</span>
+                )}
+              </div>
             </div>
           );
         })}
@@ -313,6 +436,7 @@ function Calendar() {
     );
   };
 
+  // Render week view
   const renderWeekView = () => {
     const days = getDaysInWeek(currentDate);
     const today = new Date();
@@ -341,7 +465,7 @@ function Calendar() {
               const dayPosts = getPostsForDate(date).filter(post => new Date(post.created_at).getHours() === hour);
               return (
                 <div
-                  key={`${date.toISOString()}-${hour}`}
+                  key={date.toISOString() + '-' + hour}
                   className="bg-[#111111] p-2 min-h-[40px] overflow-y-auto hover:bg-[#1A1A1A] transition-all duration-200"
                 >
                   {dayPosts.map(post => <PostItem key={post.id} post={post} />)}
@@ -354,6 +478,7 @@ function Calendar() {
     );
   };
 
+  // Render day view
   const renderDayView = () => {
     const dayPosts = getPostsForDate(currentDate);
     const postsByHour: Record<number, RedditPost[]> = {};
@@ -384,8 +509,8 @@ function Calendar() {
   };
 
   const hasPosts = posts.some(day => day.posts.length > 0);
-  const selectedFilterCount = Object.values(filters).reduce((sum, arr) => sum + arr.length, 0);
 
+  // Get the title based on the current view
   const getDateTitle = () => {
     if (view === 'month') return currentDate.toLocaleString('default', { month: 'long', year: 'numeric' });
     if (view === 'week') {
@@ -399,7 +524,7 @@ function Calendar() {
   };
 
   return (
-    <div className="max-w-[1400px] mx-auto p-4 md:p-8 space-y-6">
+    <div className="max-w-[1400px] mx-auto p-4 md:p-8 space-y-6 relative">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="flex-shrink-0">
           <h1 className="text-2xl md:text-3xl font-bold text-white">Calendar</h1>
@@ -515,14 +640,6 @@ function Calendar() {
                 </div>
               )}
             </div>
-            <button
-              onClick={clearFilters}
-              className="px-4 py-2 border border-[#C69B7B] text-[#C69B7B] rounded-md hover:bg-[#C69B7B] hover:text-white transition-all duration-200 disabled:opacity-50 disabled:hover:bg-transparent"
-              disabled={selectedFilterCount === 0}
-              aria-label="Clear all filters"
-            >
-              Clear All
-            </button>
           </div>
         </div>
       </div>
@@ -617,6 +734,42 @@ function Calendar() {
           )}
         </div>
       </div>
+
+      {/* Modal for displaying all posts with details */}
+      {modalDate && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" onClick={closeModal}>
+          <div
+            className="bg-[#111111] p-6 rounded-lg shadow-lg border border-[#222222] max-w-2xl w-full max-h-[80vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-lg font-bold text-white">Posts for {modalDate.toLocaleDateString()}</h2>
+              <button
+                onClick={closeModal}
+                className="p-2 hover:bg-[#1A1A1A] rounded-full transition-all duration-200"
+                aria-label="Close modal"
+              >
+                <X size={20} className="text-gray-300" />
+              </button>
+            </div>
+            <div className="space-y-4">
+              {getPostsForDate(modalDate).length > 0 ? (
+                getPostsForDate(modalDate).map(post => (
+                  <ExpandablePostItem
+                    key={post.id}
+                    post={post}
+                    isExpanded={expandedPostId === post.id}
+                    onToggle={() => setExpandedPostId(expandedPostId === post.id ? null : post.id)}
+                    details={postDetails[post.id] || null}
+                  />
+                ))
+              ) : (
+                <p className="text-gray-400">No posts found for this date.</p>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
