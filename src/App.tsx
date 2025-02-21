@@ -7,9 +7,11 @@ import Login from './pages/Login';
 import Settings from './pages/Settings';
 import SubredditAnalysis from './pages/SubredditAnalysis';
 import Projects from './pages/Projects';
+import Calendar from './pages/Calendar';
 import ProjectView from './pages/ProjectView';
 import SavedList from './pages/SavedList';
 import SpyGlass from './pages/SpyGlass';
+import RedditAccounts from './pages/RedditAccounts';
 import { Menu } from 'lucide-react';
 
 function PrivateRoute({ children }: { children: React.ReactNode }) {
@@ -89,9 +91,19 @@ function App() {
               <ProjectView />
             </PrivateRoute>
           } />
+          <Route path="/calendar" element={
+            <PrivateRoute>
+              <Calendar />
+            </PrivateRoute>
+          } />
           <Route path="/spyglass" element={
             <PrivateRoute>
               <SpyGlass />
+            </PrivateRoute>
+          } />
+          <Route path="/accounts" element={
+            <PrivateRoute>
+              <RedditAccounts />
             </PrivateRoute>
           } />
         </Routes>

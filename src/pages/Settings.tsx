@@ -45,7 +45,7 @@ function Settings() {
 
       <div className="space-y-6">
         {/* Subscription Section */}
-        <div className="bg-[#111111] p-6 rounded-lg">
+        <div className="bg-[#0f0f0f] p-6 rounded-lg text-[#ffffff]">
           <div className="flex items-center justify-between mb-1">
             <div>
               <h2 className="text-xl font-semibold mb-1">Subscription</h2>
@@ -76,7 +76,7 @@ function Settings() {
         </div>
 
         {/* Profile Information Section */}
-        <form onSubmit={handleProfileUpdate} className="bg-[#111111] p-6 rounded-lg">
+        <form onSubmit={handleProfileUpdate} className="bg-[#0f0f0f] p-6 rounded-lg text-[#ffffff]">
           <h2 className="text-xl font-semibold mb-1">Profile Information</h2>
           <p className="text-gray-500 text-sm mb-6">Update your account profile settings</p>
 
@@ -108,7 +108,7 @@ function Settings() {
         </form>
 
         {/* Change Password Section */}
-        <form onSubmit={handlePasswordUpdate} className="bg-[#111111] p-6 rounded-lg">
+        <form onSubmit={handlePasswordUpdate} className="bg-[#0f0f0f] p-6 rounded-lg text-[#ffffff]">
           <h2 className="text-xl font-semibold mb-1">Change Password</h2>
           <p className="text-gray-500 text-sm mb-6">Update your account password</p>
 

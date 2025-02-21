@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { Download, FolderPlus, X, ChevronDown, ChevronUp, Search, Calendar } from 'lucide-react';
+import { Download, FolderPlus, X, ChevronDown, ChevronUp, Search, Calendar, Users, Activity } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import SubredditAnalysis from '../pages/SubredditAnalysis';
-import { getSubredditInfo, getSubredditPosts } from '../lib/reddit';
+import { getSubredditInfo, getSubredditPosts, cleanRedditImageUrl } from '../lib/reddit';
 import { analyzeSubredditData, AnalysisResult } from '../lib/analysis';
-import AddToProjectModal from '../components/AddToProjectModal';
+import AddToProjectModal from './AddToProjectModal';
+import AnalysisCard from '../features/subreddit-analysis/components/analysis-card';
+import { AnalysisData } from '../features/subreddit-analysis/types';
 
 interface ProjectSubreddit {
   id: string;
@@ -15,13 +17,42 @@ interface ProjectSubreddit {
     active_users: number;
     marketing_friendly_score: number;
     allowed_content: string[];
+    icon_img: string | null;
+    community_icon: string | null;
+    analysis_data: AnalysisData | null;
   };
   created_at: string;
-  last_post_at: string | null;
 }
 
 interface ProjectSubredditsProps {
   projectId: string;
+}
+
+interface PostCount {
+  subreddit_id: string;
+  total_posts_24h: number;
+}
+
+interface SubredditCounts {
+  [key: string]: number;
+}
+
+interface DatabaseSubreddit {
+  id: string;
+  name: string;
+  subscriber_count: number;
+  active_users: number;
+  marketing_friendly_score: number;
+  allowed_content: string[];
+  icon_img: string | null;
+  community_icon: string | null;
+  analysis_data: AnalysisData | null;
+}
+
+interface DatabaseProjectSubreddit {
+  id: string;
+  created_at: string;
+  subreddit: DatabaseSubreddit;
 }
 
 function ProjectSubreddits({ projectId }: ProjectSubredditsProps) {
@@ -34,10 +65,87 @@ function ProjectSubreddits({ projectId }: ProjectSubredditsProps) {
   const [analysisResult, setAnalysisResult] = useState<AnalysisResult | null>(null);
   const [analyzing, setAnalyzing] = useState(false);
   const [selectedSubreddit, setSelectedSubreddit] = useState<{id: string; name: string} | null>(null);
+  const [postCounts, setPostCounts] = useState<Record<string, number | null>>({});
+
+  // Function to refresh subreddit data
+  const refreshSubredditData = async (subreddit: ProjectSubreddit['subreddit']) => {
+    try {
+      const info = await getSubredditInfo(subreddit.name);
+      return info;
+    } catch (err) {
+      console.error(`Error refreshing data for r/${subreddit.name}:`, err);
+      return null;
+    }
+  };
 
   useEffect(() => {
     fetchProjectSubreddits();
+    fetchPostCounts();
   }, [projectId]);
+
+  // Add effect to refresh subreddit data periodically
+  useEffect(() => {
+    if (subreddits.length === 0) return;
+
+    // Refresh data for all subreddits
+    const refreshAll = async () => {
+      for (const projectSubreddit of subreddits) {
+        await refreshSubredditData(projectSubreddit.subreddit);
+      }
+    };
+
+    refreshAll();
+
+    // Set up interval to refresh every hour
+    const interval = setInterval(refreshAll, 60 * 60 * 1000);
+    return () => clearInterval(interval);
+  }, [subreddits.length]);
+
+  // New effect: when subreddits update, fetch their post counts
+  useEffect(() => {
+    if (subreddits.length > 0) {
+      fetchPostCounts();
+    }
+  }, [subreddits]);
+
+  const fetchPostCounts = async () => {
+    try {
+      if (subreddits.length === 0) return;
+
+      // Get post counts for all subreddits
+      const { data, error } = await supabase
+        .rpc('get_subreddit_post_counts', {
+          subreddit_ids: subreddits.map(s => s.subreddit.id)
+        });
+
+      if (error) throw error;
+
+      // Convert to record format
+      const counts = (data as PostCount[] || []).reduce<SubredditCounts>((acc, { subreddit_id, total_posts_24h }) => ({
+        ...acc,
+        [subreddit_id]: total_posts_24h
+      }), {});
+
+      setPostCounts(counts);
+    } catch (err) {
+      console.error('Error fetching post counts:', err);
+    }
+  };
+
+  const getSubredditIcon = (subreddit: ProjectSubreddit['subreddit']): string => {
+    // Use community icon first if available
+    if (subreddit.community_icon) {
+      return cleanRedditImageUrl(subreddit.community_icon) || '/default-subreddit-icon.png';
+    }
+    
+    // Fallback to icon_img if available
+    if (subreddit.icon_img) {
+      return cleanRedditImageUrl(subreddit.icon_img) || '/default-subreddit-icon.png';
+    }
+    
+    // Final fallback to generated placeholder
+    return `https://api.dicebear.com/7.x/shapes/svg?seed=${subreddit.name}&backgroundColor=111111&radius=12`;
+  };
 
   const fetchProjectSubreddits = async () => {
     try {
@@ -52,23 +160,48 @@ function ProjectSubreddits({ projectId }: ProjectSubredditsProps) {
             subscriber_count,
             active_users,
             marketing_friendly_score,
-            allowed_content
+            allowed_content,
+            icon_img,
+            community_icon,
+            analysis_data
           )
         `)
         .eq('project_id', projectId)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      setSubreddits(data || []);
+      
+      // Transform the data to match the ProjectSubreddit interface
+      const transformedData = (data as unknown as DatabaseProjectSubreddit[]).map(item => {
+        // Handle case where 'subreddit' might be returned as an array
+        const subredditData = Array.isArray(item.subreddit) ? item.subreddit[0] : item.subreddit;
+        return {
+          id: item.id,
+          created_at: item.created_at,
+          subreddit: {
+            id: subredditData.id,
+            name: subredditData.name,
+            subscriber_count: subredditData.subscriber_count,
+            active_users: subredditData.active_users,
+            marketing_friendly_score: subredditData.marketing_friendly_score,
+            allowed_content: subredditData.allowed_content,
+            icon_img: subredditData.icon_img,
+            community_icon: subredditData.community_icon,
+            analysis_data: subredditData.analysis_data
+          }
+        };
+      });
+
+      setSubreddits(transformedData);
     } catch (err) {
       console.error('Error fetching project subreddits:', err);
-      setError('Failed to load subreddits');
+      setError('Failed to load project subreddits');
     } finally {
       setLoading(false);
     }
   };
 
-  const removeSubreddit = async (id: string) => {
+  const removeProjectSubreddit = async (id: string) => {
     try {
       const { error } = await supabase
         .from('project_subreddits')
@@ -81,29 +214,6 @@ function ProjectSubreddits({ projectId }: ProjectSubredditsProps) {
       console.error('Error removing subreddit:', err);
       setError('Failed to remove subreddit');
     }
-  };
-
-  const exportToCSV = () => {
-    const headers = ['Subreddit', 'Subscribers', 'Active Users', 'Marketing Score', 'Content Types', 'Date Added'];
-    const rows = subreddits.map(s => [
-      s.subreddit.name,
-      s.subreddit.subscriber_count,
-      s.subreddit.active_users,
-      `${s.subreddit.marketing_friendly_score}%`,
-      s.subreddit.allowed_content.join(', '),
-      new Date(s.created_at).toLocaleDateString()
-    ]);
-
-    const csvContent = [
-      headers.join(','),
-      ...rows.map(r => r.join(','))
-    ].join('\n');
-
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    link.href = URL.createObjectURL(blob);
-    link.download = 'project_subreddits.csv';
-    link.click();
   };
 
   const formatNumber = (num: number): string => {
@@ -119,7 +229,7 @@ function ProjectSubreddits({ projectId }: ProjectSubredditsProps) {
       link: "bg-[#4A3B69] text-white",
       video: "bg-[#1E3A5F] text-white"
     };
-    return styles[type.toLowerCase()] || "bg-gray-600 text-white";
+    return `${styles[type.toLowerCase()] || "bg-gray-600"} px-2.5 py-0.5 rounded-full text-xs font-medium`;
   };
 
   const toggleSubredditExpansion = async (subredditName: string) => {
@@ -180,156 +290,170 @@ function ProjectSubreddits({ projectId }: ProjectSubredditsProps) {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="text-gray-400">Loading subreddits...</div>
+        <div className="text-gray-400">Loading project subreddits...</div>
       </div>
     );
   }
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h2 className="text-xl font-semibold">Subreddits</h2>
-        <button 
-          onClick={exportToCSV}
-          className="secondary flex items-center gap-2"
+      {/* Search and Filter Bar */}
+      <div className="flex flex-col md:flex-row gap-4">
+        <div className="relative flex-1">
+          <input
+            type="text"
+            value={filterText}
+            onChange={(e) => setFilterText(e.target.value)}
+            placeholder="Filter by name..."
+            className="search-input w-full h-12 md:h-10 bg-[#111111] rounded-md"
+          />
+          <Search className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" size={20} />
+        </div>
+        <select
+          value={sortBy}
+          onChange={(e) => setSortBy(e.target.value as 'date' | 'name')}
+          className="bg-[#111111] border-none rounded-md px-4 h-12 md:h-10 focus:ring-1 focus:ring-[#333333] min-w-[140px]"
         >
-          <Download size={20} />
-          Export CSV
-        </button>
+          <option value="date">Date Added</option>
+          <option value="name">Name</option>
+        </select>
       </div>
 
-      {error && (
-        <div className="p-4 bg-red-900/30 text-red-400 rounded-lg">
-          {error}
-        </div>
-      )}
-
-      <div className="space-y-6">
-        <div className="flex gap-4">
-          <div className="relative flex-1">
-            <input
-              type="text"
-              value={filterText}
-              onChange={(e) => setFilterText(e.target.value)}
-              placeholder="Filter by name..."
-              className="search-input w-full h-10 bg-[#111111] rounded-md"
-            />
-            <Search className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" size={20} />
-          </div>
-          <select
-            value={sortBy}
-            onChange={(e) => setSortBy(e.target.value as 'date' | 'name')}
-            className="bg-[#111111] border-none rounded-md px-4 h-10 focus:ring-1 focus:ring-[#333333]"
-          >
-            <option value="date">Date Added</option>
-            <option value="name">Name</option>
-          </select>
+      {/* Subreddits Table */}
+      <div className="bg-[#111111] rounded-lg overflow-hidden">
+        {/* Table Header */}
+        <div className="hidden md:grid grid-cols-[2fr_1.5fr_1fr_auto_80px_120px] gap-4 px-6 py-4 border-b border-[#222222] text-sm text-gray-400">
+          <div className="hidden md:block">Subreddit</div>
+          <div className="hidden md:block">Community Stats</div>
+          <div className="hidden md:block">Marketing-Friendly</div>
+          <div className="hidden md:block">Content Types</div>
+          <div className="hidden md:block text-center">Posts</div>
+          <div className="hidden md:block text-right">Actions</div>
         </div>
 
-        {subreddits.length === 0 ? (
-          <div className="bg-[#111111] rounded-lg p-8 text-center">
-            <h3 className="text-xl font-semibold mb-2">No Subreddits Yet</h3>
-            <p className="text-gray-400">
-              Add subreddits to this project to start tracking them
-            </p>
-          </div>
-        ) : (
-          <div className="bg-[#111111] rounded-lg overflow-hidden">
-            <div className="grid grid-cols-[2fr_1fr_1fr_auto_auto_auto] gap-6 p-4 border-b border-[#222222] text-sm text-gray-400">
-              <div>Subreddit</div>
-              <div>Community Stats</div>
-              <div>Marketing-Friendly</div>
-              <div>Content Types</div>
-              <div className="text-center">Posts</div>
-              <div className="w-[80px] text-right">Actions</div>
-            </div>
-
-            <div className="divide-y divide-[#222222]">
-              {filteredSubreddits.map((item) => (
-                <div key={item.id}>
-                  <div className="grid grid-cols-[2fr_1fr_1fr_auto_auto_auto] gap-6 p-4 items-center hover:bg-[#1A1A1A] transition-colors">
-                    <div className="font-medium">
-                      r/{item.subreddit.name}
-                    </div>
-
-                    <div className="flex items-center gap-1 text-gray-400">
-                      <span>{formatNumber(item.subreddit.subscriber_count)}</span>
-                      <span className="text-gray-600">•</span>
-                      <span>{formatNumber(item.subreddit.active_users)} online</span>
-                    </div>
-
-                    <div>
-                      <div className="w-24 h-2 bg-[#222222] rounded-full overflow-hidden">
-                        <div 
-                          className="h-full bg-gradient-to-r from-[#C69B7B] via-[#E6B17E] to-[#4CAF50]"
-                          style={{ width: `${item.subreddit.marketing_friendly_score}%` }}
-                        />
-                      </div>
-                      <div className="text-sm text-gray-400 mt-1">
-                        {item.subreddit.marketing_friendly_score}%
-                      </div>
-                    </div>
-
-                    <div className="flex gap-1">
-                      {item.subreddit.allowed_content.map((type) => (
-                        <span 
-                          key={type}
-                          className={`px-2 py-1 text-xs rounded ${getContentTypeBadgeStyle(type)}`}
-                        >
-                          {type}
-                        </span>
-                      ))}
-                    </div>
-
-                    <div className="flex items-center justify-center gap-1">
-                      <Calendar size={16} className="text-gray-400" />
-                      <span className="text-gray-400">0</span>
-                    </div>
-
-                    <div className="flex items-center justify-end gap-2">
-                      <button 
-                        onClick={() => removeSubreddit(item.id)}
-                        className="text-gray-400 hover:text-white p-2 rounded-full hover:bg-white/10"
-                        title="Remove from Project"
-                      >
-                        <X size={20} />
-                      </button>
-                      <button 
-                        onClick={() => toggleSubredditExpansion(item.subreddit.name)}
-                        className="text-gray-400 hover:text-white p-2 rounded-full hover:bg-white/10"
-                        title={expandedSubreddit === item.subreddit.name ? "Hide Analysis" : "Show Analysis"}
-                      >
-                        {expandedSubreddit === item.subreddit.name ? (
-                          <ChevronUp size={20} />
-                        ) : (
-                          <ChevronDown size={20} />
-                        )}
-                      </button>
-                    </div>
+        {/* Table Body */}
+        <div className="divide-y divide-[#222222]">
+          {filteredSubreddits.map((saved) => (
+            <div key={saved.id}>
+              <div 
+                onClick={() => toggleSubredditExpansion(saved.subreddit.name)}
+                className="flex flex-col md:grid md:grid-cols-[2fr_1.5fr_1fr_auto_80px_120px] gap-4 p-4 md:px-6 md:py-4 items-start md:items-center hover:bg-[#1A1A1A] transition-colors cursor-pointer"
+              >
+                {/* Subreddit Name with Icon */}
+                <div className="flex items-center gap-3 w-full min-w-0">
+                  <div className="w-10 h-10 rounded-lg bg-[#1A1A1A] overflow-hidden flex-shrink-0">
+                    <img 
+                      src={getSubredditIcon(saved.subreddit)}
+                      alt={saved.subreddit.name}
+                      className="w-full h-full object-cover"
+                      onError={(e) => {
+                        const target = e.target as HTMLImageElement;
+                        target.src = `https://api.dicebear.com/7.x/shapes/svg?seed=${saved.subreddit.name}&backgroundColor=111111&radius=12`;
+                      }}
+                    />
                   </div>
+                  <div className="font-medium truncate">
+                    r/{saved.subreddit.name}
+                  </div>
+                </div>
 
-                  {/* Expanded Analysis Section */}
-                  {expandedSubreddit === item.subreddit.name && (
-                    <div className="border-t border-[#222222] bg-[#0A0A0A] p-6">
-                      {analyzing ? (
-                        <div className="text-center py-8 text-gray-400">
-                          Analyzing subreddit...
-                        </div>
-                      ) : analysisResult ? (
-                        <SubredditAnalysis analysis={analysisResult} />
-                      ) : (
-                        <div className="text-center py-8 text-gray-400">
-                          Failed to load analysis
-                        </div>
-                      )}
+                {/* Community Stats */}
+                <div className="flex flex-col text-sm mt-2 md:mt-0 min-w-0">
+                  <div className="flex items-center gap-1.5 text-gray-400">
+                    <Users size={14} />
+                    <span>{formatNumber(saved.subreddit.subscriber_count)}</span>
+                  </div>
+                  {saved.subreddit.active_users > 0 && (
+                    <div className="flex items-center gap-1.5 text-emerald-400 mt-1 min-w-0">
+                      <Activity size={14} />
+                      <span className="truncate">{formatNumber(saved.subreddit.active_users)} online</span>
                     </div>
                   )}
                 </div>
-              ))}
+
+                {/* Marketing Score */}
+                <div className="w-full mt-2 md:mt-0">
+                  <div className="w-full max-w-[100px] h-2 bg-[#222222] rounded-full overflow-hidden">
+                    <div className="h-full" style={{
+                      width: `${saved.subreddit.marketing_friendly_score}%`,
+                      backgroundColor: saved.subreddit.marketing_friendly_score >= 80 ? '#4CAF50' :
+                                     saved.subreddit.marketing_friendly_score >= 60 ? '#FFA726' :
+                                     '#EF5350'
+                    }} />
+                  </div>
+                  <div className="text-sm text-gray-400 mt-1">
+                    {saved.subreddit.marketing_friendly_score}%
+                  </div>
+                </div>
+
+                {/* Content Types */}
+                <div className="flex flex-wrap gap-1 mt-2 md:mt-0 min-w-0">
+                  {saved.subreddit.allowed_content.map((type) => (
+                    <span 
+                      key={type}
+                      className={`px-2 py-1 text-xs rounded ${getContentTypeBadgeStyle(type)}`}
+                    >
+                      {type}
+                    </span>
+                  ))}
+                </div>
+
+                {/* Posts Count */}
+                <div className="flex items-center gap-1 mt-2 md:mt-0 justify-center">
+                  <Calendar size={16} className="text-gray-400" />
+                  <span className="text-gray-400">{postCounts[saved.subreddit.id] || 0}</span>
+                </div>
+
+                {/* Actions */}
+                <div className="flex items-center gap-1 mt-4 md:mt-0 md:justify-end">
+                  <button 
+                    className="text-gray-400 hover:text-white p-2 rounded-full hover:bg-white/10"
+                    title="Remove from Project"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      removeProjectSubreddit(saved.id);
+                    }}
+                  >
+                    <X size={20} />
+                  </button>
+                  <div className="text-gray-400 p-2">
+                    {expandedSubreddit === saved.subreddit.name ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
+                  </div>
+                </div>
+              </div>
+
+              {/* Expanded Analysis Section */}
+              {expandedSubreddit === saved.subreddit.name && (
+                <div className="border-t border-[#222222] bg-[#0A0A0A] p-6" onClick={e => e.stopPropagation()}>
+                  {saved.subreddit.analysis_data ? (
+                    <AnalysisCard 
+                      analysis={saved.subreddit.analysis_data}
+                      mode="saved"
+                    />
+                  ) : analyzing ? (
+                    <div className="text-center py-8 text-gray-400">
+                      Analyzing subreddit...
+                    </div>
+                  ) : (
+                    <div className="text-center py-8 text-gray-400">
+                      No analysis data available
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
-          </div>
-        )}
+          ))}
+        </div>
       </div>
+
+      {selectedSubreddit && (
+        <AddToProjectModal
+          isOpen={true}
+          onClose={() => setSelectedSubreddit(null)}
+          subredditId={selectedSubreddit.id}
+          subredditName={selectedSubreddit.name}
+        />
+      )}
     </div>
   );
 }

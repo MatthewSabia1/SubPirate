@@ -28,7 +28,7 @@ function CreateProjectModal({
 
   const getProjectImage = () => {
     if (imageUrl) return imageUrl;
-    return `https://api.dicebear.com/7.x/shapes/svg?seed=${name}&backgroundColor=111111`;
+    return `https://api.dicebear.com/7.x/shapes/svg?seed=${name}&backgroundColor=0f0f0f`;
   };
 
   const handleImageUpload = async (file: File) => {
@@ -127,7 +127,7 @@ function CreateProjectModal({
           <div>
             <label className="block text-sm font-medium mb-2">Project Image</label>
             <div className="inline-block relative group">
-              <div className="w-24 h-24 bg-[#1A1A1A] rounded-lg overflow-hidden">
+              <div className="w-24 h-24 bg-[#0f0f0f] rounded-lg overflow-hidden">
                 <img 
                   src={getProjectImage()}
                   alt={name}

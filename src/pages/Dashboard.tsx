@@ -1,10 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import { Search, Shield, Users, ExternalLink, AlertTriangle, Activity } from 'lucide-react';
-import { getSubredditInfo, getSubredditPosts, searchSubreddits, SubredditInfo, RedditAPIError } from '../lib/reddit';
+import { getSubredditInfo, getSubredditPosts, searchSubreddits, SubredditInfo, RedditAPIError, cleanRedditImageUrl } from '../lib/reddit';
 import { analyzeSubredditData, AnalysisProgress, AnalysisResult } from '../lib/analysis';
 import { useNavigate } from 'react-router-dom';
 import ProgressBar from '../components/ProgressBar';
-import SubredditAnalysis from './SubredditAnalysis';
+import SubredditAnalysis from '../components/SubredditAnalysis';
 
 function Dashboard() {
   const [subredditInput, setSubredditInput] = useState('');
@@ -20,9 +20,32 @@ function Dashboard() {
   const [analysisResult, setAnalysisResult] = useState<AnalysisResult | null>(null);
   const navigate = useNavigate();
 
+  const getSubredditIcon = (subreddit: SubredditInfo) => {
+    try {
+      // Try community icon first if it's not a stylesheet
+      if (subreddit.community_icon && 
+          !subreddit.community_icon.includes('styles/') && 
+          !subreddit.community_icon.includes('.css')) {
+        const cleanIcon = cleanRedditImageUrl(subreddit.community_icon);
+        if (cleanIcon) return cleanIcon;
+      }
+      
+      // Try icon_img next if available
+      if (subreddit.icon_img) {
+        const cleanIcon = cleanRedditImageUrl(subreddit.icon_img);
+        if (cleanIcon) return cleanIcon;
+      }
+    } catch (err) {
+      console.error('Error processing subreddit icon:', err);
+    }
+    
+    // Fallback to generated avatar
+    return `https://api.dicebear.com/7.x/shapes/svg?seed=${encodeURIComponent(subreddit.name)}&backgroundColor=0f0f0f&radius=12`;
+  };
+
   const handleAnalyzeSubreddit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!subredditInput || analyzing) return;
+    if (!subredditInput?.trim() || analyzing) return;
 
     setAnalyzing(true);
     setAnalyzeError(null);
@@ -34,7 +57,11 @@ function Dashboard() {
     });
 
     try {
-      const cleanSubreddit = subredditInput.replace(/^r\//, '').trim();
+      // Clean and validate subreddit name
+      const cleanSubreddit = subredditInput.trim().replace(/^r\//, '');
+      if (!cleanSubreddit) {
+        throw new Error('Please enter a valid subreddit name');
+      }
       
       setAnalyzeProgress({
         status: 'Fetching subreddit information...',
@@ -118,26 +145,16 @@ function Dashboard() {
     return num.toString();
   };
 
-  const getSubredditIcon = (subreddit: SubredditInfo) => {
-    // Use community icon first if available
-    if (subreddit.community_icon) {
-      return subreddit.community_icon;
-    }
-    
-    // Fallback to icon_img if available
-    if (subreddit.icon_img) {
-      return subreddit.icon_img;
-    }
-    
-    // Final fallback to generated placeholder
-    return `https://api.dicebear.com/7.x/shapes/svg?seed=${subreddit.name}&backgroundColor=111111&radius=12`;
-  };
-
   return (
-    <div className="max-w-[1200px] mx-auto px-8 space-y-8">
+    <div className="max-w-[1200px] mx-auto px-4 md:px-8 py-12 md:py-20">
+      <h1 className="text-xl md:text-5xl font-bold text-center mb-4">Welcome to Your War Room</h1>
+      <p className="text-gray-400 text-center text-base md:text-lg mb-20">
+        Use the tools below to find, analyze and add subreddits to your projects.
+      </p>
+
       {/* Analyze Specific Subreddit */}
-      <div>
-        <h2 className="text-xl md:text-2xl font-semibold mb-6">Analyze Specific Subreddit</h2>
+      <div className="bg-[#0f0f0f] rounded-2xl p-8 mb-12">
+        <h2 className="text-2xl font-semibold mb-8">Analyze Specific Subreddit</h2>
         <form onSubmit={handleAnalyzeSubreddit} className="space-y-4">
           <div className="relative">
             <input 
@@ -145,13 +162,13 @@ function Dashboard() {
               value={subredditInput}
               onChange={(e) => setSubredditInput(e.target.value)}
               placeholder="Enter subreddit name (with or without r/)"
-              className="w-full h-12 md:h-[52px] bg-[#111111] rounded-lg pl-4 pr-[120px] text-white placeholder-gray-500 border-none focus:ring-1 focus:ring-[#C69B7B]"
+              className="w-full h-[52px] bg-[#050505] rounded-lg pl-4 pr-[120px] text-white placeholder-gray-500 border-none focus:ring-1 focus:ring-[#C69B7B]"
               disabled={analyzing}
             />
             <div className="absolute right-2 top-1/2 -translate-y-1/2">
               <button 
                 type="submit" 
-                className="bg-[#C69B7B] hover:bg-[#B38A6A] h-9 px-4 rounded-md text-sm font-medium text-white flex items-center gap-2 transition-colors disabled:opacity-50 disabled:hover:bg-[#C69B7B]"
+                className="bg-[#C69B7B] hover:bg-[#B38A6A] h-10 px-6 rounded-lg text-base font-medium text-white flex items-center gap-2 transition-colors disabled:opacity-50 disabled:hover:bg-[#C69B7B]"
                 disabled={analyzing}
               >
                 <Search size={16} />
@@ -161,7 +178,7 @@ function Dashboard() {
           </div>
           
           {analyzeProgress && (
-            <div className="bg-[#111111] p-4 rounded-lg">
+            <div className="bg-[#0f0f0f] p-4 rounded-lg">
               <ProgressBar 
                 progress={analyzeProgress.progress}
                 status={analyzeProgress.status}
@@ -176,19 +193,22 @@ function Dashboard() {
               <p>{analyzeError}</p>
             </div>
           )}
+
+          {analysisResult && (
+            <div className="mt-8">
+              <SubredditAnalysis 
+                analysis={analysisResult}
+                isLoading={analyzing}
+                error={analyzeError}
+              />
+            </div>
+          )}
         </form>
       </div>
 
-      {/* Analysis Results */}
-      {analysisResult && (
-        <div>
-          <SubredditAnalysis analysis={analysisResult} />
-        </div>
-      )}
-
       {/* Discover Subreddits */}
-      <div>
-        <h2 className="text-xl md:text-2xl font-semibold mb-6">Discover Subreddits</h2>
+      <div className="bg-[#0f0f0f] rounded-2xl p-8">
+        <h2 className="text-2xl font-semibold mb-8">Discover Subreddits</h2>
         <div className="space-y-6">
           <form onSubmit={handleSearch}>
             <div className="relative">
@@ -197,13 +217,13 @@ function Dashboard() {
                 value={searchInput}
                 onChange={(e) => setSearchInput(e.target.value)}
                 placeholder="Search subreddits by keywords..."
-                className="w-full h-12 md:h-[52px] bg-[#111111] rounded-lg pl-4 pr-[120px] text-white placeholder-gray-500 border-none focus:ring-1 focus:ring-[#C69B7B]"
+                className="w-full h-[52px] bg-[#050505] rounded-lg pl-4 pr-[120px] text-white placeholder-gray-500 border-none focus:ring-1 focus:ring-[#C69B7B]"
                 disabled={loading}
               />
               <div className="absolute right-2 top-1/2 -translate-y-1/2">
                 <button 
                   type="submit" 
-                  className="bg-[#C69B7B] hover:bg-[#B38A6A] h-9 px-4 rounded-md text-sm font-medium text-white flex items-center gap-2 transition-colors"
+                  className="bg-[#C69B7B] hover:bg-[#B38A6A] h-10 px-6 rounded-lg text-base font-medium text-white flex items-center gap-2 transition-colors"
                   disabled={loading}
                 >
                   <Search size={16} />
@@ -214,13 +234,13 @@ function Dashboard() {
           </form>
 
           {searchResults.length > 0 && (
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2 bg-[#111111] rounded-md px-3 h-8">
+            <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+              <div className="flex items-center gap-2 bg-[#0A0A0A] rounded-lg px-4 h-10">
                 <Users size={16} className="text-gray-400" />
                 <select
                   value={sortBy}
                   onChange={(e) => setSortBy(e.target.value as 'subscribers' | 'name')}
-                  className="bg-transparent border-none text-sm text-gray-400 focus:ring-0 cursor-pointer h-8"
+                  className="bg-transparent border-none text-base text-gray-400 focus:ring-0 cursor-pointer h-10"
                 >
                   <option value="subscribers">Most Subscribers</option>
                   <option value="name">Name</option>
@@ -228,10 +248,10 @@ function Dashboard() {
               </div>
               <button
                 onClick={() => setShowNSFW(!showNSFW)}
-                className={`h-8 px-3 text-sm rounded-md transition-colors flex items-center gap-2 ${
+                className={`h-10 px-4 text-base rounded-lg transition-colors flex items-center gap-2 ${
                   showNSFW 
-                    ? 'bg-[#111111] text-white' 
-                    : 'bg-[#111111] text-gray-400 hover:text-white'
+                    ? 'bg-[#0A0A0A] text-white' 
+                    : 'bg-[#0A0A0A] text-gray-400 hover:text-white'
                 }`}
               >
                 <Shield size={16} className={showNSFW ? 'text-white' : 'text-gray-400'} />
@@ -240,12 +260,31 @@ function Dashboard() {
             </div>
           )}
 
+          {error && (
+            <div className="p-4 bg-red-900/30 text-red-400 rounded-lg flex items-center gap-2">
+              <AlertTriangle size={20} className="shrink-0" />
+              <p>{error}</p>
+            </div>
+          )}
+
+          {loading && (
+            <div className="text-center py-12 text-gray-400">
+              Searching subreddits...
+            </div>
+          )}
+
+          {!loading && searchResults.length === 0 && searchInput && (
+            <div className="text-center py-12 text-gray-400">
+              No subreddits found matching your search.
+            </div>
+          )}
+
           {filteredResults.length > 0 && (
             <div className="space-y-3">
               {filteredResults.map((subreddit) => (
                 <div 
                   key={subreddit.name}
-                  className="flex items-start gap-4 bg-[#111111] p-4 rounded-lg hover:bg-[#1A1A1A] transition-colors group"
+                  className="flex items-start gap-4 bg-[#0A0A0A] p-4 rounded-lg hover:bg-[#1A1A1A] transition-colors group"
                 >
                   <a 
                     href={`https://reddit.com/r/${subreddit.name}`}
@@ -303,7 +342,8 @@ function Dashboard() {
                   <button 
                     onClick={() => {
                       setSubredditInput(subreddit.name);
-                      handleAnalyzeSubreddit(new Event('submit') as any);
+                      const fakeEvent = { preventDefault: () => {} };
+                      handleAnalyzeSubreddit(fakeEvent as React.FormEvent);
                     }}
                     className="bg-[#C69B7B] hover:bg-[#B38A6A] h-9 px-4 rounded-md text-sm font-medium text-white transition-colors whitespace-nowrap flex items-center gap-2"
                   >
@@ -312,18 +352,6 @@ function Dashboard() {
                   </button>
                 </div>
               ))}
-            </div>
-          )}
-
-          {loading && (
-            <div className="text-center py-12 text-gray-400">
-              Searching subreddits...
-            </div>
-          )}
-
-          {!loading && searchResults.length === 0 && searchInput && (
-            <div className="text-center py-12 text-gray-400">
-              No subreddits found matching your search.
             </div>
           )}
         </div>

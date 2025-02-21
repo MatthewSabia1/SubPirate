@@ -193,16 +193,16 @@ function AddToProjectModal({ isOpen, onClose, subredditId, subredditName }: AddT
               <div className="relative flex-1">
                 <input
                   type="text"
+                  className="search-input w-full h-10 bg-[#0f0f0f] rounded-md"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   placeholder="Search projects..."
-                  className="search-input w-full h-10 bg-[#111111] rounded-md"
                 />
                 <Search className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" size={20} />
               </div>
               <button
                 onClick={() => setShowNewProjectForm(true)}
-                className="h-10 px-4 rounded-md bg-[#111111] hover:bg-[#1A1A1A] text-white flex items-center gap-2 transition-colors"
+                className="h-10 px-4 rounded-md bg-[#0f0f0f] hover:bg-[#1A1A1A] text-[#ffffff] flex items-center gap-2 transition-colors"
               >
                 <Plus size={20} />
                 New Project
@@ -218,21 +218,21 @@ function AddToProjectModal({ isOpen, onClose, subredditId, subredditName }: AddT
                 {searchQuery ? 'No matching projects found' : 'No projects found'}
               </div>
             ) : (
-              <div className="bg-[#111111] rounded-lg overflow-hidden">
+              <div className="bg-[#0f0f0f] rounded-lg overflow-hidden">
                 <div className="divide-y divide-[#222222]">
                   {filteredProjects.map((project) => (
                     <div
                       key={project.id}
-                      className="flex items-center gap-4 p-4 hover:bg-[#1A1A1A] transition-colors"
+                      className="flex items-center gap-4 p-4 hover:bg-[#1A1A1A] transition-colors text-[#ffffff]"
                     >
-                      <div className="w-10 h-10 rounded-lg bg-[#1A1A1A] overflow-hidden flex-shrink-0">
+                      <div className="w-10 h-10 rounded-lg bg-[#0f0f0f] overflow-hidden flex-shrink-0">
                         <img 
                           src={getProjectImage(project)}
                           alt={project.name}
                           className="w-full h-full object-cover"
                           onError={(e) => {
                             const target = e.target as HTMLImageElement;
-                            target.src = `https://api.dicebear.com/7.x/shapes/svg?seed=${project.name}&backgroundColor=111111`;
+                            target.src = `https://api.dicebear.com/7.x/shapes/svg?seed=${project.name}&backgroundColor=0f0f0f`;
                           }}
                         />
                       </div>

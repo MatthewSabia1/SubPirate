@@ -1,7 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import Modal from './Modal';
-import { Upload, X } from 'lucide-react';
+import { Upload, X, Share2 } from 'lucide-react';
 
 interface Project {
   id: string;
@@ -28,7 +28,7 @@ function ProjectSettingsModal({ isOpen, onClose, project, onUpdate }: ProjectSet
 
   const getProjectImage = () => {
     if (imageUrl) return imageUrl;
-    return `https://api.dicebear.com/7.x/shapes/svg?seed=${name}&backgroundColor=111111`;
+    return `https://api.dicebear.com/7.x/shapes/svg?seed=${name}&backgroundColor=0f0f0f`;
   };
 
   const handleImageUpload = async (file: File) => {
@@ -120,11 +120,11 @@ function ProjectSettingsModal({ isOpen, onClose, project, onUpdate }: ProjectSet
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose}>
-      <div className="p-6">
-        <h2 className="text-xl font-semibold mb-1">Project Settings</h2>
-        <p className="text-gray-400 text-sm mb-6">
-          Update project details
+    <Modal isOpen={isOpen} onClose={onClose} className="bg-[#111111]">
+      <div className="p-8">
+        <h2 className="text-2xl font-semibold mb-2">Project Settings</h2>
+        <p className="text-gray-500 text-base mb-8">
+          Update your project details or manage project settings.
         </p>
 
         {error && (
@@ -134,53 +134,36 @@ function ProjectSettingsModal({ isOpen, onClose, project, onUpdate }: ProjectSet
         )}
 
         <form onSubmit={handleSubmit} className="space-y-6">
+          {/* Project Name */}
+          <div>
+            <label className="block text-base mb-2">Project Name</label>
+            <input
+              type="text"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="Enter project name"
+              className="w-full bg-[#0A0A0A] border border-[#333333] rounded-lg px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-[#C69B7B]"
+              required
+            />
+          </div>
+
           {/* Project Image */}
           <div>
-            <label className="block text-sm font-medium mb-2">Project Image</label>
-            <div className="inline-block relative">
-              <div className="w-24 h-24 bg-[#1A1A1A] rounded-lg overflow-hidden">
+            <label className="block text-base mb-2">Project Image</label>
+            <div className="flex items-center gap-4">
+              <div className="relative w-24 h-24 bg-[#0A0A0A] rounded-lg overflow-hidden border border-[#333333]">
                 <img 
                   src={getProjectImage()}
                   alt={name}
                   className="w-full h-full object-cover"
                 />
-                {uploadProgress !== null && (
-                  <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
-                    <div className="w-4/5">
-                      <div className="h-1 bg-[#222222] rounded-full overflow-hidden">
-                        <div 
-                          className="h-full bg-[#C69B7B] transition-all duration-300"
-                          style={{ width: `${uploadProgress}%` }}
-                        />
-                      </div>
-                      <div className="text-center text-xs mt-1 text-white">
-                        {Math.round(uploadProgress)}%
-                      </div>
-                    </div>
-                  </div>
-                )}
-                <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => fileInputRef.current?.click()}
-                    className="bg-[#C69B7B] hover:bg-[#B38A6A] h-7 px-2.5 rounded text-xs font-medium text-white flex items-center gap-1 transition-colors"
-                    disabled={uploadProgress !== null}
-                  >
-                    <Upload size={12} />
-                    Change
-                  </button>
-                  {imageUrl && (
-                    <button
-                      type="button"
-                      onClick={handleRemoveImage}
-                      className="bg-red-500/20 hover:bg-red-500/30 h-7 px-2.5 rounded text-xs font-medium text-red-400 flex items-center gap-1 transition-colors"
-                      disabled={uploadProgress !== null}
-                    >
-                      <X size={12} />
-                      Remove
-                    </button>
-                  )}
-                </div>
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="absolute inset-0 bg-black/50 opacity-0 hover:opacity-100 transition-opacity flex items-center justify-center"
+                >
+                  <Upload size={20} className="text-white" />
+                </button>
               </div>
               <input
                 ref={fileInputRef}
@@ -192,49 +175,60 @@ function ProjectSettingsModal({ isOpen, onClose, project, onUpdate }: ProjectSet
                   if (file) handleImageUpload(file);
                 }}
               />
+              <div className="text-sm text-gray-500">
+                Choose File
+                <span className="block text-gray-600">No file chosen</span>
+              </div>
             </div>
-            <p className="text-xs text-gray-400 mt-2">
-              Recommended size: 128x128px. Max file size: 5MB
-            </p>
-          </div>
-
-          {/* Project Name */}
-          <div>
-            <label className="block text-sm font-medium mb-1">Project Name</label>
-            <input
-              type="text"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="Enter project name"
-              required
-            />
           </div>
 
           {/* Project Description */}
           <div>
-            <label className="block text-sm font-medium mb-1">Description (Optional)</label>
+            <label className="block text-base mb-2">Description (Optional)</label>
             <input
               type="text"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               placeholder="Enter project description"
+              className="w-full bg-[#0A0A0A] border border-[#333333] rounded-lg px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-[#C69B7B]"
             />
           </div>
 
-          {/* Action Buttons */}
-          <div className="flex gap-2">
-            <button 
-              type="submit" 
-              className="primary flex-1"
-              disabled={saving || !name.trim() || uploadProgress !== null}
-            >
-              {saving ? 'Saving...' : 'Save Changes'}
+          {/* Share Project Button */}
+          <div className="pt-4 border-t border-[#222222]">
+            <button type="button" className="w-full bg-[#0A0A0A] border border-[#333333] rounded-lg px-4 py-3 text-white hover:bg-[#111111] transition-colors flex items-center justify-center gap-2">
+              <Share2 size={20} />
+              Share Project
             </button>
+          </div>
+          
+          {/* Delete Project Warning */}
+          <div className="mt-8 pt-8 border-t border-[#222222]">
+            <p className="text-red-500 mb-4">
+              Deleting this project will remove all its data and cannot be undone.
+            </p>
             <button 
               type="button"
-              className="secondary"
+              onClick={() => {/* TODO: Implement delete */}}
+              className="w-full bg-red-900/20 text-red-500 hover:bg-red-900/30 rounded-lg px-4 py-3 transition-colors"
+            >
+              Delete Project
+            </button>
+          </div>
+
+          {/* Save/Cancel Buttons */}
+          <div className="flex gap-3 mt-8">
+            <button
+              type="submit"
+              className="flex-1 bg-[#C69B7B] hover:bg-[#B38A6A] text-white rounded-lg px-4 py-3 font-medium transition-colors disabled:opacity-50"
+              disabled={saving || !name.trim()}
+            >
+              Save Changes
+            </button>
+            <button
+              type="button"
               onClick={onClose}
-              disabled={saving || uploadProgress !== null}
+              className="px-6 bg-[#0A0A0A] hover:bg-[#111111] text-white rounded-lg transition-colors"
             >
               Cancel
             </button>

@@ -2,10 +2,14 @@ import { createClient } from '@supabase/supabase-js';
 
 const CLIENT_ID = import.meta.env.VITE_REDDIT_CLIENT_ID;
 const CLIENT_SECRET = import.meta.env.VITE_REDDIT_CLIENT_SECRET;
-const REDIRECT_URI = 'http://localhost:5173/auth/callback';
+const REDIRECT_URI = window.location.origin + '/auth/callback';
 
-if (!CLIENT_ID || !CLIENT_SECRET) {
-  throw new Error('Missing Reddit API credentials');
+if (!CLIENT_ID) {
+  console.warn('Reddit Client ID not configured. Some features may be limited.');
+}
+
+if (!CLIENT_SECRET) {
+  console.warn('Reddit Client Secret not configured. Some features may be limited.');
 }
 
 export interface RedditAuth {
@@ -41,6 +45,8 @@ export interface SubredditPost {
   url: string;
   selftext: string;
   thumbnail?: string;
+  preview_url?: string | null;
+  post_karma?: number; // Added optional property
 }
 
 export interface SubredditFrequency {
@@ -82,7 +88,9 @@ class RedditAPI {
     }
 
     // Handle full Reddit profile URLs
-    const urlMatch = cleaned.match(/(?:https?:\/\/)?(?:www\.)?reddit\.com\/(?:user|u)\/([^/?#]+)/i);
+    const urlMatch = cleaned.match(
+      /(?:https?:\/\/)?(?:www\.)?reddit\.com\/(?:user|u)\/([^/?#]+)/i
+    );
     if (urlMatch) {
       return urlMatch[1].toLowerCase();
     }
@@ -92,22 +100,22 @@ class RedditAPI {
     return withoutPrefix.toLowerCase();
   }
 
-  async analyzePostFrequency(posts: SubredditPost[]): Promise<SubredditFrequency[]> {
-    // Group posts by subreddit
-    // Count posts per subreddit
-    const frequencies = new Map<string, {
-      count: number;
-      posts: SubredditPost[];
-    }>();
+  async analyzePostFrequency(
+    posts: SubredditPost[]
+  ): Promise<SubredditFrequency[]> {
+    // Group posts by subreddit and count posts per subreddit
+    const frequencies = new Map<
+      string,
+      { count: number; posts: SubredditPost[] }
+    >();
 
-    // Count posts and collect top posts for each subreddit
-    posts.forEach(post => {
+    posts.forEach((post) => {
       const current = frequencies.get(post.subreddit) || { count: 0, posts: [] };
       frequencies.set(post.subreddit, {
         count: current.count + 1,
         posts: [...current.posts, post]
           .sort((a, b) => b.score - a.score)
-          .slice(0, 5)
+          .slice(0, 5),
       });
     });
 
@@ -116,12 +124,11 @@ class RedditAPI {
       .sort((a, b) => b[1].count - a[1].count)
       .slice(0, 20);
 
-    // Fetch subreddit info sequentially to avoid rate limits
     const results = [];
     for (const [subreddit, { count, posts }] of sortedSubreddits) {
       try {
         const data = await this.request(`/r/${subreddit}/about.json`);
-        
+
         if (!data.data) {
           throw new RedditAPIError('Invalid response from Reddit API', 0, 'about');
         }
@@ -134,14 +141,13 @@ class RedditAPI {
           active_users: info.active_user_count || 0,
           icon_img: this.cleanImageUrl(info.icon_img),
           community_icon: this.cleanImageUrl(info.community_icon),
-          lastPosts: posts
+          lastPosts: posts,
         });
 
         // Add a small delay between requests
-        await new Promise(resolve => setTimeout(resolve, 100));
+        await new Promise((resolve) => setTimeout(resolve, 100));
       } catch (error) {
         console.error(`Error fetching info for r/${subreddit}:`, error);
-        // Continue with next subreddit
       }
     }
 
@@ -160,11 +166,12 @@ class RedditAPI {
         method: 'POST',
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',
-          'Authorization': `Basic ${btoa(`${CLIENT_ID}:${CLIENT_SECRET}`)}`
+          'Authorization': `Basic ${btoa(`${CLIENT_ID}:${CLIENT_SECRET}`)}`,
+          'User-Agent': 'web:SubPirate:1.0.0'
         },
         body: new URLSearchParams({
-          grant_type: 'client_credentials'
-        })
+          grant_type: 'client_credentials',
+        }),
       });
 
       if (!response.ok) {
@@ -178,7 +185,7 @@ class RedditAPI {
 
       const data = await response.json();
       this.accessToken = data.access_token;
-      this.expiresAt = Date.now() + (data.expires_in * 1000);
+      this.expiresAt = Date.now() + data.expires_in * 1000;
     } catch (error) {
       if (error instanceof RedditAPIError) throw error;
       throw new RedditAPIError(
@@ -201,16 +208,22 @@ class RedditAPI {
     }
 
     if (response.status === 403) {
-      throw new RedditAPIError('This subreddit is private', 403, endpoint);
+      throw new RedditAPIError('Access denied', 403, endpoint);
     }
 
     if (response.status === 429) {
       if (this.retryCount < this.MAX_RETRIES) {
         this.retryCount++;
-        await new Promise(resolve => setTimeout(resolve, 1000 * this.retryCount));
+        await new Promise((resolve) =>
+          setTimeout(resolve, 1000 * this.retryCount)
+        );
         return null; // Signal retry
       }
-      throw new RedditAPIError('Too many requests. Please try again later.', 429, endpoint);
+      throw new RedditAPIError(
+        'Too many requests. Please try again later.',
+        429,
+        endpoint
+      );
     }
 
     if (!response.ok) {
@@ -226,22 +239,20 @@ class RedditAPI {
     return response.json();
   }
 
-  async request(endpoint: string, options: RequestInit = {}) {
+  async request(endpoint: string): Promise<any> {
     try {
       await this.ensureAuth();
 
       const response = await fetch(`https://oauth.reddit.com${endpoint}`, {
-        ...options,
         headers: {
-          ...options.headers,
-          'Authorization': `Bearer ${this.accessToken}`,
-          'User-Agent': 'SubPirate/1.0.0 (by /u/subpirate_bot)'
-        }
+          Authorization: `Bearer ${this.accessToken}`,
+          'User-Agent': 'web:SubPirate:1.0.0'
+        },
       });
 
       const result = await this.handleResponse(response, endpoint);
       if (result === null) {
-        return this.request(endpoint, options); // Retry
+        return this.request(endpoint); // Retry
       }
       return result;
     } catch (error) {
@@ -294,33 +305,55 @@ class RedditAPI {
 
   private cleanImageUrl(url: string | null): string | null {
     if (!url) return null;
-    
-    // Remove query parameters
-    const cleanUrl = url.split('?')[0];
-    
-    // Handle special cases
-    if (cleanUrl.includes('reddit_default')) return null;
-    if (cleanUrl.includes('default-icon')) return null;
-    
-    return cleanUrl;
+
+    // Handle special URL cases
+    if (url === 'self' || url === 'default' || url === 'spoiler' || url === 'nsfw') return null;
+
+    // Handle URLs with query parameters
+    if (url.includes('?')) {
+      try {
+        const urlObj = new URL(url);
+        
+        // Keep all params for Reddit CDN URLs
+        if (urlObj.hostname.includes('redd.it') || 
+            urlObj.hostname.includes('reddit.com') || 
+            urlObj.hostname.includes('redditstatic.com')) {
+          return url;
+        }
+        
+        // Strip query params for non-Reddit URLs
+        return `${urlObj.origin}${urlObj.pathname}`;
+      } catch (err) {
+        // If URL parsing fails, return original
+        return url;
+      }
+    }
+
+    return url;
   }
 
   async getSubredditInfo(subreddit: string): Promise<SubredditInfo> {
     try {
       const data = await this.request(`/r/${subreddit}/about.json`);
-      
-      if (!data.data) {
+
+      if (!data?.data) {
         throw new RedditAPIError('Invalid response from Reddit API', 0, 'about');
       }
 
       const info = data.data;
 
       // Get subreddit rules
-      const rulesData = await this.request(`/r/${subreddit}/about/rules.json`);
-      const rules = rulesData.rules?.map((rule: any) => ({
-        title: this.decodeHtmlEntities(rule.short_name || rule.title),
-        description: this.decodeHtmlEntities(rule.description || '')
-      })) || [];
+      let rules = [];
+      try {
+        const rulesData = await this.request(`/r/${subreddit}/about/rules.json`);
+        rules = rulesData.rules?.map((rule: any) => ({
+          title: this.decodeHtmlEntities(rule.short_name || rule.title || ''),
+          description: this.decodeHtmlEntities(rule.description || '')
+        })) || [];
+      } catch (err) {
+        console.warn('Failed to fetch subreddit rules:', err);
+        rules = [];
+      }
 
       // Clean and validate icons
       const icon_img = this.cleanImageUrl(info.icon_img);
@@ -331,35 +364,35 @@ class RedditAPI {
         title: this.decodeHtmlEntities(info.title || info.display_name),
         subscribers: info.subscribers || 0,
         active_users: info.active_user_count || 0,
-        description: this.cleanMarkdown(this.decodeHtmlEntities(info.public_description || info.description || '')),
+        description: this.cleanMarkdown(
+          this.decodeHtmlEntities(info.public_description || info.description || '')
+        ),
         created_utc: info.created_utc,
         over18: info.over_18 || false,
         icon_img,
         community_icon,
-        rules
+        rules,
       };
     } catch (error) {
       if (error instanceof RedditAPIError) throw error;
-      throw new RedditAPIError(
-        'Failed to get subreddit information',
-        0,
-        'about'
-      );
+      throw new RedditAPIError('Failed to get subreddit information', 0, 'about');
     }
   }
 
   async getSubredditPosts(
     subreddit: string,
     sort: 'hot' | 'new' | 'top' = 'hot',
-    limit = 100
+    limit: number = 100,
+    timeframe: 'hour' | 'day' | 'week' | 'month' | 'year' | 'all' = 'day'
   ): Promise<SubredditPost[]> {
     try {
-      const data = await this.request(`/r/${subreddit}/${sort}.json?limit=${limit}`);
-      
-      if (!data.data?.children) {
+      const endpoint = `/r/${subreddit}/${sort}.json?limit=${limit}&t=${timeframe}`;
+      const data = await this.request(endpoint);
+
+      if (!data?.data?.children) {
         throw new RedditAPIError('Invalid response from Reddit API', 0, 'posts');
       }
-      
+
       return data.data.children
         .filter((child: any) => child.data && !child.data.stickied)
         .map((child: any) => ({
@@ -370,15 +403,15 @@ class RedditAPI {
           score: child.data.score,
           num_comments: child.data.num_comments,
           url: child.data.url,
-          selftext: this.cleanMarkdown(this.decodeHtmlEntities(child.data.selftext || ''))
+          selftext: this.cleanMarkdown(
+            this.decodeHtmlEntities(child.data.selftext || '')
+          ),
+          thumbnail: this.cleanImageUrl(child.data.thumbnail),
+          preview_url: child.data.preview?.images?.[0]?.source?.url || null,
         }));
     } catch (error) {
       if (error instanceof RedditAPIError) throw error;
-      throw new RedditAPIError(
-        'Failed to get subreddit posts',
-        0,
-        'posts'
-      );
+      throw new RedditAPIError('Failed to get subreddit posts', 0, 'posts');
     }
   }
 
@@ -403,61 +436,117 @@ class RedditAPI {
             title: this.decodeHtmlEntities(child.data.title || child.data.display_name),
             subscribers: child.data.subscribers || 0,
             active_users: child.data.active_user_count || 0,
-            description: this.cleanMarkdown(this.decodeHtmlEntities(child.data.public_description || child.data.description || '')),
+            description: this.cleanMarkdown(
+              this.decodeHtmlEntities(child.data.public_description || child.data.description || '')
+            ),
             created_utc: child.data.created_utc,
             over18: child.data.over_18 || false,
             icon_img,
             community_icon,
-            rules: []
+            rules: [],
           };
         });
     } catch (error) {
       if (error instanceof RedditAPIError) throw error;
-      throw new RedditAPIError(
-        'Failed to search subreddits',
-        0,
-        'search'
-      );
+      throw new RedditAPIError('Failed to search subreddits', 0, 'search');
     }
   }
 
-  async getUserPosts(username: string): Promise<UserPost[]> {
+  async getUserPosts(
+    username: string,
+    sort: 'new' | 'top' = 'new',
+    limit = 100,
+    timeframe: 'hour' | 'day' | 'week' | 'month' | 'year' | 'all' = 'day'
+  ): Promise<SubredditPost[]> {
     try {
-      const response = await fetch(`https://www.reddit.com/user/${username}/submitted.json?limit=100`);
-      
-      if (!response.ok) {
+      const cleanUsername = this.parseUsername(username);
+      if (!cleanUsername) {
+        throw new RedditAPIError('Invalid username format', 400, 'user_posts');
+      }
+
+      try {
+        // First get user info for accurate karma
+        const userResponse = await fetch(
+          `https://www.reddit.com/user/${cleanUsername}/about.json`,
+          {
+            headers: { 'User-Agent': 'web:SubPirate:1.0.0' },
+          }
+        );
+
+        if (!userResponse.ok) {
+          if (userResponse.status === 404) {
+            throw new RedditAPIError('User not found', 404, 'user_posts');
+          }
+          throw new RedditAPIError('Failed to fetch user data', userResponse.status, 'user_posts');
+        }
+
+        const userData = await userResponse.json();
+        const postKarma = userData.data?.link_karma || 0;
+
+        // Then get all posts
+        const response = await fetch(
+          `https://www.reddit.com/user/${cleanUsername}/submitted.json?limit=${limit}&sort=${sort}${
+            sort === 'top' ? `&t=${timeframe}` : ''
+          }&raw_json=1`,
+          {
+            headers: { 'User-Agent': 'web:SubPirate:1.0.0' },
+          }
+        );
+
+        if (!response.ok) {
+          throw new RedditAPIError(
+            response.status === 404 ? 'User posts not found' : 'Failed to fetch user posts',
+            response.status,
+            'user_posts'
+          );
+        }
+
+        const data = await response.json();
+
+        if (!data.data?.children) {
+          throw new RedditAPIError('Invalid response from Reddit API', 0, 'user_posts');
+        }
+
+        const posts = data.data.children
+          .filter((child: any) => child.data)
+          .map((child: any) => ({
+            id: child.data.id,
+            title: this.decodeHtmlEntities(child.data.title),
+            subreddit: child.data.subreddit,
+            created_utc: child.data.created_utc,
+            score: child.data.score,
+            num_comments: child.data.num_comments,
+            url: child.data.url,
+            selftext: this.cleanMarkdown(
+              this.decodeHtmlEntities(child.data.selftext || '')
+            ),
+            thumbnail: child.data.thumbnail,
+          }));
+
+        // Add post karma to the first post for access in the calling code
+        if (posts.length > 0) {
+          posts[0].post_karma = postKarma;
+        }
+
+        return posts;
+      } catch (error) {
+        // Handle all network and API errors
+        if (error instanceof RedditAPIError) throw error;
         throw new RedditAPIError(
-          response.status === 404 ? 'User not found' : 'Failed to fetch user posts',
-          response.status,
+          'Failed to connect to Reddit. Please check your internet connection.',
+          0,
           'user_posts'
         );
       }
-
-      const data = await response.json();
-      
-      if (!data.data?.children) {
-        throw new RedditAPIError('Invalid response from Reddit API', 0, 'user_posts');
-      }
-
-      return data.data.children
-        .filter((child: any) => child.data)
-        .map((child: any) => ({
-          id: child.data.id,
-          title: this.decodeHtmlEntities(child.data.title),
-          subreddit: child.data.subreddit,
-          created_utc: child.data.created_utc,
-          score: child.data.score,
-          num_comments: child.data.num_comments,
-          url: child.data.url,
-          selftext: this.cleanMarkdown(this.decodeHtmlEntities(child.data.selftext || ''))
-        }));
     } catch (error) {
-      if (error instanceof RedditAPIError) throw error;
+      if (error instanceof RedditAPIError) {
+        throw error;
+      }
       throw new RedditAPIError(
         'Failed to analyze user. Please check the username and try again.',
         0,
         'user_posts'
-      );
+        );
     }
   }
 }

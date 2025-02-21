@@ -166,19 +166,19 @@ function ShareProjectModal({ isOpen, onClose, projectId, projectName }: SharePro
               <input
                 type="text"
                 value={searchQuery}
+                className="search-input w-full h-10 bg-[#0f0f0f] rounded-md"
                 onChange={handleSearchChange}
                 placeholder="Search users by name or email"
-                className="search-input w-full h-10 bg-[#111111] rounded-md"
               />
               <Search className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" size={20} />
             </div>
 
             {searchResults.length > 0 && (
-              <div className="mt-2 bg-[#1A1A1A] rounded-lg divide-y divide-gray-800">
+              <div className="mt-2 bg-[#0f0f0f] rounded-lg divide-y divide-gray-800">
                 {searchResults.map((user) => (
                   <div
                     key={user.id}
-                    className="flex items-center justify-between p-3 first:rounded-t-lg last:rounded-b-lg hover:bg-[#222222]"
+                    className="flex items-center justify-between p-3 first:rounded-t-lg last:rounded-b-lg hover:bg-[#1A1A1A] text-[#ffffff]"
                   >
                     <div>
                       <div className="font-medium">
@@ -206,7 +206,7 @@ function ShareProjectModal({ isOpen, onClose, projectId, projectName }: SharePro
               {members.map((member) => (
                 <div
                   key={member.id}
-                  className="flex items-center justify-between bg-[#1A1A1A] p-3 rounded-lg"
+                  className="flex items-center justify-between bg-[#0f0f0f] p-3 rounded-lg text-[#ffffff]"
                 >
                   <div>
                     <div className="font-medium">
@@ -220,7 +220,7 @@ function ShareProjectModal({ isOpen, onClose, projectId, projectName }: SharePro
                     <select
                       value={member.role}
                       onChange={(e) => updateMemberRole(member.id, e.target.value as 'read' | 'edit' | 'owner')}
-                      className="bg-[#111111] border-none rounded-md px-3 py-1 text-sm focus:ring-1 focus:ring-[#333333]"
+                      className="bg-[#0f0f0f] border-none rounded-md px-3 py-1 text-sm focus:ring-1 focus:ring-[#333333]"
                     >
                       <option value="read">Read Only</option>
                       <option value="edit">Editor</option>

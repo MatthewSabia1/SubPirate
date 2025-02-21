@@ -31,35 +31,13 @@ interface Profile {
 function Sidebar({ isMobileOpen, onMobileClose }: SidebarProps) {
   const location = useLocation();
   const navigate = useNavigate();
-  const { user, signOut } = useAuth();
-  const [profile, setProfile] = useState<Profile | null>(null);
+  const { user, profile, signOut } = useAuth();
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const handleNavigation = (path: string) => {
     navigate(path);
     onMobileClose?.();
-  };
-
-  useEffect(() => {
-    if (user) {
-      fetchProfile();
-    }
-  }, [user]);
-
-  const fetchProfile = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('display_name, image_url')
-        .eq('id', user?.id)
-        .single();
-
-      if (error) throw error;
-      setProfile(data);
-    } catch (err) {
-      console.error('Error fetching profile:', err);
-    }
   };
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -118,7 +96,7 @@ function Sidebar({ isMobileOpen, onMobileClose }: SidebarProps) {
 
       if (updateError) throw updateError;
 
-      setProfile(prev => prev ? { ...prev, image_url: publicUrl } : null);
+      // Profile will be automatically updated via auth subscription
     } catch (err) {
       console.error('Error uploading image:', err);
       setError('Failed to upload image');
@@ -144,7 +122,7 @@ function Sidebar({ isMobileOpen, onMobileClose }: SidebarProps) {
         .update({ image_url: null })
         .eq('id', user.id);
 
-      setProfile(prev => prev ? { ...prev, image_url: null } : null);
+      // Profile will be automatically updated via auth subscription
     } catch (err) {
       console.error('Error removing image:', err);
       setError('Failed to remove image');
@@ -228,12 +206,14 @@ function Sidebar({ isMobileOpen, onMobileClose }: SidebarProps) {
           <div className="group relative">
             <div className="flex items-center gap-3">
               <div className="relative">
-                <img 
-                  src={getProfileImage()}
-                  alt={profile?.display_name || 'Profile'}
-                  className="w-10 h-10 rounded-lg bg-[#1A1A1A]"
-                />
-                <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity rounded-lg flex items-center justify-center gap-2">
+                <div className="w-10 h-10 rounded-lg bg-[#0f0f0f] overflow-hidden">
+                  <img 
+                    src={getProfileImage()}
+                    alt={profile?.display_name || 'Profile'}
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+                <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity rounded-lg flex items-center justify-center gap-1 text-[#ffffff]">
                   <label className="cursor-pointer">
                     <input
                       type="file"
@@ -242,15 +222,17 @@ function Sidebar({ isMobileOpen, onMobileClose }: SidebarProps) {
                       onChange={handleImageUpload}
                       disabled={uploading}
                     />
-                    <Upload 
-                      size={16} 
-                      className="text-white hover:text-[#C69B7B] transition-colors"
-                    />
+                    <div className="w-7 h-7 rounded-full hover:bg-white/10 flex items-center justify-center transition-colors">
+                      <Upload 
+                        size={16} 
+                        className="text-white"
+                      />
+                    </div>
                   </label>
                   {profile?.image_url && (
                     <button
                       onClick={handleRemoveImage}
-                      className="text-white hover:text-red-400 transition-colors"
+                      className="w-7 h-7 rounded-full hover:bg-white/10 flex items-center justify-center transition-colors"
                     >
                       <X size={16} />
                     </button>

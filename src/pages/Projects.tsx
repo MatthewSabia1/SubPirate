@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, Settings, ChevronRight, Trash2, Share2 } from 'lucide-react';
+import { Plus, Settings, ChevronRight, Trash2, Share2, AlertTriangle } from 'lucide-react';
 import ShareProjectModal from '../components/ShareProjectModal';
 import ProjectSettingsModal from '../components/ProjectSettingsModal';
 import { supabase } from '../lib/supabase';
@@ -92,17 +92,17 @@ function Projects() {
 
   return (
     <div className="p-8">
-      <div className="flex items-center justify-between mb-8">
-        <h1 className="text-2xl md:text-4xl font-bold">Projects</h1>
-        <button className="primary flex items-center gap-2 text-sm md:text-base">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
+        <h1 className="text-2xl md:text-4xl font-bold truncate">Projects</h1>
+        <button className="primary flex items-center justify-center gap-2 text-sm md:text-base h-10 md:h-11">
           <Plus size={20} />
-          <span className="hidden md:inline">New Project</span>
-          <span className="md:hidden">New</span>
+          New Project
         </button>
       </div>
 
       {error && (
-        <div className="mb-8 p-4 bg-red-900/30 text-red-400 rounded-lg">
+        <div className="mb-8 p-4 bg-red-900/30 text-red-400 rounded-lg flex items-center gap-2">
+          <AlertTriangle size={20} className="shrink-0" />
           {error}
         </div>
       )}
@@ -113,7 +113,7 @@ function Projects() {
           <p className="text-gray-400 mb-6">
             Create your first project to start analyzing subreddits
           </p>
-          <button className="primary flex items-center gap-2 mx-auto">
+          <button className="primary flex items-center justify-center gap-2 mx-auto h-10 md:h-11">
             <Plus size={20} />
             New Project
           </button>
@@ -122,11 +122,12 @@ function Projects() {
         <div className="bg-[#111111] rounded-lg overflow-hidden">
           <div className="divide-y divide-[#222222]">
             {projects.map((project) => (
-              <div
+              <article
                 key={project.id}
-                className="flex items-center gap-4 p-4 hover:bg-[#1A1A1A] transition-colors group"
+                onClick={() => navigate(`/projects/${project.id}`)}
+                className="flex flex-col sm:flex-row sm:items-center gap-4 p-4 hover:bg-[#1A1A1A] transition-colors group cursor-pointer"
               >
-                <div className="w-12 h-12 rounded-lg bg-[#1A1A1A] overflow-hidden group-hover:bg-[#222222] transition-colors">
+                <div className="w-16 sm:w-12 h-16 sm:h-12 rounded-lg bg-[#1A1A1A] overflow-hidden group-hover:bg-[#222222] transition-colors flex-shrink-0">
                   <img 
                     src={getProjectImage(project)}
                     alt={project.name}
@@ -138,46 +139,51 @@ function Projects() {
                   />
                 </div>
 
-                <div className="flex-1 min-w-0">
-                  <h3 className="font-medium mb-1">{project.name}</h3>
+                <div className="flex-1 min-w-0 space-y-1">
+                  <h3 className="font-medium text-lg sm:text-base truncate">{project.name}</h3>
                   {project.description && (
-                    <p className="text-sm text-gray-400 truncate">
+                    <p className="text-sm text-gray-400 line-clamp-2 sm:line-clamp-1">
                       {project.description}
                     </p>
                   )}
                 </div>
 
-                <div className="flex items-center gap-1 md:gap-2">
+                <div className="flex items-center gap-2 self-end sm:self-center mt-4 sm:mt-0">
                   <button 
-                    onClick={() => openShareModal(project)}
-                    className="text-gray-400 hover:text-white p-1.5 md:p-2 rounded-full hover:bg-white/10"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      openShareModal(project);
+                    }}
+                    className="text-gray-400 hover:text-white p-2 rounded-full hover:bg-white/10"
                     title="Share Project"
                   >
                     <Share2 size={20} />
                   </button>
                   <button 
-                    onClick={() => openSettingsModal(project)}
-                    className="text-gray-400 hover:text-white p-1.5 md:p-2 rounded-full hover:bg-white/10"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      openSettingsModal(project);
+                    }}
+                    className="text-gray-400 hover:text-white p-2 rounded-full hover:bg-white/10"
                     title="Project Settings"
                   >
                     <Settings size={20} />
                   </button>
                   <button 
-                    onClick={() => deleteProject(project.id)}
-                    className="text-gray-400 hover:text-white p-1.5 md:p-2 rounded-full hover:bg-white/10"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      deleteProject(project.id);
+                    }}
+                    className="text-gray-400 hover:text-white p-2 rounded-full hover:bg-white/10"
                     title="Delete Project"
                   >
                     <Trash2 size={20} />
                   </button>
-                  <button 
-                    onClick={() => navigate(`/projects/${project.id}`)}
-                    className="text-gray-400 hover:text-white p-1.5 md:p-2 rounded-full hover:bg-white/10"
-                    title="View Project"
-                  >
+                  <div className="text-gray-400 p-2">
                     <ChevronRight size={20} />
-                  </button>
+                  </div>
                 </div>
-              </div>
+              </article>
             ))}
           </div>
         </div>

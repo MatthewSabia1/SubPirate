@@ -1,4 +1,5 @@
 import { redditApi } from './redditApi';
+import { supabase } from './supabase';
 import type { SubredditInfo, SubredditPost } from './redditApi';
 
 export type { SubredditInfo, SubredditPost };
@@ -26,43 +27,94 @@ export function parseSubredditName(input: string): string {
 
   const urlMatch = cleaned.match(/(?:https?:\/\/)?(?:www\.)?reddit\.com\/r\/([^/?#]+)/i);
   if (urlMatch) {
-    return urlMatch[1].toLowerCase();
+    return urlMatch[1].replace(/^r\//, '').toLowerCase();
   }
 
   const withoutPrefix = cleaned.replace(/^\/?(r\/)?/i, '').split(/[/?#]/)[0];
   return withoutPrefix.toLowerCase();
 }
 
+export function getSubredditIcon(subreddit: { icon_img: string | null; community_icon: string | null; name: string }): string {
+  // Try community icon first if it's not a stylesheet
+  if (subreddit.community_icon && 
+      !subreddit.community_icon.includes('styles/') && 
+      !subreddit.community_icon.includes('.css')) {
+    const cleanIcon = cleanRedditImageUrl(subreddit.community_icon);
+    if (cleanIcon) return cleanIcon;
+  }
+  
+  // Try icon_img next if available
+  if (subreddit.icon_img) {
+    const cleanIcon = cleanRedditImageUrl(subreddit.icon_img);
+    if (cleanIcon) return cleanIcon;
+  }
+  
+  // Fallback to generated avatar
+  return `https://api.dicebear.com/7.x/shapes/svg?seed=${encodeURIComponent(subreddit.name)}&backgroundColor=0f0f0f&radius=12`;
+}
+
 export function cleanRedditImageUrl(url: string | null): string | null {
   if (!url) return null;
   
-  // Handle Reddit's special URL formats
-  if (url.includes('?')) {
-    // Keep the first query parameter for Reddit image URLs that require it
-    const [baseUrl, query] = url.split('?');
-    const firstParam = query.split('&')[0];
-    return `${baseUrl}?${firstParam}`;
+  // Handle special URL cases and invalid URLs 
+  if (url === 'self' || url === 'default' || url === 'spoiler' || url === 'nsfw' || 
+      url === 'image' || url === 'private' || url === 'none' || url === 'null') {
+    return null;
   }
   
-  // Handle special cases
-  if (url.includes('reddit_default')) return null;
-  if (url.includes('default-icon')) return null;
-  if (url.includes('styles/')) return null;
+  // Handle URLs with query parameters
+  if (url.includes('?')) {
+    try {
+      const urlObj = new URL(url);
+      
+      // Keep important params for Reddit CDN URLs
+      if (urlObj.hostname.includes('redd.it') || 
+          urlObj.hostname.includes('reddit.com') || 
+          urlObj.hostname.includes('redditstatic.com')) {
+        // Keep only width and format params
+        const params = new URLSearchParams();
+        if (urlObj.searchParams.has('width')) params.set('width', urlObj.searchParams.get('width')!);
+        if (urlObj.searchParams.has('format')) params.set('format', urlObj.searchParams.get('format')!);
+        return `${urlObj.origin}${urlObj.pathname}${params.toString() ? `?${params}` : ''}`;
+      }
+      
+      // For non-Reddit URLs, strip query params
+      return `${urlObj.origin}${urlObj.pathname}`;
+    } catch (err) {
+      console.error('Failed to parse image URL:', err);
+      return null;
+    }
+  }
   
-  return url;
+  // Validate URL format
+  try {
+    new URL(url);
+    return url;
+  } catch (err) {
+    console.error('Invalid image URL:', err);
+    return null;
+  }
 }
 
 export async function getSubredditInfo(subreddit: string): Promise<SubredditInfo> {
-  const cleanSubreddit = parseSubredditName(subreddit);
-  
-  if (!cleanSubreddit) {
-    throw new RedditAPIError('Please enter a valid subreddit name');
-  }
-
   try {
-    return await redditApi.getSubredditInfo(cleanSubreddit);
+    const cleanSubreddit = parseSubredditName(subreddit);
+    
+    if (!cleanSubreddit) {
+      throw new RedditAPIError('Please enter a valid subreddit name');
+    }
+
+    // Directly fetch subreddit info from Reddit API without checking/updating the database
+    const info = await redditApi.getSubredditInfo(cleanSubreddit);
+
+    return {
+      ...info,
+      rules: info.rules || [] // Ensure rules array exists
+    };
   } catch (error) {
-    if (error instanceof Error) {
+    if (error instanceof RedditAPIError) {
+      throw error;
+    } else if (error instanceof Error) {
       throw new RedditAPIError(error.message);
     }
     throw new RedditAPIError('Failed to fetch subreddit info');
@@ -72,7 +124,8 @@ export async function getSubredditInfo(subreddit: string): Promise<SubredditInfo
 export async function getSubredditPosts(
   subreddit: string, 
   sort: 'hot' | 'new' | 'top' = 'hot',
-  limit = 100
+  limit = 100,
+  timeframe: 'hour' | 'day' | 'week' | 'month' | 'year' | 'all' = 'day'
 ): Promise<SubredditPost[]> {
   const cleanSubreddit = parseSubredditName(subreddit);
   
@@ -81,7 +134,7 @@ export async function getSubredditPosts(
   }
 
   try {
-    return await redditApi.getSubredditPosts(cleanSubreddit, sort, limit);
+    return await redditApi.getSubredditPosts(cleanSubreddit, sort, limit, timeframe);
   } catch (error) {
     if (error instanceof Error) {
       throw new RedditAPIError(error.message);
@@ -129,4 +182,37 @@ export function calculateMarketingFriendliness(subreddit: SubredditInfo, posts: 
   }
 
   return Math.max(0, Math.min(score, maxScore));
+}
+
+export function cleanImageUrl(url: string | null): string | null {
+  if (!url) return null;
+
+  // Handle placeholder strings
+  if (url === 'self' || url === 'default' || url === 'spoiler' || url === 'nsfw') {
+    return null;
+  }
+
+  // Handle Reddit's image URLs
+  if (url.includes('?')) {
+    // Keep only the base URL for most images
+    if (!url.includes('reddit') && !url.includes('redd.it')) {
+      return url.split('?')[0];
+    }
+    
+    // For Reddit CDN URLs, keep important query params
+    const urlObj = new URL(url);
+    const params = new URLSearchParams();
+    
+    // Keep only necessary params
+    if (urlObj.searchParams.has('width')) {
+      params.set('width', urlObj.searchParams.get('width')!);
+    }
+    if (urlObj.searchParams.has('format')) {
+      params.set('format', urlObj.searchParams.get('format')!);
+    }
+    
+    return params.toString() ? `${urlObj.origin}${urlObj.pathname}?${params}` : `${urlObj.origin}${urlObj.pathname}`;
+  }
+
+  return url;
 }

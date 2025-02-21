@@ -172,6 +172,33 @@ function getRecommendedContentTypes(posts: SubredditPost[]): string[] {
   return Array.from(types);
 }
 
+function calculateMarketingScore(input: any): number {
+  let score = 50; // Base score
+
+  // Factor 1: Community Size and Activity (30 points)
+  const subscriberScore = Math.min((input.subscribers || 0) / 1000000, 1) * 15;
+  const activeUsersRatio = (input.active_users || 0) / (input.subscribers || 1);
+  const activityScore = Math.min(activeUsersRatio * 1000, 1) * 15;
+  score += subscriberScore + activityScore;
+
+  // Factor 2: Engagement Quality (30 points)
+  const avgEngagement = input.engagement_metrics?.interaction_rate || 0;
+  const engagementScore = Math.min(avgEngagement / 100, 1) * 30;
+  score += engagementScore;
+
+  // Factor 3: Rule Restrictions (-20 points max)
+  const highImpactRules = (input.rules || []).filter(r => r.marketingImpact === 'high').length;
+  const mediumImpactRules = (input.rules || []).filter(r => r.marketingImpact === 'medium').length;
+  score -= (highImpactRules * 4) + (mediumImpactRules * 2);
+
+  // Factor 4: Post Frequency and Timing (10 points)
+  const postsPerDay = input.posts_per_day || 0;
+  const postFrequencyScore = Math.min(postsPerDay / 10, 1) * 10;
+  score += postFrequencyScore;
+
+  return Math.max(0, Math.min(100, Math.round(score)));
+}
+
 export async function analyzeSubredditData(
   info: SubredditInfo,
   posts: SubredditPost[],
