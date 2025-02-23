@@ -1,6 +1,109 @@
 # Active Context
 
 ## Current Focus
+- Data structure consistency fixes across subreddit analysis components
+- Standardizing property naming between AI service and frontend components
+- Improving error handling and validation
+- Improving error handling and validation in Reddit API integration
+- Standardizing error handling patterns across the application
+- Maintaining consistent error reporting
+
+## Recent Changes
+- Renamed `postingGuidelines` to `postingLimits` across the application for consistency
+- Updated OpenRouter API schema to match frontend data structure
+- Enhanced validation checks in AnalysisCard component
+- Improved error handling in save operations
+- Added proper typing for analysis data structure
+- Enhanced `getUserPosts` function:
+  - Removed error masking for better debugging
+  - Added specific error types and messages
+  - Improved error context and status codes
+  - Better handling of API-specific errors
+- Error Handling Structure:
+  - Hierarchical error handling approach
+  - Clear separation of concerns
+  - Specific error messages with context
+  - Proper error propagation
+- Error Types:
+  - Enhanced RedditAPIError usage
+  - Added HTTP status codes
+  - Improved error messages
+  - Better error context
+
+### Data Structure Updates
+```typescript
+interface AnalysisData {
+  postingLimits: {
+    frequency: number;
+    bestTimeToPost: string[];
+    contentRestrictions: string[];
+  };
+  contentStrategy: {
+    recommendedTypes: string[];
+    topics: string[];
+    dos: string[];
+    donts: string[];
+  };
+  // ... other properties
+}
+```
+
+### Components Updated
+1. `AnalysisCard.tsx`
+   - Updated interface definitions
+   - Enhanced validation checks
+   - Fixed property access paths
+   - Improved save operation mapping
+
+2. `SubredditAnalysis.tsx`
+   - Updated data mapping for Supabase
+   - Fixed property access in UI rendering
+   - Added proper error handling
+
+3. `openrouter.ts`
+   - Updated JSON schema to match new structure
+   - Improved error handling with retries
+   - Enhanced response validation
+
+## Active Decisions
+- Using `postingLimits` as the standard property name for posting-related data
+- Maintaining consistent property paths across components
+- Implementing comprehensive validation checks
+- Following TypeScript best practices for type safety
+- Using specific error types for better error handling
+- Including context in error messages
+- Proper error propagation
+- Maintaining error handling consistency
+
+## Next Steps
+1. Monitor error rates after deployment
+2. Consider adding data migration for existing saved analyses
+3. Update documentation to reflect new data structure
+4. Consider adding schema validation at API boundaries
+5. Apply consistent error handling pattern to other API methods
+6. Monitor error reporting effectiveness
+7. Consider adding error tracking analytics
+8. Update documentation with new error handling patterns
+
+## Current Considerations
+- Backward compatibility with existing saved analyses
+- Error handling for edge cases
+- Performance impact of additional validation
+- User experience during data loading and validation
+
+## Dependencies
+- Supabase database schema
+- OpenRouter API integration
+- Frontend component structure
+- TypeScript type system
+
+## Recent Insights
+- Consistent property naming improves maintainability
+- Strong typing prevents runtime errors
+- Proper validation improves user experience
+- Centralized error handling reduces code duplication
+
+## Current Focus
 Working on enhancing the subreddit analysis system, specifically:
 1. Improving type safety and error handling
 2. Enhancing database compatibility
