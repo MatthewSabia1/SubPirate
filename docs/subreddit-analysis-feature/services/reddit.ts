@@ -33,4 +33,4 @@ import {
 } from './errors';
 
 // Rest of the file content remains the same
-${Array.from({ length: 770 }, (_, i) => i >= 11 ? '' : '\n').join('')}
+/* content omitted */
