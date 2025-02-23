@@ -1,95 +1,97 @@
 # Active Context
 
 ## Current Focus
-Working on the subreddit analysis feature, specifically:
-1. Fixing issues with the Rules section in analysis results
-2. Improving the save functionality
-3. Handling JSON parsing errors from OpenRouter API
+Working on the analytics dashboard, specifically:
+1. Implementing comprehensive analytics features
+2. Adding data visualization with Chart.js
+3. Integrating with Supabase for data aggregation
 
 ## Recent Changes
 
-### Analysis Component Updates
-1. Modified SubredditAnalysis component:
-   - Rules section now expanded by default
-   - Added event propagation prevention
-   - Improved save button visibility and functionality
-   - Enhanced error handling for save operations
+### Analytics Dashboard Implementation
+1. Added Analytics component:
+   - Comprehensive data visualization
+   - Real-time data fetching
+   - Interactive date range selection
+   - Export functionality
 
-2. OpenRouter Integration:
-   - Added robust JSON parsing with fallback strategies
-   - Improved error handling for malformed responses
-   - Added retry logic for failed requests
+2. Chart Integration:
+   - Added Chart.js with custom styling
+   - Implemented multiple chart types
+   - Added responsive layouts
+   - Enhanced data presentation
 
-3. Database Integration:
-   - Updated subreddit saving logic
-   - Added proper error handling
-   - Improved type safety
+3. Data Management:
+   - Added Supabase queries for analytics
+   - Implemented data aggregation
+   - Added real-time updates
+   - Enhanced error handling
 
 ## Active Decisions
 
-### 1. Analysis Display
-- Keep Rules section expanded by default for better UX
-- Prevent re-analysis when interacting with analysis sections
-- Show save button consistently in new analysis mode
-- Use clear loading states during analysis
+### 1. Analytics Display
+- Use consistent chart styling across the dashboard
+- Implement responsive layouts for all screen sizes
+- Show loading states during data fetching
+- Provide clear error messages
 
-### 2. Error Handling
-- Implement robust JSON parsing for OpenRouter responses
-- Show user-friendly error messages
-- Add retry logic for transient failures
-- Log detailed errors for debugging
+### 2. Data Processing
+- Aggregate data efficiently
+- Cache results where appropriate
+- Handle real-time updates
+- Implement proper error recovery
 
-### 3. Data Management
-- Cache analysis results in localStorage
-- Use optimistic updates for better UX
-- Implement proper type safety
-- Handle edge cases in data transformation
+### 3. User Experience
+- Provide interactive filters
+- Enable date range selection
+- Add export functionality
+- Show meaningful metrics
 
 ## Next Steps
 
 ### Immediate Tasks
-1. Test and verify Rules section fixes
-2. Monitor OpenRouter response handling
-3. Verify save functionality
-4. Add loading indicators
+1. Add more chart types
+2. Implement advanced filters
+3. Add more metrics
+4. Enhance export options
 
 ### Short-term Goals
-1. Implement analysis result caching
-2. Add batch analysis capabilities
-3. Improve error recovery
-4. Enhance performance
+1. Add custom date ranges
+2. Implement comparison views
+3. Add trend analysis
+4. Enhance data visualization
 
 ## Known Issues
 
-### 1. Analysis
-- Occasional JSON parsing errors from OpenRouter
-- Re-analysis triggering on section expansion
-- Save button visibility inconsistencies
+### 1. Analytics
+- Limited historical data
+- Some metrics not yet implemented
+- Performance with large datasets
 
 ### 2. Performance
-- Large analysis results causing UI lag
-- Multiple rapid analyses causing rate limits
-- Cache invalidation edge cases
+- Chart rendering optimization needed
+- Data aggregation performance
+- Real-time update handling
 
 ### 3. UX
-- Inconsistent loading states
-- Error message clarity
-- Section expansion behavior
+- Filter UX improvements needed
+- Date picker enhancements
+- Mobile responsiveness
 
 ## Current Questions
-1. Should we implement rate limiting for analysis requests?
-2. How to handle very large subreddit datasets?
-3. What additional error recovery strategies needed?
-4. How to improve analysis result caching?
+1. What additional metrics should we add?
+2. How to optimize chart performance?
+3. What export formats to support?
+4. How to handle real-time updates efficiently?
 
 ## Recent Learnings
-1. OpenRouter response format inconsistencies
-2. Event propagation impact on analysis
-3. Save operation edge cases
-4. Performance implications of large datasets
+1. Chart.js configuration options
+2. Data aggregation strategies
+3. Real-time update patterns
+4. Performance optimization techniques
 
 ## Active Experiments
-1. JSON parsing strategies
-2. Error handling approaches
-3. Cache management techniques
-4. Performance optimizations 
+1. Chart.js configuration strategies
+2. Data processing approaches
+3. Real-time update techniques
+4. Performance optimizations

@@ -1,10 +1,12 @@
 import React, { useState } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import Sidebar from './components/Sidebar';
 import Dashboard from './pages/Dashboard';
 import Login from './pages/Login';
 import Settings from './pages/Settings';
+import Analytics from './pages/Analytics';
 import SubredditAnalysis from './pages/SubredditAnalysis';
 import Projects from './pages/Projects';
 import Calendar from './pages/Calendar';
@@ -13,6 +15,16 @@ import SavedList from './pages/SavedList';
 import SpyGlass from './pages/SpyGlass';
 import RedditAccounts from './pages/RedditAccounts';
 import { Menu } from 'lucide-react';
+
+// Create a client
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      refetchOnWindowFocus: false,
+      retry: 1
+    }
+  }
+});
 
 function PrivateRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
@@ -58,56 +70,63 @@ function PrivateRoute({ children }: { children: React.ReactNode }) {
 function App() {
   return (
     <AuthProvider>
-      <Router>
-        <Routes>
-          <Route path="/login" element={<Login />} />
-          <Route path="/" element={
-            <PrivateRoute>
-              <Dashboard />
-            </PrivateRoute>
-          } />
-          <Route path="/saved" element={
-            <PrivateRoute>
-              <SavedList />
-            </PrivateRoute>
-          } />
-          <Route path="/settings" element={
-            <PrivateRoute>
-              <Settings />
-            </PrivateRoute>
-          } />
-          <Route path="/analysis/:subreddit" element={
-            <PrivateRoute>
-              <SubredditAnalysis />
-            </PrivateRoute>
-          } />
-          <Route path="/projects" element={
-            <PrivateRoute>
-              <Projects />
-            </PrivateRoute>
-          } />
-          <Route path="/projects/:projectId" element={
-            <PrivateRoute>
-              <ProjectView />
-            </PrivateRoute>
-          } />
-          <Route path="/calendar" element={
-            <PrivateRoute>
-              <Calendar />
-            </PrivateRoute>
-          } />
-          <Route path="/spyglass" element={
-            <PrivateRoute>
-              <SpyGlass />
-            </PrivateRoute>
-          } />
-          <Route path="/accounts" element={
-            <PrivateRoute>
-              <RedditAccounts />
-            </PrivateRoute>
-          } />
-        </Routes>
-      </Router>
+      <QueryClientProvider client={queryClient}>
+        <Router>
+          <Routes>
+            <Route path="/login" element={<Login />} />
+            <Route path="/" element={
+              <PrivateRoute>
+                <Dashboard />
+              </PrivateRoute>
+            } />
+            <Route path="/saved" element={
+              <PrivateRoute>
+                <SavedList />
+              </PrivateRoute>
+            } />
+            <Route path="/settings" element={
+              <PrivateRoute>
+                <Settings />
+              </PrivateRoute>
+            } />
+            <Route path="/analytics" element={
+              <PrivateRoute>
+                <Analytics />
+              </PrivateRoute>
+            } />
+            <Route path="/analysis/:subreddit" element={
+              <PrivateRoute>
+                <SubredditAnalysis />
+              </PrivateRoute>
+            } />
+            <Route path="/projects" element={
+              <PrivateRoute>
+                <Projects />
+              </PrivateRoute>
+            } />
+            <Route path="/projects/:projectId" element={
+              <PrivateRoute>
+                <ProjectView />
+              </PrivateRoute>
+            } />
+            <Route path="/calendar" element={
+              <PrivateRoute>
+                <Calendar />
+              </PrivateRoute>
+            } />
+            <Route path="/spyglass" element={
+              <PrivateRoute>
+                <SpyGlass />
+              </PrivateRoute>
+            } />
+            <Route path="/accounts" element={
+              <PrivateRoute>
+                <RedditAccounts />
+              </PrivateRoute>
+            } />
+          </Routes>
+        </Router>
+      </QueryClientProvider>
     </AuthProvider>
   );
 }

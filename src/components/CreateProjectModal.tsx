@@ -2,6 +2,7 @@ import React, { useState, useRef } from 'react';
 import { Upload, X } from 'lucide-react';
 import Modal from './Modal';
 import { supabase } from '../lib/supabase';
+import { useAuth } from '../contexts/AuthContext';
 
 interface CreateProjectModalProps {
   isOpen: boolean;
@@ -18,6 +19,7 @@ function CreateProjectModal({
   defaultName = '',
   defaultDescription = ''
 }: CreateProjectModalProps) {
+  const { user } = useAuth();
   const [name, setName] = useState(defaultName);
   const [description, setDescription] = useState(defaultDescription);
   const [imageUrl, setImageUrl] = useState<string | null>(null);
@@ -88,17 +90,35 @@ function CreateProjectModal({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name.trim() || saving) return;
+    if (!name.trim() || saving || !user) return;
 
     setSaving(true);
     setError(null);
 
     try {
+      // Create new project
+      const { data: project, error: projectError } = await supabase
+        .from('projects')
+        .insert({
+          name: name.trim(),
+          description: description.trim() || null,
+          image_url: imageUrl,
+          user_id: user.id
+        })
+        .select()
+        .single();
+
+      if (projectError) throw projectError;
+      if (!project) throw new Error('Failed to create project');
+
+      // Call onSubmit with the created project
       await onSubmit({
-        name: name.trim(),
-        description: description.trim() || null,
-        image_url: imageUrl
+        ...project,
+        name: project.name,
+        description: project.description,
+        image_url: project.image_url
       });
+
       onClose();
     } catch (err) {
       console.error('Error creating project:', err);

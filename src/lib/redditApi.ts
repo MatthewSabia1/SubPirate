@@ -74,8 +74,31 @@ class RedditAPI {
   private accessToken: string | null = null;
   private refreshToken: string | null = null;
   private expiresAt: number = 0;
-  private retryCount: number = 0;
-  private readonly MAX_RETRIES = 3;
+  private readonly USER_AGENT = 'web:SubPirate:1.0.0';
+
+  private async getRedditProfilePic(username: string): Promise<string | null> {
+    try {
+      const response = await fetch(`https://www.reddit.com/user/${username}/about.json`, {
+        headers: {
+          "User-Agent": this.USER_AGENT,
+          "Accept": "application/json"
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! Status: ${response.status}`);
+      }
+
+      const data = await response.json();
+      // Handle both icon_img and snoovatar_img
+      const avatarUrl = data?.data?.icon_img || data?.data?.snoovatar_img;
+      return avatarUrl ? avatarUrl.split('?')[0] : null;
+    } catch (error) {
+      console.error("Error fetching Reddit profile picture:", error);
+      // Return a generated avatar as fallback
+      return `https://api.dicebear.com/7.x/initials/svg?seed=${username}&backgroundColor=111111`;
+    }
+  }
 
   parseUsername(input: string): string {
     if (!input || typeof input !== 'string') {
@@ -98,6 +121,113 @@ class RedditAPI {
     // Handle u/username format
     const withoutPrefix = cleaned.replace(/^\/?(u\/)?/i, '').split(/[/?#]/)[0];
     return withoutPrefix.toLowerCase();
+  }
+
+  private async handleResponse(response: Response, endpoint: string) {
+    // Handle specific HTTP status codes
+    if (response.status === 404) {
+      throw new RedditAPIError('Subreddit not found', 404, endpoint);
+    }
+
+    if (response.status === 403) {
+      const responseText = await response.text();
+      if (responseText.includes('quarantined')) {
+        throw new RedditAPIError('This subreddit is quarantined', 403, endpoint);
+      } else if (responseText.includes('private')) {
+        throw new RedditAPIError('This subreddit is private', 403, endpoint);
+      } else if (responseText.includes('banned')) {
+        throw new RedditAPIError('This subreddit has been banned', 403, endpoint);
+      } else {
+        throw new RedditAPIError('Access denied', 403, endpoint);
+      }
+    }
+
+    if (response.status === 429) {
+      throw new RedditAPIError(
+        'Too many requests. Please try again later.',
+        429,
+        endpoint
+      );
+    }
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      throw new RedditAPIError(
+        error.message || `Reddit API error (${response.status})`,
+        response.status,
+        endpoint
+      );
+    }
+  }
+
+  async request(endpoint: string): Promise<any> {
+    try { 
+      // Use JSON API endpoint with proper headers
+      const url = `https://www.reddit.com${endpoint}${endpoint.endsWith('.json') ? '' : '.json'}`;
+      const response = await fetch(url, {
+        headers: {
+          'User-Agent': this.USER_AGENT,
+          'Accept': 'application/json'
+        },
+        credentials: 'omit' // Prevent CORS preflight
+      });
+
+      await this.handleResponse(response, endpoint);
+
+      // Only try to parse JSON if we have a successful response
+      if (response.ok) {
+        const result = await response.json();
+        if (!result) {
+          throw new RedditAPIError('Invalid response from Reddit API');
+        }
+        return result;
+      }
+
+      throw new RedditAPIError('Failed to fetch data from Reddit');
+    } catch (error) {
+      if (error instanceof RedditAPIError) throw error;
+      if (error instanceof TypeError && error.message.includes('Failed to fetch')) {
+        throw new RedditAPIError(
+          'Failed to connect to Reddit. Please check your internet connection.',
+          0,
+          endpoint
+        );
+      }
+      throw new RedditAPIError(
+        'Failed to fetch data from Reddit. Please try again later.',
+        0,
+        endpoint
+      );
+    }
+  }
+
+  private async retryWithBackoff<T>(
+    operation: () => Promise<T>,
+    maxRetries: number = 3,
+    baseDelay: number = 1000
+  ): Promise<T> {
+    let lastError: Error | null = null;
+    
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
+      try {
+        return await operation();
+      } catch (error) {
+        lastError = error as Error;
+        if (error instanceof RedditAPIError && error.status === 429) {
+          // Exponential backoff
+          const delay = baseDelay * Math.pow(2, attempt);
+          await new Promise(resolve => setTimeout(resolve, delay));
+          continue;
+        }
+        throw error;
+      }
+    }
+    
+    throw lastError;
+  }
+
+  private async safeRequest(endpoint: string): Promise<any> {
+    return this.retryWithBackoff(() => this.request(endpoint));
   }
 
   async analyzePostFrequency(
@@ -127,10 +257,11 @@ class RedditAPI {
     const results = [];
     for (const [subreddit, { count, posts }] of sortedSubreddits) {
       try {
-        const data = await this.request(`/r/${subreddit}/about.json`);
+        const data = await this.safeRequest(`/r/${subreddit}/about.json`);
 
         if (!data.data) {
-          throw new RedditAPIError('Invalid response from Reddit API', 0, 'about');
+          console.warn(`Invalid response for r/${subreddit}`);
+          continue;
         }
 
         const info = data.data;
@@ -147,7 +278,8 @@ class RedditAPI {
         // Add a small delay between requests
         await new Promise((resolve) => setTimeout(resolve, 100));
       } catch (error) {
-        console.error(`Error fetching info for r/${subreddit}:`, error);
+        // Log error but continue with other subreddits
+        console.warn(`Error fetching info for r/${subreddit}:`, error);
       }
     }
 
@@ -161,107 +293,14 @@ class RedditAPI {
   }
 
   private async getApplicationOnlyToken() {
-    try {
-      const response = await fetch('https://www.reddit.com/api/v1/access_token', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
-          'Authorization': `Basic ${btoa(`${CLIENT_ID}:${CLIENT_SECRET}`)}`,
-          'User-Agent': 'web:SubPirate:1.0.0'
-        },
-        body: new URLSearchParams({
-          grant_type: 'client_credentials',
-        }),
-      });
-
-      if (!response.ok) {
-        const error = await response.json().catch(() => ({}));
-        throw new RedditAPIError(
-          error.message || 'Failed to authenticate with Reddit',
-          response.status,
-          'auth'
-        );
-      }
-
-      const data = await response.json();
-      this.accessToken = data.access_token;
-      this.expiresAt = Date.now() + data.expires_in * 1000;
-    } catch (error) {
-      if (error instanceof RedditAPIError) throw error;
-      throw new RedditAPIError(
-        'Failed to connect to Reddit. Please check your internet connection.',
-        0,
-        'auth'
-      );
-    }
+    // Using public API, no auth needed
+    this.accessToken = 'public';
+    this.expiresAt = Date.now() + 24 * 60 * 60 * 1000; // 24 hours
   }
 
   async ensureAuth() {
     if (!this.accessToken || Date.now() >= this.expiresAt) {
       await this.getApplicationOnlyToken();
-    }
-  }
-
-  private async handleResponse(response: Response, endpoint: string) {
-    if (response.status === 404) {
-      throw new RedditAPIError('Subreddit not found', 404, endpoint);
-    }
-
-    if (response.status === 403) {
-      throw new RedditAPIError('Access denied', 403, endpoint);
-    }
-
-    if (response.status === 429) {
-      if (this.retryCount < this.MAX_RETRIES) {
-        this.retryCount++;
-        await new Promise((resolve) =>
-          setTimeout(resolve, 1000 * this.retryCount)
-        );
-        return null; // Signal retry
-      }
-      throw new RedditAPIError(
-        'Too many requests. Please try again later.',
-        429,
-        endpoint
-      );
-    }
-
-    if (!response.ok) {
-      const error = await response.json().catch(() => ({}));
-      throw new RedditAPIError(
-        error.message || `Reddit API error (${response.status})`,
-        response.status,
-        endpoint
-      );
-    }
-
-    this.retryCount = 0; // Reset retry count on success
-    return response.json();
-  }
-
-  async request(endpoint: string): Promise<any> {
-    try {
-      await this.ensureAuth();
-
-      const response = await fetch(`https://oauth.reddit.com${endpoint}`, {
-        headers: {
-          Authorization: `Bearer ${this.accessToken}`,
-          'User-Agent': 'web:SubPirate:1.0.0'
-        },
-      });
-
-      const result = await this.handleResponse(response, endpoint);
-      if (result === null) {
-        return this.request(endpoint); // Retry
-      }
-      return result;
-    } catch (error) {
-      if (error instanceof RedditAPIError) throw error;
-      throw new RedditAPIError(
-        'Failed to connect to Reddit. Please check your internet connection.',
-        0,
-        endpoint
-      );
     }
   }
 
@@ -455,7 +494,7 @@ class RedditAPI {
   async getUserPosts(
     username: string,
     sort: 'new' | 'top' = 'new',
-    limit = 100,
+    limit = 25,
     timeframe: 'hour' | 'day' | 'week' | 'month' | 'year' | 'all' = 'day'
   ): Promise<SubredditPost[]> {
     try {
@@ -464,89 +503,56 @@ class RedditAPI {
         throw new RedditAPIError('Invalid username format', 400, 'user_posts');
       }
 
-      try {
-        // First get user info for accurate karma
-        const userResponse = await fetch(
-          `https://www.reddit.com/user/${cleanUsername}/about.json`,
-          {
-            headers: { 'User-Agent': 'web:SubPirate:1.0.0' },
-          }
-        );
+      // Get user data and posts in parallel to speed up the request
+      const [userData, postsData] = await Promise.all([
+        this.request(`/user/${cleanUsername}/about`),
+        this.request(`/user/${cleanUsername}/submitted?limit=${limit}&sort=${sort}${
+          sort === 'top' ? `&t=${timeframe}` : ''
+        }`)
+      ]);
 
-        if (!userResponse.ok) {
-          if (userResponse.status === 404) {
-            throw new RedditAPIError('User not found', 404, 'user_posts');
-          }
-          throw new RedditAPIError('Failed to fetch user data', userResponse.status, 'user_posts');
-        }
-
-        const userData = await userResponse.json();
-        const postKarma = userData.data?.link_karma || 0;
-
-        // Then get all posts
-        const response = await fetch(
-          `https://www.reddit.com/user/${cleanUsername}/submitted.json?limit=${limit}&sort=${sort}${
-            sort === 'top' ? `&t=${timeframe}` : ''
-          }&raw_json=1`,
-          {
-            headers: { 'User-Agent': 'web:SubPirate:1.0.0' },
-          }
-        );
-
-        if (!response.ok) {
-          throw new RedditAPIError(
-            response.status === 404 ? 'User posts not found' : 'Failed to fetch user posts',
-            response.status,
-            'user_posts'
-          );
-        }
-
-        const data = await response.json();
-
-        if (!data.data?.children) {
-          throw new RedditAPIError('Invalid response from Reddit API', 0, 'user_posts');
-        }
-
-        const posts = data.data.children
-          .filter((child: any) => child.data)
-          .map((child: any) => ({
-            id: child.data.id,
-            title: this.decodeHtmlEntities(child.data.title),
-            subreddit: child.data.subreddit,
-            created_utc: child.data.created_utc,
-            score: child.data.score,
-            num_comments: child.data.num_comments,
-            url: child.data.url,
-            selftext: this.cleanMarkdown(
-              this.decodeHtmlEntities(child.data.selftext || '')
-            ),
-            thumbnail: child.data.thumbnail,
-          }));
-
-        // Add post karma to the first post for access in the calling code
-        if (posts.length > 0) {
-          posts[0].post_karma = postKarma;
-        }
-
-        return posts;
-      } catch (error) {
-        // Handle all network and API errors
-        if (error instanceof RedditAPIError) throw error;
-        throw new RedditAPIError(
-          'Failed to connect to Reddit. Please check your internet connection.',
-          0,
-          'user_posts'
-        );
+      if (!userData?.data) {
+        throw new RedditAPIError('Invalid user data response', 0, 'user_posts');
       }
+
+      if (!postsData?.data?.children) {
+        throw new RedditAPIError('Invalid posts response', 0, 'user_posts');
+      }
+
+      const postKarma = userData.data.link_karma || 0;
+      const posts = postsData.data.children
+        .filter((child: any) => child.data && !child.data.stickied)
+        .map((child: any) => ({
+          id: child.data.id,
+          title: this.decodeHtmlEntities(child.data.title),
+          subreddit: child.data.subreddit,
+          created_utc: child.data.created_utc,
+          score: child.data.score,
+          num_comments: child.data.num_comments,
+          url: child.data.url,
+          selftext: this.cleanMarkdown(
+            this.decodeHtmlEntities(child.data.selftext || '')
+          ),
+          thumbnail: child.data.thumbnail,
+          preview_url: child.data.preview?.images?.[0]?.source?.url || null
+        }));
+
+      // Add post karma to the first post for access in the calling code
+      if (posts.length > 0) {
+        posts[0].post_karma = postKarma;
+      }
+
+      return posts;
+
     } catch (error) {
       if (error instanceof RedditAPIError) {
         throw error;
       }
       throw new RedditAPIError(
-        'Failed to analyze user. Please check the username and try again.',
+        error instanceof Error ? error.message : 'Failed to analyze user. Please check the username and try again.',
         0,
         'user_posts'
-        );
+      );
     }
   }
 }

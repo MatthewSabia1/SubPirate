@@ -133,17 +133,7 @@ function ProjectSubreddits({ projectId }: ProjectSubredditsProps) {
   };
 
   const getSubredditIcon = (subreddit: ProjectSubreddit['subreddit']): string => {
-    // Use community icon first if available
-    if (subreddit.community_icon) {
-      return cleanRedditImageUrl(subreddit.community_icon) || '/default-subreddit-icon.png';
-    }
-    
-    // Fallback to icon_img if available
-    if (subreddit.icon_img) {
-      return cleanRedditImageUrl(subreddit.icon_img) || '/default-subreddit-icon.png';
-    }
-    
-    // Final fallback to generated placeholder
+    // Always use generated placeholder for consistency
     return `https://api.dicebear.com/7.x/shapes/svg?seed=${subreddit.name}&backgroundColor=111111&radius=12`;
   };
 

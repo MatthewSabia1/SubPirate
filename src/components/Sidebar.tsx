@@ -4,6 +4,7 @@ import {
   Search, 
   Telescope, 
   BookmarkCheck, 
+  BarChart3,
   Calendar, 
   FolderKanban, 
   Users, 
@@ -170,6 +171,13 @@ function Sidebar({ isMobileOpen, onMobileClose }: SidebarProps) {
         >
           <Telescope size={20} />
           SpyGlass
+        </button>
+        <button
+          onClick={() => handleNavigation('/analytics')}
+          className={`sidebar-link w-full text-left ${location.pathname === '/analytics' ? 'active' : ''}`}
+        >
+          <BarChart3 size={20} />
+          Analytics
         </button>
         <button
           onClick={() => handleNavigation('/saved')}

@@ -66,8 +66,7 @@ export function cleanRedditImageUrl(url: string | null): string | null {
   if (url.includes('?')) {
     try {
       const urlObj = new URL(url);
-      
-      // Keep important params for Reddit CDN URLs
+      // For Reddit CDN URLs, keep important params
       if (urlObj.hostname.includes('redd.it') || 
           urlObj.hostname.includes('reddit.com') || 
           urlObj.hostname.includes('redditstatic.com')) {
@@ -187,31 +186,30 @@ export function calculateMarketingFriendliness(subreddit: SubredditInfo, posts: 
 export function cleanImageUrl(url: string | null): string | null {
   if (!url) return null;
 
-  // Handle placeholder strings
-  if (url === 'self' || url === 'default' || url === 'spoiler' || url === 'nsfw') {
+  // Handle special URL cases and invalid URLs 
+  if (url === 'self' || url === 'default' || url === 'spoiler' || url === 'nsfw' || 
+      url === 'image' || url === 'private' || url === 'none' || url === 'null' ||
+      url.includes('styles.redditmedia.com') || url.includes('styles/')) {
     return null;
   }
 
   // Handle Reddit's image URLs
   if (url.includes('?')) {
-    // Keep only the base URL for most images
-    if (!url.includes('reddit') && !url.includes('redd.it')) {
-      return url.split('?')[0];
-    }
-    
-    // For Reddit CDN URLs, keep important query params
     const urlObj = new URL(url);
-    const params = new URLSearchParams();
     
-    // Keep only necessary params
-    if (urlObj.searchParams.has('width')) {
-      params.set('width', urlObj.searchParams.get('width')!);
-    }
-    if (urlObj.searchParams.has('format')) {
-      params.set('format', urlObj.searchParams.get('format')!);
+    // For Reddit CDN URLs, keep important params
+    if (urlObj.hostname.includes('redd.it') || 
+        urlObj.hostname.includes('reddit.com') || 
+        urlObj.hostname.includes('redditstatic.com')) {
+      // Keep only width and format params
+      const params = new URLSearchParams();
+      if (urlObj.searchParams.has('width')) params.set('width', urlObj.searchParams.get('width')!);
+      if (urlObj.searchParams.has('format')) params.set('format', urlObj.searchParams.get('format')!);
+      return `${urlObj.origin}${urlObj.pathname}${params.toString() ? `?${params}` : ''}`;
     }
     
-    return params.toString() ? `${urlObj.origin}${urlObj.pathname}?${params}` : `${urlObj.origin}${urlObj.pathname}`;
+    // For non-Reddit URLs, strip query params
+    return `${urlObj.origin}${urlObj.pathname}`;
   }
 
   return url;

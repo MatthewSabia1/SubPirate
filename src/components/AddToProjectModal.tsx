@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Plus, X, Search } from 'lucide-react';
 import Modal from './Modal';
 import { supabase } from '../lib/supabase';
+import { useAuth } from '../contexts/AuthContext';
 
 interface Project {
   id: string;
@@ -18,6 +19,7 @@ interface AddToProjectModalProps {
 }
 
 function AddToProjectModal({ isOpen, onClose, subredditId, subredditName }: AddToProjectModalProps) {
+  const { user } = useAuth();
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -87,7 +89,7 @@ function AddToProjectModal({ isOpen, onClose, subredditId, subredditName }: AddT
 
   const handleCreateProject = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newProjectName.trim()) return;
+    if (!newProjectName.trim() || !user) return;
 
     setSaving(true);
     try {
@@ -96,7 +98,8 @@ function AddToProjectModal({ isOpen, onClose, subredditId, subredditName }: AddT
         .from('projects')
         .insert({
           name: newProjectName.trim(),
-          description: newProjectDescription.trim() || null
+          description: newProjectDescription.trim() || null,
+          user_id: user.id
         })
         .select()
         .single();
@@ -113,6 +116,10 @@ function AddToProjectModal({ isOpen, onClose, subredditId, subredditName }: AddT
         });
 
       if (linkError) throw linkError;
+
+      // Clear form and close modal
+      setNewProjectName('');
+      setNewProjectDescription('');
       onClose();
     } catch (err) {
       console.error('Error creating project:', err);

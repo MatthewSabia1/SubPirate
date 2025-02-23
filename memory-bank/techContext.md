@@ -5,21 +5,22 @@
 ### Frontend
 - **Framework**: React with TypeScript
 - **Styling**: Tailwind CSS
-- **State Management**: React Query + Local State
+- **State Management**: React Query + Local State + Chart.js
 - **Router**: React Router
 - **Icons**: Lucide React
 - **Forms**: React Hook Form
+- **Charts**: Chart.js + React Chart.js 2
 
 ### Backend
 - **Platform**: Supabase
 - **Database**: PostgreSQL
 - **Authentication**: Supabase Auth
 - **Storage**: Supabase Storage
-- **Real-time**: Supabase Realtime
+- **Real-time**: Supabase Realtime + Chart.js Updates
 
 ### External APIs
 - **Reddit API**: Direct REST integration
-- **OpenRouter API**: AI analysis with Grok model
+- **Chart.js**: Data visualization
 - **DiceBear**: Avatar generation
 
 ## Development Environment
@@ -56,7 +57,9 @@ VITE_OPENROUTER_API_KEY=
   "@supabase/supabase-js": "^2.0.0",
   "tailwindcss": "^3.0.0",
   "lucide-react": "^0.300.0",
-  "react-hook-form": "^7.0.0"
+  "lucide-react": "^0.300.0",
+  "chart.js": "^4.4.1",
+  "react-chartjs-2": "^5.2.0"
 }
 ```
 

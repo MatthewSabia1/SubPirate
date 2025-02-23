@@ -42,7 +42,7 @@ CREATE TABLE public.projects (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
   user_id uuid NOT NULL,
   name text NOT NULL,
-  description text NULL,
+  description text NOT NULL,
   created_at timestamp with time zone NULL DEFAULT now(),
   updated_at timestamp with time zone NULL DEFAULT now(),
   image_url text NULL,
@@ -94,7 +94,8 @@ CREATE TABLE public.saved_subreddits (
 ) TABLESPACE pg_default;
 
 CREATE VIEW public.saved_subreddits_with_icons AS 
-SELECT ss.id,
+SELECT 
+    ss.id,
     ss.user_id,
     ss.created_at,
     s.id AS subreddit_id,
@@ -104,7 +105,8 @@ SELECT ss.id,
     s.marketing_friendly_score,
     s.allowed_content,
     s.icon_img,
-    s.community_icon
+    s.community_icon,
+    s.analysis_data
 FROM saved_subreddits ss
 JOIN subreddits s ON ss.subreddit_id = s.id;
 
@@ -152,6 +154,7 @@ CREATE TABLE public.subreddits (
   community_icon text NULL,
   total_posts_24h integer NULL DEFAULT 0,
   last_post_sync timestamp with time zone NULL DEFAULT now(),
+  analysis_data jsonb NULL,
   CONSTRAINT subreddits_pkey PRIMARY KEY (id),
   CONSTRAINT subreddits_name_key UNIQUE (name)
 ) TABLESPACE pg_default;
@@ -159,7 +162,7 @@ CREATE TABLE public.subreddits (
 CREATE TABLE public.subscription_tiers (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
   name text NOT NULL,
-  description text NULL,
+  description text NOT NULL,
   stripe_price_id text NOT NULL,
   price integer NOT NULL,
   interval text NOT NULL,
@@ -179,4 +182,46 @@ CREATE TABLE public.subscriptions (
   status public.subscription_status NOT NULL,
   price_id text NULL,
   quantity integer NULL DEFAULT 1,
-  cancel_at_period
+  cancel_at_period_end boolean NULL DEFAULT false,
+  cancel_at timestamp with time zone NULL,
+  canceled_at timestamp with time zone NULL,
+  current_period_start timestamp with time zone NULL,
+  current_period_end timestamp with time zone NULL,
+  created_at timestamp with time zone NULL DEFAULT now(),
+  ended_at timestamp with time zone NULL,
+  trial_start timestamp with time zone NULL,
+  trial_end timestamp with time zone NULL,
+  tier_id uuid NULL,
+  CONSTRAINT subscriptions_pkey PRIMARY KEY (id),
+  CONSTRAINT subscriptions_user_id_key UNIQUE (user_id),
+  CONSTRAINT subscriptions_tier_id_fkey FOREIGN KEY (tier_id) REFERENCES subscription_tiers(id),
+  CONSTRAINT subscriptions_user_id_fkey FOREIGN KEY (user_id) REFERENCES profiles(id) ON DELETE CASCADE
+) TABLESPACE pg_default;
+
+-- Row Level Security Policies
+
+CREATE POLICY "Users can view own profile" ON public.profiles FOR SELECT TO authenticated USING (auth.uid() = id);
+CREATE POLICY "Users can update own profile" ON public.profiles FOR UPDATE TO authenticated USING (auth.uid() = id) WITH CHECK (auth.uid() = id);
+
+CREATE POLICY "Users can view own projects" ON public.projects FOR SELECT TO authenticated USING (auth.uid() = user_id);
+CREATE POLICY "Users can create projects" ON public.projects FOR INSERT TO authenticated WITH CHECK (auth.uid() = user_id);
+CREATE POLICY "Users can update own projects" ON public.projects FOR UPDATE TO authenticated USING (auth.uid() = user_id);
+CREATE POLICY "Users can delete own projects" ON public.projects FOR DELETE TO authenticated USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can view own project subreddits" ON public.project_subreddits FOR SELECT TO authenticated USING (EXISTS (SELECT 1 FROM public.projects WHERE (public.projects.id = public.project_subreddits.project_id) AND (public.projects.user_id = auth.uid())));
+CREATE POLICY "Users can create project subreddits" ON public.project_subreddits FOR INSERT TO authenticated WITH CHECK (EXISTS (SELECT 1 FROM public.projects WHERE (public.projects.id = public.project_subreddits.project_id) AND (public.projects.user_id = auth.uid())));
+CREATE POLICY "Users can delete project subreddits" ON public.project_subreddits FOR DELETE TO authenticated USING (EXISTS (SELECT 1 FROM public.projects WHERE (public.projects.id = public.project_subreddits.project_id) AND (public.projects.user_id = auth.uid())));
+
+CREATE POLICY "Users can view own reddit accounts" ON public.reddit_accounts FOR SELECT TO authenticated USING (user_id = auth.uid());
+CREATE POLICY "Users can create reddit accounts" ON public.reddit_accounts FOR INSERT TO authenticated WITH CHECK (user_id = auth.uid());
+CREATE POLICY "Users can update own reddit accounts" ON public.reddit_accounts FOR UPDATE TO authenticated USING (user_id = auth.uid());
+CREATE POLICY "Users can delete own reddit accounts" ON public.reddit_accounts FOR DELETE TO authenticated USING (user_id = auth.uid());
+
+CREATE POLICY "Authenticated users can view subreddits" ON public.subreddits FOR SELECT TO authenticated USING (true);
+CREATE POLICY "Authenticated users can create subreddits" ON public.subreddits FOR INSERT TO authenticated WITH CHECK (true);
+CREATE POLICY "Authenticated users can update subreddits" ON public.subreddits FOR UPDATE TO authenticated USING (true);
+
+CREATE POLICY "Users can view own subscription" ON public.subscriptions FOR SELECT TO authenticated USING (user_id = auth.uid());
+CREATE POLICY "Users can update own subscription" ON public.subscriptions FOR UPDATE TO authenticated USING (user_id = auth.uid());
+
+-- Add any additional policies as needed
