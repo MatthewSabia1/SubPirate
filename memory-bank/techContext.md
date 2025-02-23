@@ -78,47 +78,88 @@ VITE_OPENROUTER_API_KEY=
 
 ## Database Schema
 
-### Tables
+### Core Tables
+
+#### profiles
+```sql
+create table profiles (
+  id uuid primary key references auth.users(id) on delete cascade,
+  display_name text,
+  email text,
+  image_url text,
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
+);
+```
 
 #### projects
 ```sql
 create table projects (
-  id uuid primary key default uuid_generate_v4(),
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid references profiles(id) on delete cascade,
   name text not null,
-  description text,
+  description text not null,
   image_url text,
-  created_at timestamp with time zone default timezone('utc'::text, now()),
-  updated_at timestamp with time zone default timezone('utc'::text, now()),
-  user_id uuid references auth.users(id) on delete cascade
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
 );
 ```
 
 #### subreddits
 ```sql
 create table subreddits (
-  id uuid primary key default uuid_generate_v4(),
+  id uuid primary key default gen_random_uuid(),
   name text unique not null,
-  subscriber_count integer not null,
-  active_users integer not null,
-  marketing_friendly_score integer not null,
-  allowed_content text[] not null,
-  posting_requirements jsonb not null,
-  posting_frequency jsonb not null,
-  best_practices text[] not null,
+  subscriber_count integer default 0,
+  active_users integer default 0,
+  marketing_friendly_score integer default 0,
+  posting_requirements jsonb default '{}',
+  posting_frequency jsonb default '{}',
+  allowed_content text[] default '{}',
+  best_practices text[] default '{}',
   rules_summary text,
   title_template text,
-  last_analyzed_at timestamp with time zone not null,
-  analysis_data jsonb not null
+  icon_img text,
+  community_icon text,
+  total_posts_24h integer default 0,
+  analysis_data jsonb,
+  last_analyzed_at timestamptz default now(),
+  last_post_sync timestamptz default now(),
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
 );
 ```
+
+#### reddit_accounts
+```sql
+create table reddit_accounts (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid references profiles(id) on delete cascade,
+  username text not null,
+  karma_score integer default 0,
+  avatar_url text,
+  total_posts integer default 0,
+  posts_today integer default 0,
+  total_posts_24h integer default 0,
+  last_post_check timestamptz default now(),
+  last_karma_check timestamptz default now(),
+  last_post_sync timestamptz default now(),
+  created_at timestamptz default now(),
+  updated_at timestamptz default now(),
+  unique(user_id, username)
+);
+```
+
+### Relationship Tables
 
 #### project_subreddits
 ```sql
 create table project_subreddits (
-  id uuid primary key default uuid_generate_v4(),
+  id uuid primary key default gen_random_uuid(),
   project_id uuid references projects(id) on delete cascade,
   subreddit_id uuid references subreddits(id) on delete cascade,
-  created_at timestamp with time zone default timezone('utc'::text, now()),
+  created_at timestamptz default now(),
+  last_post_at timestamptz,
   unique(project_id, subreddit_id)
 );
 ```
@@ -126,13 +167,68 @@ create table project_subreddits (
 #### saved_subreddits
 ```sql
 create table saved_subreddits (
-  id uuid primary key default uuid_generate_v4(),
-  user_id uuid references auth.users(id) on delete cascade,
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid references profiles(id) on delete cascade,
   subreddit_id uuid references subreddits(id) on delete cascade,
-  created_at timestamp with time zone default timezone('utc'::text, now()),
+  created_at timestamptz default now(),
+  last_post_at timestamptz,
   unique(user_id, subreddit_id)
 );
 ```
+
+#### reddit_posts
+```sql
+create table reddit_posts (
+  id uuid primary key default gen_random_uuid(),
+  reddit_account_id uuid references reddit_accounts(id) on delete cascade,
+  subreddit_id uuid references subreddits(id) on delete cascade,
+  post_id text not null,
+  created_at timestamptz default now(),
+  unique(reddit_account_id, post_id)
+);
+```
+
+### Views
+
+#### saved_subreddits_with_icons
+```sql
+create view saved_subreddits_with_icons as
+select 
+  ss.id,
+  ss.user_id,
+  ss.created_at,
+  s.id as subreddit_id,
+  s.name,
+  s.subscriber_count,
+  s.active_users,
+  s.marketing_friendly_score,
+  s.allowed_content,
+  s.icon_img,
+  s.community_icon,
+  s.analysis_data
+from saved_subreddits ss
+join subreddits s on ss.subreddit_id = s.id;
+```
+
+### Security Policies
+
+The database implements Row Level Security (RLS) with the following key policies:
+
+1. **Profiles**
+   - Users can only view and update their own profile
+
+2. **Projects**
+   - Users can only view, create, update, and delete their own projects
+
+3. **Reddit Accounts**
+   - Users can only view, create, update, and delete their own reddit accounts
+
+4. **Subreddits**
+   - All authenticated users can view, create, and update subreddits
+   - No deletion allowed to maintain data integrity
+
+5. **Project Subreddits**
+   - Users can only view, create, and delete project subreddits for their own projects
 
 ## API Integration
 

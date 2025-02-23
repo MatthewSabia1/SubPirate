@@ -7,10 +7,8 @@ CREATE TABLE public.profiles (
   updated_at timestamp with time zone NULL DEFAULT now(),
   email text NULL,
   image_url text NULL,
-  subscription_id uuid NULL,
   CONSTRAINT profiles_pkey PRIMARY KEY (id),
-  CONSTRAINT profiles_id_fkey FOREIGN KEY (id) REFERENCES auth.users(id) ON DELETE CASCADE,
-  CONSTRAINT profiles_subscription_id_fkey FOREIGN KEY (subscription_id) REFERENCES subscriptions(id)
+  CONSTRAINT profiles_id_fkey FOREIGN KEY (id) REFERENCES auth.users(id) ON DELETE CASCADE
 ) TABLESPACE pg_default;
 
 CREATE TABLE public.project_members (
