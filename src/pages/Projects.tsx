@@ -82,16 +82,14 @@ function Projects() {
 
   if (loading) {
     return (
-      <div className="p-8">
-        <div className="flex items-center justify-center h-64">
-          <div className="text-gray-400">Loading projects...</div>
-        </div>
+      <div className="flex items-center justify-center h-64">
+        <div className="text-gray-400">Loading projects...</div>
       </div>
     );
   }
 
   return (
-    <div className="p-8">
+    <div className="max-w-[1200px] mx-auto px-4 md:px-8">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
         <h1 className="text-2xl md:text-4xl font-bold truncate">Projects</h1>
         <button className="primary flex items-center justify-center gap-2 text-sm md:text-base h-10 md:h-11">
