@@ -149,4 +149,225 @@ src/
 - Unit tests for utils
 - Component testing
 - Integration tests
-- E2E workflows 
+- E2E workflows
+
+### 1. Type Safety Guidelines
+- Use `unknown` for external data
+- Implement type guards
+- Validate parsed data
+- Handle edge cases
+
+### 2. Analysis Guidelines
+- Sample sufficient data
+- Validate inputs
+- Provide fallbacks
+- Handle errors gracefully
+
+### 3. Database Guidelines
+- Match schema types
+- Handle nullables
+- Validate before save
+- Type-safe queries
+
+## UI Patterns
+
+### Card Interaction Pattern
+```tsx
+<div 
+  onClick={handleCardClick}
+  className="p-4 hover:bg-[#1A1A1A] transition-colors cursor-pointer"
+>
+  <div className="flex items-center justify-between">
+    {/* Card Content */}
+    <div className="flex items-center gap-4">
+      {/* Main Content */}
+    </div>
+    
+    {/* Action Buttons */}
+    <div onClick={e => e.stopPropagation()}>
+      {/* Independent Actions */}
+    </div>
+  </div>
+</div>
+```
+
+Key characteristics:
+1. Full Card Clickability:
+   - Entire card surface is clickable
+   - Clear visual feedback on hover
+   - Proper cursor indication
+   - Accessible click targets
+
+2. Action Independence:
+   - Action buttons stop event propagation
+   - Preserve independent functionality
+   - Clear visual separation
+   - Maintain hover states
+
+3. Visual Hierarchy:
+   - Card-level hover effects
+   - Action-specific states
+   - Status indicators
+   - Consistent spacing
+
+4. Implementation:
+   - Event bubbling control
+   - Type-safe handlers
+   - Proper event isolation
+   - Accessibility support
+
+### Data Display Consistency
+1. Community Stats Format
+   - Total subscribers: Gray text with Users icon
+   - Online users: Emerald text with Activity icon
+   - Consistent spacing and layout across views
+   - Conditional rendering for online count when > 0
+
+2. Component Structure
+   - Grid-based layouts for data tables
+   - Consistent column widths and spacing
+   - Unified action button styling
+   - Standardized icon usage
+
+### Data Refresh Patterns
+1. Automatic Updates
+   - Periodic refresh of subreddit data
+   - Database synchronization
+   - Local state management
+   - Error handling and recovery
+
+2. Data Transformation
+   - Consistent handling of API responses
+   - Proper type casting and validation
+   - Unified formatting functions
+   - Error boundary implementation
+
+## Component Architecture
+
+### Shared Components
+1. Data Display Components
+   - Community stats display
+   - Action buttons
+   - Status indicators
+   - Loading states
+
+2. Data Management
+   - Refresh mechanisms
+   - State synchronization
+   - Error handling
+   - Cache management
+
+### Code Organization
+1. Component Structure
+   - Consistent prop interfaces
+   - Shared utility functions
+   - Common styling patterns
+   - Reusable hooks
+
+2. State Management
+   - Local component state
+   - Database synchronization
+   - Cache handling
+   - Error state management
+
+## Analysis System Architecture
+
+### Data Flow
+```mermaid
+flowchart LR
+    Input[Subreddit Data] --> Preprocessing[Data Preprocessing]
+    Preprocessing --> TopPosts[Top 50 Posts]
+    TopPosts --> Analysis[Analysis Engine]
+    Analysis --> AIProcessing[OpenRouter AI]
+    AIProcessing --> Validation[Output Validation]
+    Validation --> Transform[Type Transform]
+    Transform --> Database[Supabase DB]
+```
+
+### Analysis Pipeline
+1. **Data Collection**
+   - Fetch subreddit metadata
+   - Gather top 50 posts
+   - Sort by performance
+   - Extract key metrics
+
+2. **Preprocessing**
+   - Clean input data
+   - Format for AI analysis
+   - Remove noise
+   - Prepare context
+
+3. **AI Analysis**
+   - Send to OpenRouter
+   - Process response
+   - Validate output
+   - Transform types
+
+4. **Data Storage**
+   - Type validation
+   - Schema matching
+   - Database update
+   - Cache refresh
+
+### Type Safety Patterns
+1. **API Response Handling**
+   - Use `unknown` for initial responses
+   - Type validation before processing
+   - Specific error types
+   - Safe type assertions
+
+2. **Data Validation**
+   - Schema validation
+   - Type guards
+   - Default values
+   - Error recovery
+
+3. **Database Compatibility**
+   - Strict schema types
+   - Nullable field handling
+   - Type-safe transformations
+   - Validation before storage
+
+## Layout Patterns
+
+### Page Container Pattern
+The application now follows a consistent page container pattern across major list views:
+
+```tsx
+<div className="max-w-[1200px] mx-auto px-4 md:px-8">
+  {/* Page content */}
+</div>
+```
+
+Key characteristics:
+1. Maximum width constraint (1200px)
+2. Centered horizontally using auto margins
+3. Responsive padding:
+   - Mobile: 16px (px-4)
+   - Desktop: 32px (px-8)
+
+Currently implemented in:
+- SavedList component (`src/pages/SavedList.tsx`)
+- Projects page (`src/pages/Projects.tsx`)
+
+This pattern ensures:
+- Consistent content width across pages
+- Proper content alignment
+- Responsive behavior on different screen sizes
+- Improved readability on wide screens
+
+### Card List Pattern
+For lists of items (projects, saved subreddits), we use:
+```tsx
+<div className="bg-[#111111] rounded-lg overflow-hidden">
+  <div className="divide-y divide-[#222222]">
+    {/* List items */}
+  </div>
+</div>
+```
+
+Features:
+- Dark background (#111111)
+- Rounded corners
+- Dividers between items (#222222)
+- Overflow handling 
