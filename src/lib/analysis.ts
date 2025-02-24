@@ -271,6 +271,64 @@ function calculateMarketingScore(input: SubredditAnalysisInput): number {
   return Math.max(0, Math.min(100, Math.round(finalScore)));
 }
 
+function extractCommonTopics(posts: SubredditPost[]): string[] {
+  // Extract common words/phrases from titles
+  const commonWords = posts
+    .map(post => post.title.toLowerCase())
+    .join(' ')
+    .split(/\W+/)
+    .filter(word => word.length > 3)
+    .reduce((acc, word) => {
+      acc[word] = (acc[word] || 0) + 1;
+      return acc;
+    }, {} as Record<string, number>);
+
+  // Get top 5 most common meaningful words
+  return Object.entries(commonWords)
+    .sort(([, a], [, b]) => b - a)
+    .slice(0, 5)
+    .map(([word]) => word);
+}
+
+function extractTitlePatterns(posts: SubredditPost[]): string[] {
+  const patterns = [
+    'Question format: "What/How/Why..."',
+    'List format: "X ways to..."',
+    'Guide format: "How to..."',
+    'Discussion format: "Thoughts on..."'
+  ];
+
+  // Count pattern occurrences
+  const patternCounts = patterns.map(pattern => ({
+    pattern,
+    count: posts.filter(post => 
+      post.title.toLowerCase().includes(pattern.split(':')[1].trim().toLowerCase())
+    ).length
+  }));
+
+  // Return patterns that appear in at least 10% of posts
+  return patternCounts
+    .filter(({ count }) => count >= posts.length * 0.1)
+    .map(({ pattern }) => pattern);
+}
+
+function calculateTitleEffectiveness(posts: SubredditPost[]): number {
+  if (!posts.length) return 0;
+
+  // Calculate average engagement
+  const avgEngagement = posts.reduce((sum, post) => 
+    sum + post.score + post.num_comments, 0
+  ) / posts.length;
+
+  // Find posts with above average engagement
+  const highEngagementPosts = posts.filter(post => 
+    post.score + post.num_comments > avgEngagement
+  );
+
+  // Return percentage of high engagement posts
+  return Math.round((highEngagementPosts.length / posts.length) * 100);
+}
+
 export async function analyzeSubredditData(
   info: SubredditInfo,
   posts: SubredditPost[],
@@ -407,12 +465,14 @@ export async function analyzeSubredditData(
         marketingFriendliness: {
           score: calculateMarketingScore(input),
           reasons: [
-            `Community of ${formatNumber(info.subscribers)} members with ${formatNumber(info.active_users)} currently active`,
-            `Average engagement rate: ${Math.round(engagement.interaction_rate)} interactions per post`
+            `Community size: ${formatNumber(info.subscribers)} members`,
+            `Activity level: ${formatNumber(info.active_users)} active users`,
+            `Engagement rate: ${Math.round(engagement.interaction_rate)} interactions per post`
           ],
           recommendations: [
-            'Detailed recommendations loading...',
-            'AI analysis in progress...'
+            'Follow posting guidelines and rules',
+            'Match community engagement patterns',
+            'Maintain consistent posting schedule'
           ]
         },
         postingLimits: {
@@ -424,43 +484,64 @@ export async function analyzeSubredditData(
         },
         contentStrategy: {
           recommendedTypes: getRecommendedContentTypes(topPosts),
-          topics: ['Analyzing common topics...'],
-          style: 'Analyzing posting patterns and community preferences...',
+          topics: extractCommonTopics(topPosts),
+          style: 'Match successful post formats',
           dos: [
             `Post during peak hours: ${formatBestPostingTimes(engagement.peak_hours)[0]}`,
-            `Aim for ${Math.round(engagement.avg_comments)} or more comments per post`,
-            'Additional insights loading...'
+            `Target ${Math.round(engagement.avg_comments)} or more comments per post`,
+            'Follow community posting patterns'
           ],
           donts: [
             ...info.rules
               .filter(rule => analyzeRuleMarketingImpact(rule) === 'high')
               .map(rule => rule.title),
-            'Additional restrictions loading...'
+            'Avoid low-effort content',
+            'Respect posting frequency limits'
           ]
         },
         titleTemplates: {
-          patterns: ['Analyzing successful title patterns...'],
-          examples: ['Loading examples from top posts...'],
-          effectiveness: 0
+          patterns: extractTitlePatterns(topPosts),
+          examples: topPosts.slice(0, 3).map(post => post.title),
+          effectiveness: calculateTitleEffectiveness(topPosts)
         },
         strategicAnalysis: {
           strengths: [
-            `Active community with ${formatNumber(info.active_users)} online users`,
-            `Average of ${Math.round(input.posts_per_day)} posts per day`,
-            'Detailed strengths analysis loading...'
+            `Active community: ${formatNumber(info.active_users)} online users`,
+            `Regular activity: ${Math.round(input.posts_per_day)} posts per day`,
+            'Established posting patterns'
           ],
-          weaknesses: ['Analyzing potential challenges...'],
-          opportunities: ['Identifying growth opportunities...'],
-          risks: ['Evaluating potential risks...']
+          weaknesses: [
+            'Competition for visibility',
+            'Need to maintain engagement',
+            'Content quality standards'
+          ],
+          opportunities: [
+            'Peak posting time optimization',
+            'Content type diversification',
+            'Community engagement potential'
+          ],
+          risks: [
+            'Rule violation penalties',
+            'Engagement fluctuations',
+            'Content saturation'
+          ]
         },
         gamePlan: {
           immediate: [
-            'Follow posting time patterns',
-            'Match community engagement levels',
-            'Detailed strategy loading...'
+            'Study top performing content',
+            'Plan content calendar',
+            'Prepare posting templates'
           ],
-          shortTerm: ['Analyzing optimal approach...'],
-          longTerm: ['Developing long-term recommendations...']
+          shortTerm: [
+            'Build posting consistency',
+            'Track engagement metrics',
+            'Refine content strategy'
+          ],
+          longTerm: [
+            'Establish community presence',
+            'Optimize posting schedule',
+            'Scale successful formats'
+          ]
         }
       }
     };

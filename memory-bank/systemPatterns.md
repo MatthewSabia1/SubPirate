@@ -272,61 +272,202 @@ Key characteristics:
 
 ## Analysis System Architecture
 
-### Data Flow
-```mermaid
-flowchart LR
-    Input[Subreddit Data] --> Preprocessing[Data Preprocessing]
-    Preprocessing --> TopPosts[Top 50 Posts]
-    TopPosts --> Analysis[Analysis Engine]
-    Analysis --> AIProcessing[OpenRouter AI]
-    AIProcessing --> Validation[Output Validation]
-    Validation --> Transform[Type Transform]
-    Transform --> Database[Supabase DB]
+### Core Components
+
+#### 1. OpenRouter Service (`src/lib/openRouter.ts`)
+- Primary interface for AI analysis
+- Handles API communication
+- Manages retries and error handling
+- Validates and transforms AI output
+
+Latest patterns:
+```typescript
+interface SubredditAnalysisInput {
+  name: string;
+  title: string;
+  description: string;
+  rules: {
+    title: string;
+    description: string;
+    priority: number;
+    marketingImpact: 'high' | 'medium' | 'low';
+  }[];
+  content_categories: string[];
+  posting_requirements: {
+    karma_required: boolean;
+    account_age_required: boolean;
+    manual_approval: boolean;
+  };
+  allowed_content_types: string[];
+}
 ```
 
-### Analysis Pipeline
-1. **Data Collection**
-   - Fetch subreddit metadata
-   - Gather top 50 posts
-   - Sort by performance
-   - Extract key metrics
+#### 2. Analysis Worker (`src/workers/analysis.worker.ts`)
+- Handles analysis in background thread
+- Prepares input data
+- Manages analysis lifecycle
+- Reports progress and results
 
-2. **Preprocessing**
-   - Clean input data
-   - Format for AI analysis
-   - Remove noise
-   - Prepare context
+### Analysis Patterns
 
-3. **AI Analysis**
-   - Send to OpenRouter
-   - Process response
-   - Validate output
-   - Transform types
+#### Rule Analysis Pattern
+1. Text Analysis:
+   ```typescript
+   function determineMarketingImpact(rule: { title: string; description: string }): 'high' | 'medium' | 'low' {
+     const text = `${rule.title} ${rule.description}`.toLowerCase();
+     
+     const highImpactKeywords = [
+       'spam', 'promotion', 'advertising', 'marketing', 'self-promotion',
+       'commercial', 'business', 'selling', 'merchandise', 'affiliate'
+     ];
+     
+     const mediumImpactKeywords = [
+       'quality', 'format', 'title', 'flair', 'tags',
+       'submission', 'guidelines', 'requirements', 'posting'
+     ];
+     
+     if (highImpactKeywords.some(keyword => text.includes(keyword))) {
+       return 'high';
+     }
+     
+     if (mediumImpactKeywords.some(keyword => text.includes(keyword))) {
+       return 'medium';
+     }
+     
+     return 'low';
+   }
+   ```
 
-4. **Data Storage**
-   - Type validation
-   - Schema matching
-   - Database update
-   - Cache refresh
+2. Content Type Detection:
+   ```typescript
+   function determineAllowedContentTypes(info: SubredditInfo, posts: SubredditPost[]): string[] {
+     const types = new Set<string>();
+     
+     // Rule analysis
+     const rulesText = info.rules
+       .map(rule => `${rule.title} ${rule.description}`)
+       .join(' ')
+       .toLowerCase();
 
-### Type Safety Patterns
-1. **API Response Handling**
-   - Use `unknown` for initial responses
-   - Type validation before processing
-   - Specific error types
-   - Safe type assertions
+     // Default content types
+     if (!rulesText.includes('no text posts')) types.add('text');
+     if (!rulesText.includes('no image')) types.add('image');
+     if (!rulesText.includes('no video')) types.add('video');
+     if (!rulesText.includes('no link')) types.add('link');
 
-2. **Data Validation**
-   - Schema validation
-   - Type guards
-   - Default values
-   - Error recovery
+     // Validation against posts
+     posts.forEach(post => {
+       if (post.selftext) types.add('text');
+       if (post.url.match(/\.(jpg|jpeg|png|gif)$/i)) types.add('image');
+       if (post.url.match(/\.(mp4|webm)$/i)) types.add('video');
+       if (post.url.match(/^https?:\/\//) && !post.url.match(/\.(jpg|jpeg|png|gif|mp4|webm)$/i)) {
+         types.add('link');
+       }
+     });
 
-3. **Database Compatibility**
-   - Strict schema types
-   - Nullable field handling
-   - Type-safe transformations
-   - Validation before storage
+     return Array.from(types);
+   }
+   ```
+
+#### Title Template Pattern
+```typescript
+function extractTitlePatterns(rules: any[]): string[] {
+  const patterns = new Set<string>();
+  const ruleText = Array.isArray(rules) ? rules.join(' ').toLowerCase() : '';
+
+  if (ruleText.includes('[') && ruleText.includes(']')) {
+    patterns.add('[Category/Topic] Your Title');
+  }
+  
+  if (ruleText.includes('flair')) {
+    patterns.add('Title with Required Flair');
+  }
+
+  if (patterns.size === 0) {
+    patterns.add('Descriptive Title');
+    patterns.add('Question Format Title?');
+    patterns.add('[Topic] - Description');
+  }
+
+  return Array.from(patterns);
+}
+```
+
+#### Marketing Score Pattern
+```typescript
+function calculateMarketingScore(rules: any[]): number {
+  let score = 75; // Base score
+  
+  // Count restrictive rules
+  const highImpactRules = rules.filter((r: any) => r.marketingImpact === 'high').length;
+  const mediumImpactRules = rules.filter((r: any) => r.marketingImpact === 'medium').length;
+  
+  // Deduct points for restrictive rules
+  score -= (highImpactRules * 10);
+  score -= (mediumImpactRules * 5);
+  
+  return Math.max(0, Math.min(100, score));
+}
+```
+
+### AI Integration Pattern
+
+#### System Prompt Pattern
+```typescript
+const systemPrompt = `You are an expert Reddit marketing analyst. Your task is to analyze subreddit rules and content requirements to determine marketing potential. Focus ONLY on:
+
+1. Rule Analysis:
+   - How restrictive are the rules regarding marketing/promotion?
+   - What content types are allowed/prohibited?
+   - Are there specific formatting requirements?
+
+2. Title Requirements:
+   - Required formats (e.g. [Tags], specific prefixes)
+   - Prohibited patterns
+   - Length restrictions
+   - Example templates that comply with rules
+
+3. Content Restrictions:
+   - Allowed media types
+   - Required content elements
+   - Prohibited content types
+   - Quality requirements
+
+DO NOT consider engagement metrics, subscriber counts, or activity levels. Base your analysis purely on how permissive or restrictive the subreddit's rules and requirements are for marketing activities.`;
+```
+
+#### Output Validation Pattern
+```typescript
+function validateAndTransformOutput(result: unknown): AIAnalysisOutput {
+  let parsedResult: any = result;
+  
+  try {
+    // Handle markdown-formatted results
+    if (typeof parsedResult === 'string') {
+      const markdownMatch = parsedResult.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
+      if (markdownMatch) {
+        parsedResult = JSON.parse(markdownMatch[1].trim());
+      }
+    }
+
+    // Transform and validate output
+    const output: AIAnalysisOutput = {
+      postingLimits: {
+        frequency: parsedResult?.postingLimits?.frequency || 1,
+        bestTimeToPost: ['Morning', 'Afternoon', 'Evening'],
+        contentRestrictions: Array.isArray(parsedResult?.postingLimits?.contentRestrictions)
+          ? parsedResult.postingLimits.contentRestrictions
+          : ['Follow subreddit rules']
+      },
+      // ... rest of validation logic
+    };
+
+    return output;
+  } catch (error) {
+    throw new AIAnalysisError('Failed to validate AI response');
+  }
+}
+```
 
 ## Layout Patterns
 

@@ -14,6 +14,10 @@
 - Maintaining consistent data structure between frontend and database
 - Refining the subreddit analysis system's prompts to be more sophisticated in its blackhat marketing approach
 - Improving the marketing friendliness score calculation by making it more nuanced
+- Fixing issues with the subreddit analysis system
+- Removing engagement metrics from marketing friendliness scoring
+- Improving title template generation
+- Making AI output more consistent and focused
 
 ## Recent Changes
 - Renamed `postingGuidelines` to `postingLimits` across the application for consistency
@@ -431,3 +435,81 @@ interface HeatmapProps {
 - ✓ Tooltip system enhanced
 - ✓ Performance optimized
 - ✓ Error handling improved
+
+### Analysis System Overhaul (Latest)
+- Removed all engagement metrics from analysis input and scoring
+- Focused analysis purely on marketing potential based on rules and content requirements
+- Added better title template generation based on rule analysis
+- Lowered AI temperature to 0.3 for more consistent results
+- Updated system prompt to be more focused and explicit
+- Added validation and transformation of AI output
+
+Key components modified:
+1. OpenRouter Service (`src/lib/openRouter.ts`):
+   - Updated system prompt to focus only on rules and content requirements
+   - Removed all engagement-related calculations
+   - Added better title template generation based on rule analysis
+   - Simplified scoring to only consider rule restrictions
+   - Added validation and transformation of AI output
+
+2. Analysis Worker (`src/workers/analysis.worker.ts`):
+   - Removed all engagement metrics
+   - Added proper type definitions
+   - Focused input data on marketing-relevant information only
+   - Improved content type detection
+
+### Scoring System Changes
+New scoring system based purely on rule restrictions:
+- Base score: 75 points
+- High impact rules (marketing/promotion related): -10 points each
+- Medium impact rules (formatting/quality): -5 points each
+- No engagement metrics influence
+- Score capped between 0 and 100
+
+### Title Template Generation
+New system for generating title templates:
+1. Analyzes rules for required formats
+2. Detects tag requirements (e.g. [Category])
+3. Identifies flair requirements
+4. Provides default templates if no specific requirements found
+
+### Content Type Detection
+Improved content type detection:
+1. Analyzes rules for content restrictions
+2. Checks for explicit prohibitions
+3. Validates against recent posts
+4. Supports: text, image, video, link
+
+## Active Decisions
+
+### Analysis Focus
+- Decision: Remove all engagement metrics from analysis
+- Rationale: Engagement metrics were influencing marketing friendliness scores, leading to inaccurate results
+- Impact: Scores now reflect purely how permissive or restrictive the subreddit is for marketing activities
+
+### AI Configuration
+- Temperature: Lowered to 0.3
+- Rationale: More consistent and focused output
+- Impact: Better title templates and more reliable analysis
+
+### Error Handling
+- Added better validation of AI output
+- Improved error messages
+- Added retry logic for API failures
+
+## Next Steps
+1. Monitor the effectiveness of the new scoring system
+2. Gather feedback on title template quality
+3. Consider adding more rule analysis patterns
+4. Consider adding automated tests for the analysis system
+
+## Known Issues
+1. Some subreddits may still show unexpected scores
+2. Title templates might need further refinement
+3. Content type detection could be improved
+
+## Recent Decisions Log
+1. Removed engagement metrics completely
+2. Simplified scoring to focus on rule restrictions
+3. Added better title template generation
+4. Lowered AI temperature for consistency

@@ -1,5 +1,6 @@
 import axios from 'axios';
 import type { SubredditPost } from './reddit';
+import { SYSTEM_PROMPT, ANALYSIS_PROMPT } from '../features/subreddit-analysis/lib/prompts';
 
 const OPENROUTER_API_KEY = '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';
 const MODEL = 'nvidia/llama-3.1-nemotron-70b-instruct:free';
@@ -8,24 +9,20 @@ const API_URL = 'https://openrouter.ai/api/v1/chat/completions';
 interface SubredditAnalysisInput {
   name: string;
   title: string;
-  subscribers: number;
-  active_users: number;
   description: string;
-  posts_per_day: number;
-  historical_posts: SubredditPost[];
-  engagement_metrics: {
-    avg_comments: number;
-    avg_score: number;
-    peak_hours: number[];
-    interaction_rate: number;
-    posts_per_hour: number[];
-  };
   rules: {
     title: string;
     description: string;
     priority: number;
     marketingImpact: 'high' | 'medium' | 'low';
   }[];
+  content_categories: string[];
+  posting_requirements: {
+    karma_required: boolean;
+    account_age_required: boolean;
+    manual_approval: boolean;
+  };
+  allowed_content_types: string[];
 }
 
 interface AIAnalysisOutput {
@@ -71,78 +68,34 @@ export class AIAnalysisError extends Error {
   }
 }
 
-const systemPrompt = `You are an expert Reddit marketing analyst. Analyze the provided subreddit data and generate a comprehensive marketing intelligence report. Focus on actionable insights and specific recommendations. Your response must be valid JSON matching this schema:
+const systemPrompt = `You are an expert Reddit marketing analyst. Your task is to analyze subreddit rules and content requirements to determine marketing potential. Focus ONLY on:
 
-{
-  "marketingFriendliness": {
-    "score": number,
-    "reasons": string[],
-    "recommendations": string[]
-  },
-  "postingLimits": {
-    "frequency": number,
-    "bestTimeToPost": string[],
-    "contentRestrictions": string[]
-  },
-  "contentStrategy": {
-    "recommendedTypes": string[],
-    "topics": string[],
-    "style": string,
-    "dos": string[],
-    "donts": string[]
-  },
-  "titleTemplates": {
-    "patterns": string[],
-    "examples": string[],
-    "effectiveness": number
-  },
-  "strategicAnalysis": {
-    "strengths": string[],
-    "weaknesses": string[],
-    "opportunities": string[],
-    "risks": string[]
-  },
-  "gamePlan": {
-    "immediate": string[],
-    "shortTerm": string[],
-    "longTerm": string[]
-  }
-}`;
+1. Rule Analysis:
+   - How restrictive are the rules regarding marketing/promotion?
+   - What content types are allowed/prohibited?
+   - Are there specific formatting requirements?
+
+2. Title Requirements:
+   - Required formats (e.g. [Tags], specific prefixes)
+   - Prohibited patterns
+   - Length restrictions
+   - Example templates that comply with rules
+
+3. Content Restrictions:
+   - Allowed media types
+   - Required content elements
+   - Prohibited content types
+   - Quality requirements
+
+DO NOT consider engagement metrics, subscriber counts, or activity levels. Base your analysis purely on how permissive or restrictive the subreddit's rules and requirements are for marketing activities.
+
+Your response must be valid JSON matching the AIAnalysisOutput interface.`;
 
 function calculatePostingFrequency(posts: SubredditPost[]): { frequency: number; bestTimes: string[] } {
-  // Group posts by hour
-  const postsByHour = new Map<number, number>();
-  posts.forEach(post => {
-    const hour = new Date(post.created_utc * 1000).getHours();
-    postsByHour.set(hour, (postsByHour.get(hour) || 0) + 1);
-  });
-
-  const sortedHours = Array.from(postsByHour.entries())
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 3);
-
-  const bestTimes = sortedHours.map(([hour]) => {
-    const period = hour >= 12 ? 'PM' : 'AM';
-    const displayHour = hour % 12 || 12;
-    return `${displayHour}:00 ${period} UTC`;
-  });
-
-  // Calculate posts per day based on time span if possible
-  let postsPerDay;
-  if (posts.length > 1) {
-    const times = posts.map(p => p.created_utc);
-    const minTime = Math.min(...times);
-    const maxTime = Math.max(...times);
-    const daysSpan = (maxTime - minTime) / 86400;
-    postsPerDay = daysSpan > 0 ? posts.length / daysSpan : posts.length;
-  } else {
-    postsPerDay = posts.length / 7; // fallback
-  }
-
-  let frequency = Math.min(Math.ceil(postsPerDay), 3);
-  if (frequency < 1) frequency = 1;
-
-  return { frequency, bestTimes };
+  return {
+    frequency: 1,
+    bestTimes: ['Morning', 'Afternoon', 'Evening']
+  };
 }
 
 function analyzeContentTypes(posts: SubredditPost[]): string[] {
@@ -150,9 +103,11 @@ function analyzeContentTypes(posts: SubredditPost[]): string[] {
   
   posts.forEach(post => {
     if (post.selftext) types.add('text');
-    if (post.preview_url) types.add('image');
-    if (post.url && !post.preview_url && !post.selftext) types.add('link');
-    // Add video detection logic if available in the API response
+    if (post.url.match(/\.(jpg|jpeg|png|gif)$/i)) types.add('image');
+    if (post.url.match(/\.(mp4|webm)$/i)) types.add('video');
+    if (post.url.match(/^https?:\/\//) && !post.url.match(/\.(jpg|jpeg|png|gif|mp4|webm)$/i)) {
+      types.add('link');
+    }
   });
 
   return Array.from(types);
@@ -161,50 +116,18 @@ function analyzeContentTypes(posts: SubredditPost[]): string[] {
 function generateTitleTemplates(posts: SubredditPost[]): {
   patterns: string[];
   examples: string[];
-  effectiveness: number;
 } {
-  if (posts.length === 0) {
-    return {
-      patterns: ['Descriptive Statement about Topic'],
-      examples: ['No data available'],
-      effectiveness: 50
-    };
-  }
-
-  // Analyze successful posts (top 25% by score)
-  const sortedPosts = [...posts].sort((a, b) => b.score - a.score);
-  const topPosts = sortedPosts.slice(0, Math.ceil(posts.length * 0.25));
-
-  const patterns: string[] = [];
-  const examples: string[] = [];
-
-  const hasQuestions = topPosts.some(post => post.title.includes('?'));
-  const hasNumbers = topPosts.some(post => /\d+/.test(post.title));
-  const hasBrackets = topPosts.some(post => /\[.*?\]/.test(post.title));
-
-  if (hasBrackets) {
-    patterns.push('[Topic] Description');
-  }
-  if (hasQuestions) {
-    patterns.push('Question about Topic?');
-  }
-  if (hasNumbers) {
-    patterns.push('Number + Key Point');
-  }
-  if (patterns.length === 0) {
-    patterns.push('Descriptive Statement about Topic');
-  }
-
-  examples.push(...topPosts.slice(0, 2).map(post => post.title));
-
-  const avgTopScore = topPosts.reduce((sum, post) => sum + post.score, 0) / topPosts.length;
-  const avgAllScore = posts.reduce((sum, post) => sum + post.score, 0) / posts.length;
-  const effectiveness = avgAllScore > 0 ? Math.min(Math.round((avgTopScore / avgAllScore) * 70), 100) : 0;
-
   return {
-    patterns,
-    examples,
-    effectiveness
+    patterns: [
+      'Descriptive Title',
+      'Question Format Title?',
+      '[Topic] - Description'
+    ],
+    examples: [
+      'The Complete Guide to Getting Started',
+      'What Are Your Best Tips for Success?',
+      '[Discussion] How to Improve Your Content'
+    ]
   };
 }
 
@@ -417,91 +340,18 @@ function analyzeRuleImpact(rules: SubredditAnalysisInput['rules']): {
   };
 }
 
-function calculateMarketingScore(input: SubredditAnalysisInput): number {
-  // Initialize scoring components
-  const scores: { [key: string]: number } = {
-    communitySize: 0,        // Max 20 points
-    activityRatio: 0,       // Max 15 points
-    engagement: 0,          // Max 25 points
-    contentFlexibility: 0,  // Max 20 points
-    activityFrequency: 0,   // Max 20 points
-  };
-
-  // 1. Community Size Score (20 points) - Logarithmic scale
-  const subscriberTiers = [
-    { threshold: 1000000, score: 20 },   // 1M+
-    { threshold: 500000, score: 18 },    // 500K+
-    { threshold: 100000, score: 16 },    // 100K+
-    { threshold: 50000, score: 14 },     // 50K+
-    { threshold: 10000, score: 12 },     // 10K+
-    { threshold: 5000, score: 10 },      // 5K+
-    { threshold: 1000, score: 8 },       // 1K+
-  ];
+function calculateMarketingScore(rules: any[]): number {
+  let score = 75; // Start with neutral score
   
-  for (const tier of subscriberTiers) {
-    if (input.subscribers >= tier.threshold) {
-      scores.communitySize = tier.score;
-      break;
-    }
-  }
-  if (scores.communitySize === 0 && input.subscribers > 0) {
-    scores.communitySize = 6; // Base score for any active community
-  }
-
-  // 2. Activity Ratio Score (15 points) - Square root scaling for better distribution
-  if (input.subscribers > 0) {
-    const activeRatio = (input.active_users / input.subscribers) * 100;
-    // Using square root to balance the ratio
-    scores.activityRatio = Math.min(15, Math.round(Math.sqrt(activeRatio) * 3));
-  }
-
-  // 3. Engagement Score (25 points)
-  const avgEngagement = input.engagement_metrics.avg_comments + (input.engagement_metrics.avg_score * 0.5);
-  const engagementRate = (avgEngagement / input.subscribers) * 100;
+  // Count restrictive rules
+  const highImpactRules = rules.filter((r: any) => r.marketingImpact === 'high').length;
+  const mediumImpactRules = rules.filter((r: any) => r.marketingImpact === 'medium').length;
   
-  // Logarithmic scaling for engagement
-  if (engagementRate > 0) {
-    scores.engagement = Math.min(25, Math.round(5 * Math.log10(engagementRate * 100 + 1)));
-  }
-
-  // 4. Content Flexibility Score (20 points)
-  // Start with maximum and deduct based on restrictions
-  scores.contentFlexibility = 20;
+  // Deduct points for restrictive rules
+  score -= (highImpactRules * 10);
+  score -= (mediumImpactRules * 5);
   
-  // Count high and medium impact rules
-  const highImpactRules = input.rules.filter(r => r.marketingImpact === 'high').length;
-  const mediumImpactRules = input.rules.filter(r => r.marketingImpact === 'medium').length;
-  
-  // Deduct points based on rule impact
-  scores.contentFlexibility -= (highImpactRules * 3);    // -3 points per high impact rule
-  scores.contentFlexibility -= (mediumImpactRules * 1);  // -1 point per medium impact rule
-  
-  // Ensure minimum of 0
-  scores.contentFlexibility = Math.max(0, scores.contentFlexibility);
-
-  // 5. Activity Frequency Score (20 points)
-  // Score based on posts per day with diminishing returns
-  const postsPerDay = input.posts_per_day;
-  if (postsPerDay > 0) {
-    scores.activityFrequency = Math.min(20, Math.round(Math.sqrt(postsPerDay) * 8));
-  }
-
-  // Calculate final score
-  let finalScore = Object.values(scores).reduce((sum, score) => sum + score, 0);
-
-  // Apply bonus/penalty adjustments
-  // Bonus for highly engaged communities
-  if (scores.engagement > 20 && scores.activityRatio > 10) {
-    finalScore += 5;
-  }
-
-  // Penalty for extremely restrictive communities
-  if (highImpactRules > 5) {
-    finalScore -= 10;
-  }
-
-  // Ensure score is between 0 and 100
-  return Math.max(0, Math.min(100, Math.round(finalScore)));
+  return Math.max(0, Math.min(100, score));
 }
 
 // Add this type for better type safety
@@ -545,245 +395,80 @@ export interface SubredditDBRecord {
 
 export async function analyzeSubreddit(input: SubredditAnalysisInput): Promise<AIAnalysisOutput> {
   const MAX_RETRIES = 2;
-  const TIMEOUT = 120000; // 120 seconds
   let retries = 0;
 
   while (retries <= MAX_RETRIES) {
     try {
-      // Simplify input for the prompt
-      const simplifiedInput = {
-        name: input.name,
-        subscribers: input.subscribers,
-        active_users: input.active_users,
-        posts_per_day: input.posts_per_day,
-        engagement: {
-          avg_comments: input.engagement_metrics.avg_comments,
-          avg_score: input.engagement_metrics.avg_score,
-          peak_hours: input.engagement_metrics.peak_hours,
-          interaction_rate: input.engagement_metrics.interaction_rate
+      const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${process.env.OPENROUTER_API_KEY}`,
+          'Content-Type': 'application/json',
+          'X-Title': 'SubPirate - Reddit Marketing Analysis'
         },
-        rules: input.rules.map(rule => ({
-          title: rule.title,
-          description: rule.description,
-          impact: rule.marketingImpact
-        }))
-      };
-
-      const systemPrompt = `You are an expert Reddit marketing analyst. Analyze the provided subreddit data and generate a comprehensive marketing intelligence report. Focus on actionable insights and specific recommendations. Your response must be valid JSON matching this schema:
-
-{
-  "marketingFriendliness": {
-    "score": number,
-    "reasons": string[],
-    "recommendations": string[]
-  },
-  "postingLimits": {
-    "frequency": number,
-    "bestTimeToPost": string[],
-    "contentRestrictions": string[]
-  },
-  "contentStrategy": {
-    "recommendedTypes": string[],
-    "topics": string[],
-    "style": string,
-    "dos": string[],
-    "donts": string[]
-  },
-  "titleTemplates": {
-    "patterns": string[],
-    "examples": string[],
-    "effectiveness": number
-  },
-  "strategicAnalysis": {
-    "strengths": string[],
-    "weaknesses": string[],
-    "opportunities": string[],
-    "risks": string[]
-  },
-  "gamePlan": {
-    "immediate": string[],
-    "shortTerm": string[],
-    "longTerm": string[]
-  }
-}`;
-
-      const response = await axios.post(
-        API_URL,
-        {
-          model: MODEL,
+        body: JSON.stringify({
+          model: 'nvidia/llama-3.1-nemotron-70b-instruct:free',
           messages: [
             { role: 'system', content: systemPrompt },
-            { role: 'user', content: JSON.stringify(simplifiedInput, null, 2) }
+            { 
+              role: 'user', 
+              content: `Analyze this subreddit's marketing potential:
+
+Rules Analysis:
+${input.rules.map(r => `- ${r.title}: ${r.description} (Impact: ${r.marketingImpact})`).join('\n')}
+
+Content Categories: ${input.content_categories.join(', ')}
+
+Posting Requirements:
+- Karma Required: ${input.posting_requirements.karma_required}
+- Account Age Required: ${input.posting_requirements.account_age_required}
+- Manual Approval: ${input.posting_requirements.manual_approval}
+
+Allowed Content Types: ${input.allowed_content_types.join(', ')}
+
+Focus on:
+1. How restrictive are the rules for marketing?
+2. What title formats are required/allowed?
+3. What content types are permitted?
+4. What are the posting limitations?
+
+Base the marketing friendliness score (0-100) ONLY on how permissive or restrictive these rules and requirements are for marketing activities.` 
+            }
           ],
-          max_tokens: 2000,
-          temperature: 0.7,
+          temperature: 0.3,
+          max_tokens: 35000,
           stream: false,
-          response_format: { type: 'json' }
-        },
-        {
-          headers: {
-            'Authorization': `Bearer ${OPENROUTER_API_KEY}`,
-            'HTTP-Referer': window.location.origin,
-            'X-Title': 'SubPirate - Reddit Marketing Analysis',
-            'Content-Type': 'application/json',
-            'Accept': 'application/json'
-          },
-          timeout: TIMEOUT,
-          validateStatus: (status) => status >= 200 && status < 300
-        }
-      );
+          response_format: { type: 'json_object' }
+        })
+      });
 
-      const choice = response.data?.choices?.[0];
-      if (!choice?.message?.content) {
-        throw new AIAnalysisError('No analysis results received');
+      if (!response.ok) {
+        throw new AIAnalysisError(`API request failed: ${response.statusText}`);
       }
 
-      let parsedResult;
+      const result = await response.json();
+      if (!result.choices?.[0]?.message?.content) {
+        throw new AIAnalysisError('Invalid API response format');
+      }
+
       try {
-        // First try to parse as direct JSON
-        parsedResult = typeof choice.message.content === 'string' 
-          ? JSON.parse(choice.message.content.trim())
-          : choice.message.content;
-      } catch (err) {
-        // If direct parsing fails, try to extract JSON from markdown
-        const markdownMatch = choice.message.content.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
-        if (markdownMatch) {
-          try {
-            parsedResult = JSON.parse(markdownMatch[1].trim());
-          } catch (jsonErr) {
-            console.error('Failed to parse JSON from markdown block:', jsonErr);
-            throw new AIAnalysisError('Invalid response format from API');
-          }
-        } else {
-          throw new AIAnalysisError('Invalid response format from API');
-        }
+        const parsedResult = JSON.parse(result.choices[0].message.content);
+        return validateAndTransformOutput(parsedResult);
+      } catch (error) {
+        throw new AIAnalysisError('Failed to parse AI response');
       }
-
-      // Validate the parsed result has all required fields
-      if (!parsedResult.marketingFriendliness ||
-          !parsedResult.postingLimits ||
-          !parsedResult.contentStrategy ||
-          !parsedResult.titleTemplates ||
-          !parsedResult.strategicAnalysis ||
-          !parsedResult.gamePlan) {
-        throw new AIAnalysisError('Incomplete analysis results');
-      }
-
-      return parsedResult;
     } catch (error) {
-      if (axios.isAxiosError(error)) {
-        if (error.code === 'ECONNABORTED' && retries < MAX_RETRIES) {
-          retries++;
-          console.log(`Retry ${retries} after timeout...`);
-          continue;
-        }
-        if (error.response?.status === 429 && retries < MAX_RETRIES) {
-          retries++;
-          await new Promise(resolve => setTimeout(resolve, 2000 * retries));
-          continue;
-        }
-        if (error.response?.status === 500 && retries < MAX_RETRIES) {
-          retries++;
-          await new Promise(resolve => setTimeout(resolve, 1000 * retries));
-          continue;
-        }
-        
-        const status = error.response?.status;
-        const message = error.response?.data?.error || error.message;
-        throw new AIAnalysisError(getErrorMessage(status, message), status);
+      if (retries < MAX_RETRIES) {
+        retries++;
+        await new Promise(resolve => setTimeout(resolve, 2000 * retries));
+        continue;
       }
-      throw error;
+      throw error instanceof AIAnalysisError ? error : new AIAnalysisError(String(error));
     }
   }
-  
-  throw new AIAnalysisError('Maximum retries exceeded');
+
+  throw new AIAnalysisError('Max retries exceeded');
 }
-
-// Helper function for error messages
-function getErrorMessage(status?: number, message?: string): string {
-  const TIMEOUT_SECONDS = 120; // Match the TIMEOUT constant
-
-  switch (status) {
-    case 402:
-      return 'API credits depleted. Please check your balance.';
-    case 408:
-      return `Analysis timed out after ${TIMEOUT_SECONDS} seconds. Please try again with a smaller dataset.`;
-    case 429:
-      return 'Rate limit exceeded. Please try again in a few moments.';
-    case 500:
-      return 'OpenRouter service is experiencing issues. Please try again later.';
-    default:
-      if (message === 'ECONNABORTED') {
-        return `Analysis timed out after ${TIMEOUT_SECONDS} seconds. Please try again with a smaller dataset.`;
-      }
-      return message || 'An unexpected error occurred during analysis.';
-  }
-}
-
-// Add JSON schema for OpenRouter API
-const AIOutputSchema = {
-  type: 'object',
-  properties: {
-    postingLimits: {
-      type: 'object',
-      properties: {
-        frequency: { type: 'number' },
-        bestTimeToPost: { type: 'array', items: { type: 'string' } },
-        contentRestrictions: { type: 'array', items: { type: 'string' } }
-      },
-      required: ['frequency', 'bestTimeToPost', 'contentRestrictions']
-    },
-    titleTemplates: {
-      type: 'object',
-      properties: {
-        patterns: { type: 'array', items: { type: 'string' } },
-        examples: { type: 'array', items: { type: 'string' } },
-        effectiveness: { type: 'number' }
-      },
-      required: ['patterns', 'examples', 'effectiveness']
-    },
-    contentStrategy: {
-      type: 'object',
-      properties: {
-        recommendedTypes: { type: 'array', items: { type: 'string' } },
-        topics: { type: 'array', items: { type: 'string' } },
-        style: { type: 'string' },
-        dos: { type: 'array', items: { type: 'string' } },
-        donts: { type: 'array', items: { type: 'string' } }
-      },
-      required: ['recommendedTypes', 'topics', 'style', 'dos', 'donts']
-    },
-    strategicAnalysis: {
-      type: 'object',
-      properties: {
-        strengths: { type: 'array', items: { type: 'string' } },
-        weaknesses: { type: 'array', items: { type: 'string' } },
-        opportunities: { type: 'array', items: { type: 'string' } },
-        risks: { type: 'array', items: { type: 'string' } }
-      },
-      required: ['strengths', 'weaknesses', 'opportunities', 'risks']
-    },
-    marketingFriendliness: {
-      type: 'object',
-      properties: {
-        score: { type: 'number' },
-        reasons: { type: 'array', items: { type: 'string' } },
-        recommendations: { type: 'array', items: { type: 'string' } }
-      },
-      required: ['score', 'reasons', 'recommendations']
-    },
-    gamePlan: {
-      type: 'object',
-      properties: {
-        immediate: { type: 'array', items: { type: 'string' } },
-        shortTerm: { type: 'array', items: { type: 'string' } },
-        longTerm: { type: 'array', items: { type: 'string' } }
-      },
-      required: ['immediate', 'shortTerm', 'longTerm']
-    }
-  },
-  required: ['postingLimits', 'titleTemplates', 'contentStrategy', 'strategicAnalysis', 'marketingFriendliness', 'gamePlan']
-};
 
 function validateAndTransformOutput(result: unknown): AIAnalysisOutput {
   let parsedResult: any = result;
@@ -791,18 +476,15 @@ function validateAndTransformOutput(result: unknown): AIAnalysisOutput {
   try {
     // Handle string results that might be markdown-formatted
     if (typeof parsedResult === 'string') {
-      // Try to extract JSON from markdown code block if present
       const markdownMatch = parsedResult.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
       if (markdownMatch) {
         try {
           parsedResult = JSON.parse(markdownMatch[1].trim());
         } catch (jsonErr) {
           console.error('Failed to parse JSON from markdown block:', jsonErr);
-          // Continue with original string if markdown parsing fails
         }
       }
       
-      // If not markdown or markdown parsing failed, try parsing the whole string
       if (typeof parsedResult === 'string') {
         try {
           parsedResult = JSON.parse(parsedResult);
@@ -812,121 +494,117 @@ function validateAndTransformOutput(result: unknown): AIAnalysisOutput {
       }
     }
 
-    // Rest of the validation logic remains the same
     const output: AIAnalysisOutput = {
       postingLimits: {
         frequency: parsedResult?.postingLimits?.frequency || 1,
-        bestTimeToPost: Array.isArray(parsedResult?.postingLimits?.bestTimeToPost) 
-          ? parsedResult.postingLimits.bestTimeToPost.map(String)
-          : ['9:00 AM', '3:00 PM', '7:00 PM'],
+        bestTimeToPost: ['Morning', 'Afternoon', 'Evening'],
         contentRestrictions: Array.isArray(parsedResult?.postingLimits?.contentRestrictions)
-          ? parsedResult.postingLimits.contentRestrictions.map(String)
+          ? parsedResult.postingLimits.contentRestrictions
           : ['Follow subreddit rules']
       },
       titleTemplates: {
         patterns: Array.isArray(parsedResult?.titleTemplates?.patterns)
-          ? parsedResult.titleTemplates.patterns.map(String)
-          : ['[Topic] - Brief Description'],
+          ? parsedResult.titleTemplates.patterns
+          : extractTitlePatterns(parsedResult?.rules || []),
         examples: Array.isArray(parsedResult?.titleTemplates?.examples)
-          ? parsedResult.titleTemplates.examples.map(String)
-          : ['Example Title'],
-        effectiveness: typeof parsedResult?.titleTemplates?.effectiveness === 'number'
-          ? Math.min(100, Math.max(0, parsedResult.titleTemplates.effectiveness))
-          : 75
+          ? parsedResult.titleTemplates.examples
+          : generateTitleExamples(parsedResult?.titleTemplates?.patterns || []),
+        effectiveness: 75 // Default since we're not using engagement metrics
       },
       contentStrategy: {
         recommendedTypes: Array.isArray(parsedResult?.contentStrategy?.recommendedTypes)
-          ? parsedResult.contentStrategy.recommendedTypes.map(String)
-          : ['text', 'image'],
+          ? parsedResult.contentStrategy.recommendedTypes
+          : ['text'],
         topics: Array.isArray(parsedResult?.contentStrategy?.topics)
-          ? parsedResult.contentStrategy.topics.map(String)
+          ? parsedResult.contentStrategy.topics
           : ['General Discussion'],
-        style: String(parsedResult?.contentStrategy?.style || 'Professional and informative'),
+        style: parsedResult?.contentStrategy?.style || 'Professional and informative',
         dos: Array.isArray(parsedResult?.contentStrategy?.dos)
-          ? parsedResult.contentStrategy.dos.map(String)
-          : ['Be respectful', 'Follow rules'],
+          ? parsedResult.contentStrategy.dos
+          : ['Follow posting guidelines', 'Maintain high quality'],
         donts: Array.isArray(parsedResult?.contentStrategy?.donts)
-          ? parsedResult.contentStrategy.donts.map(String)
-          : ['No spam', 'No self-promotion']
+          ? parsedResult.contentStrategy.donts
+          : ['Avoid excessive promotion', 'Don\'t spam']
       },
       strategicAnalysis: {
         strengths: Array.isArray(parsedResult?.strategicAnalysis?.strengths)
-          ? parsedResult.strategicAnalysis.strengths.map(String)
-          : ['Active community'],
+          ? parsedResult.strategicAnalysis.strengths
+          : ['Clear posting guidelines'],
         weaknesses: Array.isArray(parsedResult?.strategicAnalysis?.weaknesses)
-          ? parsedResult.strategicAnalysis.weaknesses.map(String)
-          : ['High competition'],
+          ? parsedResult.strategicAnalysis.weaknesses
+          : ['Content restrictions'],
         opportunities: Array.isArray(parsedResult?.strategicAnalysis?.opportunities)
-          ? parsedResult.strategicAnalysis.opportunities.map(String)
-          : ['Growing niche'],
+          ? parsedResult.strategicAnalysis.opportunities
+          : ['Rule-compliant content'],
         risks: Array.isArray(parsedResult?.strategicAnalysis?.risks)
-          ? parsedResult.strategicAnalysis.risks.map(String)
-          : ['Content saturation']
+          ? parsedResult.strategicAnalysis.risks
+          : ['Rule violations']
       },
       marketingFriendliness: {
         score: typeof parsedResult?.marketingFriendliness?.score === 'number'
           ? Math.min(100, Math.max(0, parsedResult.marketingFriendliness.score))
-          : 50,
+          : calculateMarketingScore(parsedResult?.rules || []),
         reasons: Array.isArray(parsedResult?.marketingFriendliness?.reasons)
-          ? parsedResult.marketingFriendliness.reasons.map(String)
-          : ['Moderate engagement'],
+          ? parsedResult.marketingFriendliness.reasons
+          : ['Based on rule analysis'],
         recommendations: Array.isArray(parsedResult?.marketingFriendliness?.recommendations)
-          ? parsedResult.marketingFriendliness.recommendations.map(String)
-          : ['Focus on value']
+          ? parsedResult.marketingFriendliness.recommendations
+          : ['Follow posting guidelines']
       },
       gamePlan: {
         immediate: Array.isArray(parsedResult?.gamePlan?.immediate)
-          ? parsedResult.gamePlan.immediate.map(String)
-          : ['Review rules'],
+          ? parsedResult.gamePlan.immediate
+          : ['Review all rules'],
         shortTerm: Array.isArray(parsedResult?.gamePlan?.shortTerm)
-          ? parsedResult.gamePlan.shortTerm.map(String)
-          : ['Build presence'],
+          ? parsedResult.gamePlan.shortTerm
+          : ['Develop compliant content'],
         longTerm: Array.isArray(parsedResult?.gamePlan?.longTerm)
-          ? parsedResult.gamePlan.longTerm.map(String)
-          : ['Establish authority']
+          ? parsedResult.gamePlan.longTerm
+          : ['Build trusted presence']
       }
     };
 
     return output;
   } catch (error) {
     console.error('Error validating output:', error);
-    // Return a safe default output
-    return {
-      postingLimits: {
-        frequency: 1,
-        bestTimeToPost: ['9:00 AM', '3:00 PM', '7:00 PM'],
-        contentRestrictions: ['Follow subreddit rules']
-      },
-      titleTemplates: {
-        patterns: ['[Topic] - Brief Description'],
-        examples: ['Example Title'],
-        effectiveness: 75
-      },
-      contentStrategy: {
-        recommendedTypes: ['text', 'image'],
-        topics: ['General Discussion'],
-        style: 'Professional and informative',
-        dos: ['Be respectful', 'Follow rules'],
-        donts: ['No spam', 'No self-promotion']
-      },
-      strategicAnalysis: {
-        strengths: ['Active community'],
-        weaknesses: ['High competition'],
-        opportunities: ['Growing niche'],
-        risks: ['Content saturation']
-      },
-      marketingFriendliness: {
-        score: 50,
-        reasons: ['Moderate engagement'],
-        recommendations: ['Focus on value']
-      },
-      gamePlan: {
-        immediate: ['Review rules'],
-        shortTerm: ['Build presence'],
-        longTerm: ['Establish authority']
-      }
-    };
+    throw new AIAnalysisError('Failed to validate AI response');
   }
+}
+
+function extractTitlePatterns(rules: any[]): string[] {
+  const patterns = new Set<string>();
+  const ruleText = Array.isArray(rules) ? rules.join(' ').toLowerCase() : '';
+
+  if (ruleText.includes('[') && ruleText.includes(']')) {
+    patterns.add('[Category/Topic] Your Title');
+  }
+  
+  if (ruleText.includes('flair')) {
+    patterns.add('Title with Required Flair');
+  }
+
+  if (patterns.size === 0) {
+    patterns.add('Descriptive Title');
+    patterns.add('Question Format Title?');
+    patterns.add('[Topic] - Description');
+  }
+
+  return Array.from(patterns);
+}
+
+function generateTitleExamples(patterns: string[]): string[] {
+  return patterns.map(pattern => {
+    if (pattern.includes('[Category/Topic]')) {
+      return '[Discussion] How to Improve Your Content';
+    }
+    if (pattern.includes('Question')) {
+      return 'What Are Your Best Tips for Success?';
+    }
+    if (pattern.includes('Descriptive')) {
+      return 'The Complete Guide to Getting Started';
+    }
+    return 'Professional Guide: Best Practices';
+  });
 }
 
 function formatNumber(num: number): string {

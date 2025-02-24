@@ -408,3 +408,70 @@
 - Enhanced automod pattern analysis
 - More sophisticated stealth techniques
 - Better exploitation of rule ambiguities
+
+## Latest Updates
+
+### Analysis System Overhaul (Latest)
+✓ Completed:
+- Removed all engagement metrics from analysis
+- Updated system prompt to focus on rules and content requirements
+- Added better title template generation
+- Improved content type detection
+- Added validation and transformation of AI output
+- Lowered temperature for more consistent results
+
+### Current Status
+
+#### Working Features
+- Basic subreddit analysis
+- Rule impact analysis
+- Content type detection
+- Title template generation
+- Marketing score calculation
+- Error handling and retries
+
+#### Needs Testing
+- New scoring system effectiveness
+- Title template quality
+- Content type detection accuracy
+- AI output consistency
+
+#### In Progress
+- Monitoring new scoring system
+- Gathering feedback on title templates
+- Considering additional rule analysis patterns
+
+#### Planned
+- Add automated tests
+- Improve content type detection
+- Refine title templates further
+- Add more rule analysis patterns
+
+### Known Issues
+1. Some subreddits may show unexpected scores
+   - Status: Monitoring
+   - Impact: Medium
+   - Next Step: Gather data on problematic cases
+
+2. Title templates need refinement
+   - Status: In Progress
+   - Impact: Medium
+   - Next Step: Analyze more rule patterns
+
+3. Content type detection could be improved
+   - Status: Planned
+   - Impact: Low
+   - Next Step: Add more file type patterns
+
+### Recent Milestones
+✓ Removed engagement metrics from analysis
+✓ Improved title template generation
+✓ Added better validation
+✓ Lowered AI temperature
+✓ Updated system prompt
+
+### Next Milestones
+1. Gather data on scoring accuracy
+2. Improve title template quality
+3. Add automated tests
+4. Refine content type detection

@@ -9,6 +9,25 @@ interface WorkerMessage {
   analysisId: string;
 }
 
+interface SubredditAnalysisInput {
+  name: string;
+  title: string;
+  description: string;
+  rules: {
+    title: string;
+    description: string;
+    priority: number;
+    marketingImpact: 'high' | 'medium' | 'low';
+  }[];
+  content_categories: string[];
+  posting_requirements: {
+    karma_required: boolean;
+    account_age_required: boolean;
+    manual_approval: boolean;
+  };
+  allowed_content_types: string[];
+}
+
 interface EngagementMetrics {
   avg_comments: number;
   avg_score: number;
@@ -176,169 +195,136 @@ self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
   const { info, posts, analysisId } = e.data;
 
   try {
-    // Phase 1: Immediate Basic Analysis
-    self.postMessage({
-      type: 'progress',
-      analysisId,
-      data: { status: 'Calculating basic metrics...', progress: 20, indeterminate: false }
-    });
-
-    const scoredPosts = posts.map(post => ({
-      ...post,
-      engagement_score: (post.score * 0.75 + post.num_comments * 0.25)
-    }));
-
-    const oneMonthAgo = Date.now() - 30 * 24 * 60 * 60 * 1000;
-    let recentPosts = scoredPosts.filter(post => post.created_utc * 1000 > oneMonthAgo);
-    if (recentPosts.length < 50) {
-      recentPosts = scoredPosts;
-    }
-    const topPosts = recentPosts
-      .sort((a, b) => b.engagement_score - a.engagement_score)
-      .slice(0, 500);
-    const basicAnalysisPosts = topPosts.slice(0, 100);
-
-    const input = prepareAnalysisInput(info, basicAnalysisPosts);
-    const engagement = calculateEngagementMetrics(topPosts) || {
-      avg_comments: 0,
-      avg_score: 0,
-      peak_hours: [9, 12, 15, 18],
-      interaction_rate: 0,
-      posts_per_hour: new Array(24).fill(0)
-    };
-
-    // Send basic analysis results
-    const basicResult: AnalysisResult = {
-      info: {
-        ...info,
-        rules: info.rules.map(rule => ({
-          ...rule,
-          marketingImpact: analyzeRuleMarketingImpact(rule)
-        }))
-      },
-      posts: topPosts.map(post => ({
-        title: post.title,
-        score: post.score,
-        num_comments: post.num_comments,
-        created_utc: post.created_utc
+    // Prepare input data focused only on marketing potential
+    const input: SubredditAnalysisInput = {
+      name: info.name,
+      title: info.title,
+      description: info.description?.substring(0, 1000),
+      rules: info.rules.map((rule, index) => ({
+        title: rule.title,
+        description: rule.description,
+        priority: index + 1,
+        marketingImpact: determineMarketingImpact(rule)
       })),
-      analysis: {
-        marketingFriendliness: {
-          score: calculateMarketingScore(input),
-          reasons: [
-            `Community of ${formatNumber(info.subscribers)} members with ${formatNumber(info.active_users)} currently active`,
-            `Average engagement rate: ${Math.round(engagement.interaction_rate)} interactions per post`
-          ],
-          recommendations: [
-            'Detailed recommendations loading...',
-            'AI analysis in progress...'
-          ]
-        },
-        postingLimits: {
-          frequency: input.posts_per_day,
-          bestTimeToPost: formatBestPostingTimes(engagement.peak_hours),
-          contentRestrictions: info.rules
-            .filter(rule => analyzeRuleMarketingImpact(rule) !== 'low')
-            .map(rule => rule.description)
-        },
-        contentStrategy: {
-          recommendedTypes: getRecommendedContentTypes(topPosts),
-          topics: ['Analyzing common topics...'],
-          style: 'Analyzing posting patterns and community preferences...',
-          dos: [
-            `Post during peak hours: ${formatBestPostingTimes(engagement.peak_hours)[0]}`,
-            `Aim for ${Math.round(engagement.avg_comments)} or more comments per post`,
-            'Additional insights loading...'
-          ],
-          donts: [
-            ...info.rules
-              .filter(rule => analyzeRuleMarketingImpact(rule) === 'high')
-              .map(rule => rule.title),
-            'Additional restrictions loading...'
-          ]
-        },
-        titleTemplates: {
-          patterns: ['Analyzing successful title patterns...'],
-          examples: ['Loading examples from top posts...'],
-          effectiveness: 0
-        },
-        strategicAnalysis: {
-          strengths: [
-            `Active community with ${formatNumber(info.active_users)} online users`,
-            `Average of ${Math.round(input.posts_per_day)} posts per day`,
-            'Detailed strengths analysis loading...'
-          ],
-          weaknesses: ['Analyzing potential challenges...'],
-          opportunities: ['Identifying growth opportunities...'],
-          risks: ['Evaluating potential risks...']
-        },
-        gamePlan: {
-          immediate: [
-            'Follow posting time patterns',
-            'Match community engagement levels',
-            'Detailed strategy loading...'
-          ],
-          shortTerm: ['Analyzing optimal approach...'],
-          longTerm: ['Developing long-term recommendations...']
-        }
-      }
+      content_categories: determineContentCategories(info),
+      posting_requirements: {
+        karma_required: detectKarmaRequirement(info),
+        account_age_required: detectAgeRequirement(info),
+        manual_approval: false
+      },
+      allowed_content_types: determineAllowedContentTypes(info, posts)
     };
 
+    // Run analysis with marketing-focused data
+    const result = await analyzeSubreddit(input);
+
+    // Post back the results
     self.postMessage({
-      type: 'basicAnalysis',
+      type: 'success',
       analysisId,
-      data: basicResult
-    });
-
-    // Phase 2: AI Analysis
-    self.postMessage({
-      type: 'progress',
-      analysisId,
-      data: { status: 'Running AI analysis...', progress: 55, indeterminate: false }
-    });
-
-    const aiAnalysis = await analyzeSubreddit(input);
-
-    // Merge AI analysis with basic results
-    const finalResult: AnalysisResult = {
-      ...basicResult,
-      analysis: {
-        ...basicResult.analysis,
-        marketingFriendliness: {
-          score: Math.round(aiAnalysis.marketingFriendliness.score),
-          reasons: aiAnalysis.marketingFriendliness.reasons,
-          recommendations: aiAnalysis.marketingFriendliness.recommendations
-        },
-        postingLimits: {
-          ...basicResult.analysis.postingLimits,
-          contentRestrictions: aiAnalysis.postingLimits.contentRestrictions
-        },
-        contentStrategy: {
-          ...basicResult.analysis.contentStrategy,
-          topics: aiAnalysis.contentStrategy.topics,
-          style: aiAnalysis.contentStrategy.style,
-          dos: aiAnalysis.contentStrategy.dos,
-          donts: aiAnalysis.contentStrategy.donts
-        },
-        titleTemplates: aiAnalysis.titleTemplates,
-        strategicAnalysis: aiAnalysis.strategicAnalysis,
-        gamePlan: aiAnalysis.gamePlan
-      }
-    };
-
-    self.postMessage({
-      type: 'complete',
-      analysisId,
-      data: finalResult
+      result
     });
   } catch (error) {
     self.postMessage({
       type: 'error',
       analysisId,
-      error: error instanceof Error ? error.message : 'Unknown error during analysis'
+      error: error instanceof Error ? error.message : String(error)
     });
   }
 };
+
+// Helper functions for determining marketing-relevant data
+function determineMarketingImpact(rule: { title: string; description: string }): 'high' | 'medium' | 'low' {
+  const text = `${rule.title} ${rule.description}`.toLowerCase();
+  
+  const highImpactKeywords = [
+    'spam', 'promotion', 'advertising', 'marketing', 'self-promotion',
+    'commercial', 'business', 'selling', 'merchandise', 'affiliate'
+  ];
+  
+  const mediumImpactKeywords = [
+    'quality', 'format', 'title', 'flair', 'tags',
+    'submission', 'guidelines', 'requirements', 'posting'
+  ];
+  
+  if (highImpactKeywords.some(keyword => text.includes(keyword))) {
+    return 'high';
+  }
+  
+  if (mediumImpactKeywords.some(keyword => text.includes(keyword))) {
+    return 'medium';
+  }
+  
+  return 'low';
+}
+
+function determineContentCategories(info: SubredditInfo): string[] {
+  const categories = new Set<string>();
+  const description = info.description?.toLowerCase() || '';
+  const title = info.title.toLowerCase();
+
+  // Extract categories from title and description
+  const commonCategories = [
+    'discussion', 'news', 'media', 'art', 'gaming',
+    'technology', 'business', 'entertainment', 'education'
+  ];
+
+  commonCategories.forEach(category => {
+    if (description.includes(category) || title.includes(category)) {
+      categories.add(category);
+    }
+  });
+
+  return Array.from(categories);
+}
+
+function detectKarmaRequirement(info: SubredditInfo): boolean {
+  const rulesText = info.rules
+    .map(rule => `${rule.title} ${rule.description}`)
+    .join(' ')
+    .toLowerCase();
+  
+  return rulesText.includes('karma') && 
+         (rulesText.includes('minimum') || rulesText.includes('required'));
+}
+
+function detectAgeRequirement(info: SubredditInfo): boolean {
+  const rulesText = info.rules
+    .map(rule => `${rule.title} ${rule.description}`)
+    .join(' ')
+    .toLowerCase();
+  
+  return rulesText.includes('account age') || 
+         (rulesText.includes('account') && rulesText.includes('days old'));
+}
+
+function determineAllowedContentTypes(info: SubredditInfo, posts: SubredditPost[]): string[] {
+  const types = new Set<string>();
+  
+  // Check rules for content type restrictions
+  const rulesText = info.rules
+    .map(rule => `${rule.title} ${rule.description}`)
+    .join(' ')
+    .toLowerCase();
+
+  // Default content types
+  if (!rulesText.includes('no text posts')) types.add('text');
+  if (!rulesText.includes('no image')) types.add('image');
+  if (!rulesText.includes('no video')) types.add('video');
+  if (!rulesText.includes('no link')) types.add('link');
+
+  // Analyze recent posts to confirm allowed types
+  posts.forEach(post => {
+    if (post.selftext) types.add('text');
+    if (post.url.match(/\.(jpg|jpeg|png|gif)$/i)) types.add('image');
+    if (post.url.match(/\.(mp4|webm)$/i)) types.add('video');
+    if (post.url.match(/^https?:\/\//) && !post.url.match(/\.(jpg|jpeg|png|gif|mp4|webm)$/i)) {
+      types.add('link');
+    }
+  });
+
+  return Array.from(types);
+}
 
 // Helper function to format numbers
 function formatNumber(num: number): string {

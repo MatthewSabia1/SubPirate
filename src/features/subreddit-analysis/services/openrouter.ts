@@ -46,7 +46,7 @@ export class OpenRouter {
               { role: 'system', content: SYSTEM_PROMPT },
               { role: 'user', content: prompt }
             ],
-            temperature: 0.8,
+            temperature: 0.6,
             max_tokens: 35000,
             stream: false,
             response_format: {
@@ -54,48 +54,138 @@ export class OpenRouter {
               schema: {
                 type: 'object',
                 properties: {
-                  subreddit: { type: 'string' },
+                  subreddit: { type: 'string', pattern: "^[^\\n]*$" },
                   subscribers: { type: 'number' },
                   activeUsers: { type: 'number' },
                   marketingFriendliness: {
                     type: 'object',
                     properties: {
-                      score: { type: 'number' },
-                      reasons: { type: 'array', items: { type: 'string' } },
-                      recommendations: { type: 'array', items: { type: 'string' } }
+                      score: { 
+                        type: 'number', 
+                        minimum: 0, 
+                        maximum: 100,
+                        multipleOf: 1
+                      },
+                      reasons: { 
+                        type: 'array', 
+                        items: { 
+                          type: 'string',
+                          pattern: "^[^\\n]*$",
+                          minLength: 10
+                        },
+                        minItems: 3,
+                        maxItems: 10
+                      },
+                      recommendations: { 
+                        type: 'array', 
+                        items: { 
+                          type: 'string',
+                          pattern: "^[^\\n]*$",
+                          minLength: 20
+                        },
+                        minItems: 3,
+                        maxItems: 10
+                      }
                     },
-                    required: ['score', 'reasons', 'recommendations']
+                    required: ['score', 'reasons', 'recommendations'],
+                    additionalProperties: false
                   },
                   postingLimits: {
                     type: 'object',
                     properties: {
-                      frequency: { type: 'number' },
-                      bestTimeToPost: { type: 'array', items: { type: 'string' } },
-                      contentRestrictions: { type: 'array', items: { type: 'string' } }
+                      frequency: { type: 'number', minimum: 0 },
+                      bestTimeToPost: { 
+                        type: 'array', 
+                        items: { 
+                          type: 'string',
+                          pattern: "^[^\\n]*$"
+                        },
+                        minItems: 1
+                      },
+                      contentRestrictions: { 
+                        type: 'array', 
+                        items: { 
+                          type: 'string',
+                          pattern: "^[^\\n]*$"
+                        }
+                      }
                     },
-                    required: ['frequency', 'bestTimeToPost', 'contentRestrictions']
+                    required: ['frequency', 'bestTimeToPost', 'contentRestrictions'],
+                    additionalProperties: false
                   },
                   contentStrategy: {
                     type: 'object',
                     properties: {
-                      recommendedTypes: { type: 'array', items: { type: 'string' } },
-                      topics: { type: 'array', items: { type: 'string' } },
-                      dos: { type: 'array', items: { type: 'string' } },
-                      donts: { type: 'array', items: { type: 'string' } }
+                      recommendedTypes: { 
+                        type: 'array', 
+                        items: { 
+                          type: 'string',
+                          pattern: "^[^\\n]*$"
+                        },
+                        minItems: 1
+                      },
+                      topics: { 
+                        type: 'array', 
+                        items: { 
+                          type: 'string',
+                          pattern: "^[^\\n]*$"
+                        },
+                        minItems: 1
+                      },
+                      dos: { 
+                        type: 'array', 
+                        items: { 
+                          type: 'string',
+                          pattern: "^[^\\n]*$"
+                        },
+                        minItems: 1
+                      },
+                      donts: { 
+                        type: 'array', 
+                        items: { 
+                          type: 'string',
+                          pattern: "^[^\\n]*$"
+                        },
+                        minItems: 1
+                      }
                     },
-                    required: ['recommendedTypes', 'topics', 'dos', 'donts']
+                    required: ['recommendedTypes', 'topics', 'dos', 'donts'],
+                    additionalProperties: false
                   },
                   strategicAnalysis: {
                     type: 'object',
                     properties: {
-                      strengths: { type: 'array', items: { type: 'string' } },
-                      weaknesses: { type: 'array', items: { type: 'string' } },
-                      opportunities: { type: 'array', items: { type: 'string' } }
+                      strengths: { 
+                        type: 'array', 
+                        items: { 
+                          type: 'string',
+                          pattern: "^[^\\n]*$"
+                        },
+                        minItems: 1
+                      },
+                      weaknesses: { 
+                        type: 'array', 
+                        items: { 
+                          type: 'string',
+                          pattern: "^[^\\n]*$"
+                        },
+                        minItems: 1
+                      },
+                      opportunities: { 
+                        type: 'array', 
+                        items: { 
+                          type: 'string',
+                          pattern: "^[^\\n]*$"
+                        },
+                        minItems: 1
+                      }
                     },
-                    required: ['strengths', 'weaknesses', 'opportunities']
+                    required: ['strengths', 'weaknesses', 'opportunities'],
+                    additionalProperties: false
                   }
                 },
-                required: ['subreddit', 'subscribers', 'activeUsers', 'marketingFriendliness', 'postingLimits', 'contentStrategy', 'strategicAnalysis']
+                required: ['subreddit', 'subscribers', 'activeUsers', 'marketingFriendliness', 'postingLimits', 'contentStrategy', 'strategicAnalysis'],
+                additionalProperties: false
               }
             }
           }),
@@ -163,20 +253,26 @@ export class OpenRouter {
   }
 
   private buildPrompt(data: any): string {
-    // Simplify the data to reduce token count
+    // Preserve more context while still being efficient
     const simplifiedData = {
       name: data.name,
       title: data.title,
-      subscribers: data.subscribers,
-      active_users: data.active_users,
-      description: data.description?.substring(0, 500), // Limit description length
-      posts_per_day: data.posts_per_day,
-      historical_posts: data.historical_posts?.slice(0, 10), // Limit number of posts
-      engagement_metrics: data.engagement_metrics,
-      rules: data.rules
+      description: data.description?.substring(0, 1000), // Increased to preserve more context
+      rules: Array.isArray(data.rules) ? data.rules.map((rule: { description?: string } | string) => 
+        typeof rule === 'string' ? rule : // Keep full rule text
+        typeof rule === 'object' ? rule.description : null
+      ).filter(Boolean) : [],
+      requires_approval: data.requires_approval || false,
+      content_categories: data.content_categories || [],
+      posting_requirements: {
+        karma_required: data.karma_required || false,
+        account_age_required: data.account_age_required || false,
+        manual_approval: data.requires_approval || false
+      }
     };
     
-    return `${ANALYSIS_PROMPT}\n\nAnalyze the following subreddit data and provide a detailed marketing strategy:\n${JSON.stringify(simplifiedData, null, 2)}`;
+    // Keep the prompt simple and direct
+    return `${ANALYSIS_PROMPT}\n\nAnalyze this subreddit:\n${JSON.stringify(simplifiedData)}`;
   }
 
   private transformResponse(responseContent: string): any {
