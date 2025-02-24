@@ -79,3 +79,104 @@ SubPirateV2 provides an AI-powered analysis tool that:
 3. Enhanced data-driven strategies
 4. Improved campaign understanding
 5. Advanced analytics capabilities
+
+# Product Context
+
+## Subscription Tiers
+
+### Current Pricing Structure
+
+We offer four subscription tiers designed to accommodate different user needs and usage levels:
+
+1. **Starter Tier** - $19.99/month
+   - ID: `price_1QvyvlCtsTY6FiiZizercIly`
+   - Target: Individual users and small projects
+   - Entry-level access to core features
+   - Basic Reddit marketing tools
+
+2. **Creator Tier** - $39.99/month
+   - ID: `price_1QvyvTCtsTY6FiiZ4xK1M82X`
+   - Target: Content creators and small businesses
+   - Enhanced features for content management
+   - Expanded Reddit marketing capabilities
+
+3. **Pro Tier** - $47.99/month
+   - ID: `price_1QvyvaCtsTY6FiiZfyf3jfH2`
+   - Target: Professional marketers and growing businesses
+   - Advanced analytics and automation
+   - Priority support and additional features
+
+4. **Agency Tier** - $97.99/month
+   - ID: `price_1QvyvhCtsTY6FiiZpHBontp5`
+   - Target: Marketing agencies and large teams
+   - Full platform access
+   - Team collaboration features
+   - Premium support
+
+### Pricing Strategy
+
+1. **Value-Based Pricing**
+   - Prices reflect the value delivered at each tier
+   - Clear differentiation between tiers
+   - Competitive positioning in the market
+
+2. **Subscription Model**
+   - Monthly recurring billing
+   - All prices in USD
+   - Stored in cents to avoid floating-point issues
+
+3. **Feature Access**
+   - Progressive feature availability
+   - Higher tiers include all lower tier features
+   - Specialized features for agency needs
+
+### User Journey
+
+1. **Trial and Onboarding**
+   - Free trial period available
+   - Clear feature demonstrations
+   - Guided onboarding process
+
+2. **Upgrade Path**
+   - Easy tier upgrades
+   - Pro-rated billing
+   - No long-term contracts required
+
+3. **Retention Strategy**
+   - Regular feature updates
+   - Usage-based recommendations
+   - Proactive support
+
+### Business Goals
+
+1. **Revenue Objectives**
+   - Sustainable recurring revenue
+   - Healthy customer lifetime value
+   - Balanced tier distribution
+
+2. **Market Position**
+   - Competitive in Reddit marketing space
+   - Value leader in feature set
+   - Professional tool positioning
+
+3. **Growth Strategy**
+   - Focus on user success
+   - Feature-driven upgrades
+   - Agency partnerships
+
+### Customer Support
+
+1. **Tier-Based Support**
+   - Basic support for all tiers
+   - Priority support for Pro and Agency
+   - Technical assistance based on tier
+
+2. **Documentation**
+   - Comprehensive feature guides
+   - API documentation
+   - Best practices resources
+
+3. **Success Metrics**
+   - User engagement tracking
+   - Feature utilization
+   - Customer satisfaction scores

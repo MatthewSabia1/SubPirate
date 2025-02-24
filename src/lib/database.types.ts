@@ -154,6 +154,175 @@ export type Database = {
           created_at?: string
         }
       }
+      subscription_features: {
+        Row: {
+          id: string
+          feature_key: string
+          name: string
+          description: string
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          feature_key: string
+          name: string
+          description: string
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          feature_key?: string
+          name?: string
+          description?: string
+          created_at?: string
+          updated_at?: string
+        }
+      }
+      stripe_products: {
+        Row: {
+          id: string
+          stripe_product_id: string
+          name: string
+          description: string | null
+          active: boolean
+          metadata: Json
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          stripe_product_id: string
+          name: string
+          description?: string | null
+          active?: boolean
+          metadata?: Json
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          stripe_product_id?: string
+          name?: string
+          description?: string | null
+          active?: boolean
+          metadata?: Json
+          created_at?: string
+          updated_at?: string
+        }
+      }
+      stripe_prices: {
+        Row: {
+          id: string
+          stripe_price_id: string
+          stripe_product_id: string
+          currency: string
+          unit_amount: number
+          recurring_interval: string | null
+          recurring_interval_count: number | null
+          active: boolean
+          metadata: Json
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          stripe_price_id: string
+          stripe_product_id: string
+          currency: string
+          unit_amount: number
+          recurring_interval?: string | null
+          recurring_interval_count?: number | null
+          active?: boolean
+          metadata?: Json
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          stripe_price_id?: string
+          stripe_product_id?: string
+          currency?: string
+          unit_amount?: number
+          recurring_interval?: string | null
+          recurring_interval_count?: number | null
+          active?: boolean
+          metadata?: Json
+          created_at?: string
+          updated_at?: string
+        }
+      }
+      product_features: {
+        Row: {
+          id: string
+          stripe_product_id: string
+          feature_key: string
+          enabled: boolean
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          stripe_product_id: string
+          feature_key: string
+          enabled?: boolean
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          stripe_product_id?: string
+          feature_key?: string
+          enabled?: boolean
+          created_at?: string
+        }
+      }
+      customer_subscriptions: {
+        Row: {
+          id: string
+          user_id: string
+          stripe_customer_id: string
+          stripe_subscription_id: string | null
+          stripe_price_id: string | null
+          status: Database['public']['Enums']['subscription_status']
+          trial_start: string | null
+          trial_end: string | null
+          current_period_start: string | null
+          current_period_end: string | null
+          cancel_at_period_end: boolean
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          stripe_customer_id: string
+          stripe_subscription_id?: string | null
+          stripe_price_id?: string | null
+          status: Database['public']['Enums']['subscription_status']
+          trial_start?: string | null
+          trial_end?: string | null
+          current_period_start?: string | null
+          current_period_end?: string | null
+          cancel_at_period_end?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          stripe_customer_id?: string
+          stripe_subscription_id?: string | null
+          stripe_price_id?: string | null
+          status?: Database['public']['Enums']['subscription_status']
+          trial_start?: string | null
+          trial_end?: string | null
+          current_period_start?: string | null
+          current_period_end?: string | null
+          cancel_at_period_end?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+      }
     }
     Views: {
       [_ in never]: never
@@ -168,6 +337,7 @@ export type Database = {
     }
     Enums: {
       project_role: 'read' | 'edit' | 'owner'
+      subscription_status: 'trialing' | 'active' | 'canceled' | 'incomplete' | 'incomplete_expired' | 'past_due' | 'unpaid' | 'paused'
     }
   }
 }

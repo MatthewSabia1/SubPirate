@@ -24,6 +24,20 @@ function Dashboard() {
   const [analysisResult, setAnalysisResult] = useState<AnalysisResult | null>(null);
   const navigate = useNavigate();
 
+  // Show success message if redirected from successful checkout
+  const [showSuccessMessage, setShowSuccessMessage] = useState(false);
+  
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get('checkout') === 'success') {
+      setShowSuccessMessage(true);
+      // Remove the query parameter
+      window.history.replaceState({}, '', window.location.pathname);
+      // Hide the message after 5 seconds
+      setTimeout(() => setShowSuccessMessage(false), 5000);
+    }
+  }, []);
+
   useEffect(() => {
     const searchTimer = setTimeout(async () => {
       if (!searchInput?.trim()) {
@@ -275,6 +289,13 @@ function Dashboard() {
 
   return (
     <div className="max-w-[1200px] mx-auto px-4 md:px-8 py-12 md:py-20">
+      {showSuccessMessage && (
+        <div className="mb-6 p-4 bg-green-500/10 border border-green-500/20 rounded-lg text-green-500">
+          <p className="text-center">
+            🎉 Thank you for subscribing! Your account has been successfully upgraded.
+          </p>
+        </div>
+      )}
       <h1 className="text-xl md:text-5xl font-bold text-center mb-4">Welcome to Your War Room</h1>
       <p className="text-gray-400 text-center text-base md:text-lg mb-20">
         Use the tools below to find, analyze and add subreddits to your projects.

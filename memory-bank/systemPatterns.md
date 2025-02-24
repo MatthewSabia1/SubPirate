@@ -722,3 +722,112 @@ interface SavedSubreddit {
    - Blend with organic content
    - Avoid obvious patterns
    - Maintain legitimate appearance 
+
+## Stripe Integration Architecture
+
+### Database Schema
+
+#### Core Tables
+```sql
+-- Stripe prices table
+CREATE TABLE public.stripe_prices (
+    id text PRIMARY KEY,              -- Stripe price ID
+    active boolean DEFAULT true,
+    currency text DEFAULT 'usd',
+    unit_amount integer,              -- Amount in cents
+    type text DEFAULT 'recurring',
+    recurring_interval text DEFAULT 'month',
+    product_id text,
+    created_at timestamptz DEFAULT now(),
+    updated_at timestamptz DEFAULT now()
+);
+
+-- Main subscriptions table
+CREATE TABLE public.subscriptions (
+    id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+    user_id uuid REFERENCES auth.users NOT NULL,
+    stripe_customer_id text,
+    stripe_subscription_id text,
+    status subscription_status NOT NULL,
+    price_id text REFERENCES stripe_prices(id),
+    quantity integer DEFAULT 1,
+    cancel_at_period_end boolean DEFAULT false,
+    cancel_at timestamptz,
+    canceled_at timestamptz,
+    current_period_start timestamptz,
+    current_period_end timestamptz,
+    created_at timestamptz DEFAULT now(),
+    ended_at timestamptz,
+    trial_start timestamptz,
+    trial_end timestamptz
+);
+
+-- Customer subscriptions linking table
+CREATE TABLE public.customer_subscriptions (
+    id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+    customer_id uuid NOT NULL,
+    stripe_price_id text REFERENCES stripe_prices(id),
+    created_at timestamptz DEFAULT now(),
+    updated_at timestamptz DEFAULT now()
+);
+```
+
+### Key Design Decisions
+
+1. **ID Management**
+   - Using text type for all Stripe IDs
+   - Using UUIDs for internal primary keys
+   - Direct storage of Stripe IDs for easy reference
+
+2. **Subscription States**
+   ```sql
+   CREATE TYPE subscription_status AS ENUM (
+       'trialing',
+       'active',
+       'canceled',
+       'incomplete',
+       'incomplete_expired',
+       'past_due',
+       'unpaid',
+       'paused'
+   );
+   ```
+
+3. **Price Management**
+   - Storing prices in cents to avoid floating-point issues
+   - Maintaining Stripe price IDs as primary reference
+   - Supporting both one-time and recurring prices
+
+4. **Relationship Structure**
+   - Direct user to subscription relationship
+   - Flexible customer subscription linking
+   - Foreign key constraints for data integrity
+
+### Integration Patterns
+
+1. **Price Synchronization**
+   - Stripe is source of truth for prices
+   - Local cache in stripe_prices table
+   - Regular sync via webhooks
+
+2. **Subscription Management**
+   - Direct mapping to Stripe subscriptions
+   - Status tracking via subscription_status
+   - Support for trial periods
+
+3. **Customer Management**
+   - Flexible customer-subscription relationship
+   - Support for multiple subscription types
+   - Clean separation of concerns
+
+### Security Considerations
+
+1. **Data Protection**
+   - No sensitive payment data stored locally
+   - Only reference IDs from Stripe stored
+   - All payment processing handled by Stripe
+
+2. **Access Control**
+   - Row Level Security (RLS) policies
+   - User-specific subscription access
+   - Protected price management 

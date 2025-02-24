@@ -513,3 +513,86 @@ Improved content type detection:
 2. Simplified scoring to focus on rule restrictions
 3. Added better title template generation
 4. Lowered AI temperature for consistency
+
+## Current Focus: Stripe Integration and Pricing Updates
+
+### Recent Changes (February 24, 2025)
+
+We have successfully updated the subscription pricing structure in both Stripe and our local database. The following changes have been implemented:
+
+#### Pricing Tiers
+- Starter: $19.99 (1999 cents) - `price_1QvyvlCtsTY6FiiZizercIly`
+- Creator: $39.99 (3999 cents) - `price_1QvyvTCtsTY6FiiZ4xK1M82X`
+- Pro: $47.99 (4799 cents) - `price_1QvyvaCtsTY6FiiZfyf3jfH2`
+- Agency: $97.99 (9799 cents) - `price_1QvyvhCtsTY6FiiZpHBontp5`
+
+#### Database Schema Updates
+1. Created subscription_status ENUM type with states:
+   - trialing
+   - active
+   - canceled
+   - incomplete
+   - incomplete_expired
+   - past_due
+   - unpaid
+   - paused
+
+2. Established tables:
+   - `stripe_prices`: Stores Stripe price information
+   - `subscriptions`: Manages user subscription details
+   - `customer_subscriptions`: Links customers to their subscriptions
+
+#### Migration Status
+- Successfully executed migration `20250224103847_update_subscription_prices.sql`
+- All price records confirmed updated in database
+- Foreign key constraints properly established
+- Dependencies handled with CASCADE operations
+
+### Active Decisions
+1. Using text type for Stripe IDs throughout the schema
+2. Maintaining direct price ID references from Stripe
+3. Supporting both subscription and customer_subscription models
+
+### Next Steps
+1. Verify subscription updates for existing customers
+2. Implement subscription upgrade/downgrade logic
+3. Set up webhook handlers for subscription events
+4. Add subscription status monitoring
+5. Implement usage tracking for subscription limits
+
+### Stripe Integration Implementation
+- Successfully implemented Stripe checkout flow with test mode products and prices
+- Added dynamic pricing table that reflects Stripe products
+- Implemented success message in Dashboard after successful subscription
+- Configured proper test mode API keys and environment variables
+- Verified end-to-end subscription flow working in test mode
+
+### Recent Changes
+1. Updated `src/pages/Pricing.tsx`:
+   - Added dynamic price fetching from Stripe
+   - Implemented checkout session creation
+   - Added proper error handling for missing prices
+   - Updated success URL to redirect to root with success parameter
+
+2. Updated `src/pages/Dashboard.tsx`:
+   - Added success message component for post-subscription
+   - Implemented auto-hiding message after 5 seconds
+   - Added URL cleanup to remove success parameter
+
+### Next Steps
+1. Implement subscription status checks
+2. Add feature flags based on subscription tier
+3. Set up webhook handling for subscription events
+4. Add subscription management UI in user settings
+
+### Active Decisions
+- Using Stripe Checkout for payment processing
+- Maintaining test/live mode separation in Stripe configuration
+- Using root path (/) as dashboard landing page
+- Implementing simple success message for good UX
+
+### Current Status
+- Basic Stripe integration complete and working in test mode
+- Successfully processing test subscriptions
+- Proper error handling for edge cases
+- Clean user experience with feedback messages

@@ -2,6 +2,20 @@
 
 ## Completed Features
 
+### Core Features
+- Basic subreddit analysis
+- Subreddit search and discovery
+- User authentication with Supabase
+- Save/bookmark subreddits
+- Progress tracking for analysis
+
+### Stripe Integration
+- ✅ Dynamic pricing table
+- ✅ Test mode configuration
+- ✅ Stripe Checkout implementation
+- ✅ Success message handling
+- ✅ Basic subscription flow
+
 ### 1. Core Analysis
 - ✓ Analytics dashboard implementation
 - ✓ Data visualization with Chart.js
@@ -104,6 +118,18 @@
 - Error handling patterns
 
 ## In Progress
+
+### Subscription Management
+- [ ] Subscription status checks
+- [ ] Feature flags implementation
+- [ ] Webhook handling
+- [ ] User settings for subscription
+
+### Analysis Features
+- [ ] Advanced analytics
+- [ ] Custom metrics
+- [ ] Data export
+- [ ] Team collaboration
 
 ### Ongoing Improvements
 1. Data freshness monitoring
@@ -475,3 +501,89 @@
 2. Improve title template quality
 3. Add automated tests
 4. Refine content type detection
+
+## Completed Items
+
+### Stripe Integration (February 24, 2025)
+
+1. **Price Structure Implementation**
+   - ✅ Created all subscription tiers in Stripe
+   - ✅ Set up recurring prices for each tier
+   - ✅ Updated database schema for price management
+   - ✅ Migrated existing prices to new structure
+
+2. **Database Schema**
+   - ✅ Created subscription_status ENUM
+   - ✅ Set up stripe_prices table
+   - ✅ Created subscriptions table
+   - ✅ Added customer_subscriptions table
+   - ✅ Established proper foreign key relationships
+
+3. **Data Migration**
+   - ✅ Successfully ran migration script
+   - ✅ Verified price records in database
+   - ✅ Handled table dependencies correctly
+   - ✅ Preserved necessary relationships
+
+## In Progress
+
+1. **Subscription Management**
+   - 🔄 Subscription upgrade/downgrade flow
+   - 🔄 Trial period implementation
+   - 🔄 Cancellation handling
+
+2. **Webhook Integration**
+   - 🔄 Stripe event handling
+   - 🔄 Subscription status updates
+   - 🔄 Payment failure handling
+
+3. **User Interface**
+   - 🔄 Subscription management dashboard
+   - 🔄 Payment method management
+   - 🔄 Billing history display
+
+## Upcoming Tasks
+
+1. **Feature Implementation**
+   - ⏳ Usage tracking system
+   - ⏳ Tier-based feature gates
+   - ⏳ Team member management for Agency tier
+
+2. **Billing System**
+   - ⏳ Invoice generation
+   - ⏳ Receipt handling
+   - ⏳ Tax calculation integration
+
+3. **Analytics**
+   - ⏳ Subscription metrics dashboard
+   - ⏳ Revenue reporting
+   - ⏳ Churn analysis
+
+4. **Documentation**
+   - ⏳ User guides for subscription management
+   - ⏳ Internal API documentation
+   - ⏳ Webhook integration guide
+
+## Known Issues
+
+1. **Subscription Updates**
+   - Need to verify existing subscription updates
+   - Potential edge cases in upgrade/downgrade flow
+
+2. **Data Migration**
+   - Monitor for any issues with existing subscriptions
+   - Verify webhook handling for all subscription states
+
+## Next Actions
+
+1. Implement subscription upgrade/downgrade logic
+2. Set up webhook handlers for subscription events
+3. Create subscription management UI
+4. Add usage tracking system
+5. Implement tier-based feature gates
+
+## Next Priorities
+1. Implement subscription status checks
+2. Add feature flags for premium features
+3. Set up webhook handling
+4. Add subscription management UI
