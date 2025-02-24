@@ -7,6 +7,11 @@
 - Improving error handling and validation in Reddit API integration
 - Standardizing error handling patterns across the application
 - Maintaining consistent error reporting
+- Enhancing subreddit analysis visualization with interactive heatmap
+- Improving analysis data persistence and retrieval
+- Optimizing re-analysis functionality in saved subreddits
+- Implementing smooth hover effects and transitions
+- Maintaining consistent data structure between frontend and database
 
 ## Recent Changes
 - Renamed `postingGuidelines` to `postingLimits` across the application for consistency
@@ -302,3 +307,107 @@ Working on enhancing the subreddit analysis system, specifically:
 2. Data processing approaches
 3. Real-time update techniques
 4. Performance optimizations
+
+### Heatmap Enhancement (Latest)
+1. Interactive Visualization:
+   - Added interactive heatmap showing post activity by day and hour
+   - Implemented smooth hover effects with neighbor cell highlighting
+   - Added tooltip with post details on hover
+   - Created portal-based tooltip system for better positioning
+
+2. Data Processing:
+   - Increased post analysis from 100 to 500 posts for better data representation
+   - Implemented efficient post data batching
+   - Enhanced data normalization for visualization
+   - Added fallback strategies for sparse data
+
+3. Visual Design:
+   - Implemented modern flat design aesthetic
+   - Added subtle transitions and animations
+   - Created consistent color scheme for engagement levels
+   - Enhanced accessibility with clear visual feedback
+
+4. Technical Improvements:
+   - Optimized render performance
+   - Added proper TypeScript types
+   - Implemented efficient data caching
+   - Enhanced error handling
+
+### Analysis System Updates
+1. Data Structure:
+   - Updated analysis data interface to include heatmap data
+   - Enhanced post processing for better engagement metrics
+   - Improved data persistence in Supabase
+   - Added proper type validation
+
+2. Re-analysis Feature:
+   - Implemented re-analysis functionality for saved subreddits
+   - Added proper error handling and loading states
+   - Enhanced data refresh mechanism
+   - Improved UI feedback during analysis
+
+3. Database Integration:
+   - Updated Supabase schema for new analysis data
+   - Enhanced data synchronization
+   - Improved cache management
+   - Added proper error recovery
+
+## Active Decisions
+1. Using portal for tooltip rendering to avoid containment issues
+2. Processing 500 posts for better data representation
+3. Implementing flat design aesthetic for modern look
+4. Using efficient data batching for API calls
+5. Maintaining consistent data structure across components
+
+## Next Steps
+1. Monitor performance with increased post processing
+2. Consider adding data migration for existing analyses
+3. Implement additional heatmap customization options
+4. Enhance tooltip content and interaction
+5. Add export functionality for heatmap data
+
+## Current Considerations
+- Performance impact of processing more posts
+- User experience during re-analysis
+- Data consistency across components
+- Tooltip positioning edge cases
+- Mobile responsiveness of heatmap
+
+## Dependencies
+- Supabase database schema
+- Reddit API integration
+- React portal system
+- TypeScript type system
+
+## Recent Insights
+- Portal-based tooltips provide better positioning control
+- Processing more posts gives better activity insights
+- Flat design aesthetic improves modern feel
+- Efficient data batching reduces API load
+
+## Code Structure
+```typescript
+interface Post {
+  title: string;
+  score: number;
+  num_comments: number;
+  created_utc: number;
+}
+
+interface HeatmapProps {
+  posts: Post[];
+}
+
+// Key components:
+- HeatmapChart.tsx: Main visualization component
+- AnalysisCard.tsx: Container for analysis display
+- SavedList.tsx: Management of saved subreddits
+```
+
+## Current Status
+- ✓ Heatmap visualization implemented
+- ✓ Re-analysis functionality working
+- ✓ Data persistence improved
+- ✓ Tooltip system enhanced
+- ✓ Performance optimized
+- ✓ Error handling improved
