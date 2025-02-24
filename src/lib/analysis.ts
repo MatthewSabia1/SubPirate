@@ -15,17 +15,22 @@ export interface AnalysisResult {
       marketingImpact: 'high' | 'medium' | 'low';
     }>;
   };
-  posts: SubredditPost[];
+  posts: Array<{
+    title: string;
+    score: number;
+    num_comments: number;
+    created_utc: number;
+  }>;
   analysis: {
     marketingFriendliness: {
       score: number;
       reasons: string[];
       recommendations: string[];
     };
-    postingGuidelines: {
+    postingLimits: {
       frequency: number;
-      bestTimes: string[];
-      restrictions: string[];
+      bestTimeToPost: string[];
+      contentRestrictions: string[];
     };
     contentStrategy: {
       recommendedTypes: string[];
@@ -51,6 +56,29 @@ export interface AnalysisResult {
       longTerm: string[];
     };
   };
+}
+
+interface SubredditAnalysisInput {
+  name: string;
+  title: string;
+  subscribers: number;
+  active_users: number;
+  description: string;
+  posts_per_day: number;
+  historical_posts: SubredditPost[];
+  engagement_metrics: {
+    avg_comments: number;
+    avg_score: number;
+    peak_hours: number[];
+    interaction_rate: number;
+    posts_per_hour: number[];
+  };
+  rules: Array<{
+    title: string;
+    description: string;
+    priority: number;
+    marketingImpact: 'high' | 'medium' | 'low';
+  }>;
 }
 
 function calculateEngagementMetrics(posts: SubredditPost[]) {
@@ -112,16 +140,14 @@ function analyzeRuleMarketingImpact(rule: { title: string; description: string }
   return 'low';
 }
 
-function prepareAnalysisInput(info: SubredditInfo, posts: SubredditPost[]) {
+function prepareAnalysisInput(info: SubredditInfo, posts: SubredditPost[]): SubredditAnalysisInput {
   const engagement = calculateEngagementMetrics(posts);
   if (!engagement) {
     throw new Error('Not enough post data for analysis');
   }
 
   const historicalPosts = posts.map(post => ({
-    title: post.title,
-    content: post.selftext,
-    score: post.score,
+    ...post,
     engagement_rate: (post.score + post.num_comments) / engagement.interaction_rate
   }));
 
@@ -172,28 +198,27 @@ function getRecommendedContentTypes(posts: SubredditPost[]): string[] {
   return Array.from(types);
 }
 
-function calculateMarketingScore(input: any): number {
+function calculateMarketingScore(input: SubredditAnalysisInput): number {
   let score = 50; // Base score
-
-  // Factor 1: Community Size and Activity (30 points)
-  const subscriberScore = Math.min((input.subscribers || 0) / 1000000, 1) * 15;
-  const activeUsersRatio = (input.active_users || 0) / (input.subscribers || 1);
-  const activityScore = Math.min(activeUsersRatio * 1000, 1) * 15;
+  
+  // Factor 1: Community Size and Activity (15+15 points)
+  const subscriberScore = Math.min(input.subscribers / 1000000, 1) * 15;
+  const activityScore = input.subscribers > 0 ? Math.min(input.active_users / input.subscribers, 1) * 15 : 0;
   score += subscriberScore + activityScore;
 
-  // Factor 2: Engagement Quality (30 points)
-  const avgEngagement = input.engagement_metrics?.interaction_rate || 0;
-  const engagementScore = Math.min(avgEngagement / 100, 1) * 30;
+  // Factor 2: Engagement Quality (up to 30 points)
+  const totalEngagement = input.engagement_metrics.avg_score + input.engagement_metrics.avg_comments;
+  const engagementRatio = input.subscribers > 0 ? (totalEngagement / input.subscribers) * 100 : 0;
+  const engagementScore = Math.min(engagementRatio, 30);
   score += engagementScore;
 
-  // Factor 3: Rule Restrictions (-20 points max)
-  const highImpactRules = (input.rules || []).filter(r => r.marketingImpact === 'high').length;
-  const mediumImpactRules = (input.rules || []).filter(r => r.marketingImpact === 'medium').length;
+  // Factor 3: Rule Restrictions (- max 20 points)
+  const highImpactRules = input.rules.filter((r: { marketingImpact: string }) => r.marketingImpact === 'high').length;
+  const mediumImpactRules = input.rules.filter((r: { marketingImpact: string }) => r.marketingImpact === 'medium').length;
   score -= (highImpactRules * 4) + (mediumImpactRules * 2);
 
   // Factor 4: Post Frequency and Timing (10 points)
-  const postsPerDay = input.posts_per_day || 0;
-  const postFrequencyScore = Math.min(postsPerDay / 10, 1) * 10;
+  const postFrequencyScore = Math.min(input.posts_per_day / 10, 1) * 10;
   score += postFrequencyScore;
 
   return Math.max(0, Math.min(100, Math.round(score)));
@@ -212,8 +237,31 @@ export async function analyzeSubredditData(
       indeterminate: false
     });
 
-    const input = prepareAnalysisInput(info, posts);
-    const engagement = calculateEngagementMetrics(posts);
+    // Sort posts by engagement score (75% upvotes, 25% comments)
+    const scoredPosts = posts.map(post => ({
+      ...post,
+      engagement_score: (post.score * 0.75 + post.num_comments * 0.25)
+    }));
+
+    // Get posts from the last month, fallback to all posts if none are recent enough
+    const oneMonthAgo = Date.now() - 30 * 24 * 60 * 60 * 1000;
+    let recentPosts = scoredPosts.filter(post => post.created_utc * 1000 > oneMonthAgo);
+    
+    // If we don't have enough recent posts, use all posts
+    if (recentPosts.length < 50) {
+      recentPosts = scoredPosts;
+    }
+
+    // Sort by engagement score and get top 500
+    const topPosts = recentPosts
+      .sort((a, b) => b.engagement_score - a.engagement_score)
+      .slice(0, 500);
+
+    // For AI analysis, use a subset of the most engaged posts to keep processing time reasonable
+    const aiAnalysisPosts = topPosts.slice(0, 100);
+
+    const input = prepareAnalysisInput(info, aiAnalysisPosts);
+    const engagement = calculateEngagementMetrics(topPosts);
 
     onProgress({
       status: 'Analyzing engagement metrics...',
@@ -253,6 +301,14 @@ export async function analyzeSubredditData(
       indeterminate: false
     });
 
+    // Ensure we include all necessary post data for the heatmap
+    const postsForHeatmap = topPosts.map(post => ({
+      title: post.title,
+      score: post.score,
+      num_comments: post.num_comments,
+      created_utc: post.created_utc
+    }));
+
     const result: AnalysisResult = {
       info: {
         ...info,
@@ -261,20 +317,20 @@ export async function analyzeSubredditData(
           marketingImpact: analyzeRuleMarketingImpact(rule)
         }))
       },
-      posts,
+      posts: postsForHeatmap,
       analysis: {
         marketingFriendliness: {
           score: Math.round(aiAnalysis.marketingFriendliness.score),
           reasons: aiAnalysis.marketingFriendliness.reasons,
           recommendations: aiAnalysis.marketingFriendliness.recommendations
         },
-        postingGuidelines: {
+        postingLimits: {
           frequency: aiAnalysis.postingLimits.frequency,
-          bestTimes: formatBestPostingTimes(engagement.peak_hours),
-          restrictions: aiAnalysis.postingLimits.contentRestrictions
+          bestTimeToPost: formatBestPostingTimes(engagement.peak_hours),
+          contentRestrictions: aiAnalysis.postingLimits.contentRestrictions
         },
         contentStrategy: {
-          recommendedTypes: getRecommendedContentTypes(posts),
+          recommendedTypes: getRecommendedContentTypes(topPosts),
           topics: aiAnalysis.contentStrategy.topics,
           style: aiAnalysis.contentStrategy.style,
           dos: aiAnalysis.contentStrategy.dos,
