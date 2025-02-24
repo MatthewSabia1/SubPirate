@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Users, AlertTriangle, Trash2, MessageCircle, Star, Activity, ExternalLink, Upload, X, ChevronDown, ChevronUp, Calendar } from 'lucide-react';
+import { Users, AlertTriangle, Trash2, MessageCircle, Star, Activity, ExternalLink, Upload, X, ChevronDown, ChevronUp, Calendar, Shield, BadgeCheck } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { redditApi, SubredditPost } from '../lib/redditApi';
 import { syncRedditAccountPosts } from '../lib/redditSync';
@@ -10,9 +10,19 @@ interface RedditAccount {
   id: string;
   username: string;
   karma_score?: number;
+  link_karma?: number;
+  comment_karma?: number;
+  awardee_karma?: number;
+  awarder_karma?: number;
+  total_karma?: number;
   total_posts?: number;
-  posts_today?: number;
+  posts_today: number;
   avatar_url?: string;
+  is_gold?: boolean;
+  is_mod?: boolean;
+  verified?: boolean;
+  has_verified_email?: boolean;
+  created_utc?: string;
   last_post_check: string;
   last_karma_check: string;
   refreshing?: boolean;
@@ -186,64 +196,47 @@ function RedditAccounts() {
     }
   };
 
-  const handleAddAccount = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newUsername.trim() || connecting || !user) return;
+  const handleAddAccount = async () => {
+    if (connecting) return;
 
     setConnecting(true);
     setAddError(null);
 
     try {
-      const cleanUsername = redditApi.parseUsername(newUsername.trim());
-      if (!cleanUsername) {
-        throw new Error('Please enter a valid Reddit username');
-      }
-
-      // Check if account already exists
-      const { data: existing } = await supabase
-        .from('reddit_accounts')
-        .select('id')
-        .eq('username', cleanUsername)
-        .eq('user_id', user.id)
-        .maybeSingle();
-
-      if (existing) {
-        throw new Error('This Reddit account is already connected');
-      }
-
-      // Verify account exists and get initial stats
-      const posts = await redditApi.getUserPosts(cleanUsername);
-      const profilePic = await getRedditProfilePic(cleanUsername);
-      const postKarma = posts.length > 0 ? posts[0].post_karma || 0 : 0;
+      // Generate a random state string for security
+      const state = Math.random().toString(36).substring(7);
       
-      const postsToday = posts.filter(post => {
-        const postDate = new Date(post.created_utc * 1000);
-        const today = new Date();
-        return postDate.toDateString() === today.toDateString();
-      }).length;
+      // Store state in session storage to verify on callback
+      sessionStorage.setItem('reddit_oauth_state', state);
 
-      // Add account to database
-      const { error: insertError } = await supabase
-        .from('reddit_accounts')
-        .insert({
-          username: cleanUsername,
-          user_id: user.id,
-          karma_score: postKarma,
-          total_posts: posts.length,
-          posts_today: postsToday,
-          avatar_url: profilePic,
-          last_post_check: new Date().toISOString(),
-          last_karma_check: new Date().toISOString()
-        });
+      // Construct the OAuth URL with expanded scopes
+      const params = new URLSearchParams({
+        client_id: import.meta.env.VITE_REDDIT_APP_ID,
+        response_type: 'code',
+        state,
+        redirect_uri: `${window.location.origin}/auth/reddit/callback`,
+        duration: 'permanent',
+        scope: [
+          'identity',
+          'read',
+          'submit',
+          'subscribe',
+          'history',
+          'mysubreddits',
+          'privatemessages',
+          'save',
+          'vote',
+          'edit',
+          'flair',
+          'report'
+        ].join(' ')
+      });
 
-      if (insertError) throw insertError;
-
-      setNewUsername('');
-      fetchAccounts();
+      // Redirect to Reddit's OAuth page
+      window.location.href = `https://www.reddit.com/api/v1/authorize?${params}`;
     } catch (err) {
-      console.error('Error adding account:', err);
-      setAddError(err instanceof Error ? err.message : 'Failed to add Reddit account');
-    } finally {
+      console.error('Error initiating Reddit OAuth:', err);
+      setAddError(err instanceof Error ? err.message : 'Failed to connect Reddit account');
       setConnecting(false);
     }
   };
@@ -252,8 +245,8 @@ function RedditAccounts() {
     if (!deleteAccount) return;
 
     try {
-      // Delete avatar if exists
-      if (deleteAccount.avatar_url) {
+      // Delete avatar if exists and is a valid URL
+      if (deleteAccount.avatar_url && typeof deleteAccount.avatar_url === 'string') {
         const avatarPath = deleteAccount.avatar_url.split('/').slice(-2).join('/');
         await supabase.storage
           .from('user_images')
@@ -336,31 +329,35 @@ function RedditAccounts() {
     }
   };
 
-  const handleRemoveAvatar = async (accountId: string) => {
+  const handleDeleteAvatar = async (accountId: string) => {
     const account = accounts.find(a => a.id === accountId);
     if (!account?.avatar_url) return;
 
     try {
+      setUploadingAvatar(accountId);
+
       const filePath = account.avatar_url.split('/user_images/')[1];
-      await supabase.storage
+      const { error: deleteError } = await supabase.storage
         .from('user_images')
         .remove([filePath]);
 
-      // Update account
+      if (deleteError) throw deleteError;
+
       const { error: updateError } = await supabase
         .from('reddit_accounts')
-        .update({ avatar_url: null })
+        .update({ avatar_url: undefined })
         .eq('id', accountId);
 
       if (updateError) throw updateError;
 
-      // Update local state
       setAccounts(prev => prev.map(a => 
-        a.id === accountId ? { ...a, avatar_url: null } : a
+        a.id === accountId ? { ...a, avatar_url: undefined } : a
       ));
     } catch (err) {
-      console.error('Error removing avatar:', err);
-      setError('Failed to remove avatar');
+      console.error('Error deleting avatar:', err);
+      setError('Failed to delete avatar');
+    } finally {
+      setUploadingAvatar(null);
     }
   };
 
@@ -420,6 +417,11 @@ function RedditAccounts() {
     return `https://api.dicebear.com/7.x/initials/svg?seed=${username}&backgroundColor=111111`;
   };
 
+  // Helper function to get avatar URL
+  function getAvatarSrc(account: RedditAccount): string {
+    return account.avatar_url || getAccountAvatar(account.username);
+  }
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -438,6 +440,25 @@ function RedditAccounts() {
               Connect and manage your Reddit accounts
             </p>
           </div>
+          <button
+            onClick={handleAddAccount}
+            disabled={connecting}
+            className={`bg-orange-600 hover:bg-orange-500 text-white font-medium py-2 px-4 rounded flex items-center space-x-2 transition-colors ${
+              connecting ? 'opacity-50 cursor-not-allowed' : ''
+            }`}
+          >
+            {connecting ? (
+              <>
+                <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
+                <span>Connecting...</span>
+              </>
+            ) : (
+              <>
+                <Users size={20} />
+                <span>Connect Reddit Account</span>
+              </>
+            )}
+          </button>
         </div>
 
         {error && (
@@ -447,40 +468,11 @@ function RedditAccounts() {
           </div>
         )}
 
-        {/* Add Account Form */}
-        <div className="bg-[#0f0f0f] rounded-lg p-6 mb-8">
-          <h2 className="text-xl font-semibold mb-1">Add Reddit Account</h2>
-          <p className="text-gray-400 text-sm mb-6">
-            Enter a Reddit username to connect it to your account
-          </p>
-
-          {addError && (
-            <div className="mb-6 p-3 bg-red-900/30 text-red-400 rounded-md text-sm flex items-center gap-2">
-              <AlertTriangle size={16} className="shrink-0" />
-              <p>{addError}</p>
-            </div>
-          )}
-
-          <form onSubmit={handleAddAccount} className="flex gap-4">
-            <input
-              type="text"
-              value={newUsername}
-              onChange={(e) => setNewUsername(e.target.value)}
-              placeholder="Enter username or profile URL"
-              className="flex-1 text-sm md:text-base"
-              disabled={connecting}
-            />
-            <button 
-              type="submit" 
-              className="primary flex items-center gap-2 whitespace-nowrap text-sm md:text-base"
-              disabled={connecting || !newUsername.trim()}
-            >
-              <Users size={20} />
-              <span className="hidden md:inline">{connecting ? 'Connecting...' : 'Connect Account'}</span>
-              <span className="md:hidden">{connecting ? 'Connecting...' : 'Connect'}</span>
-            </button>
-          </form>
-        </div>
+        {addError && (
+          <div className="bg-red-900/50 text-red-100 p-4 rounded mb-6">
+            {addError}
+          </div>
+        )}
 
         {/* Accounts List */}
         <div className="bg-[#0f0f0f] rounded-lg overflow-hidden">
@@ -502,12 +494,12 @@ function RedditAccounts() {
                 <div className="relative group">
                   <div className="w-10 h-10 rounded-lg bg-[#1A1A1A] overflow-hidden">
                     <img 
-                      src={account.avatar_url || getAccountAvatar(account.username)}
+                      src={getAvatarSrc(account)}
                       alt={`u/${account.username}`}
                       className="w-full h-full object-cover"
                       onError={(e) => {
                         const target = e.target as HTMLImageElement;
-                        target.src = getAccountAvatar(account.username);
+                        target.src = getAvatarSrc(account);
                       }}
                     />
                     <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
@@ -529,7 +521,7 @@ function RedditAccounts() {
                       </label>
                       {account.avatar_url && (
                         <button
-                          onClick={() => handleRemoveAvatar(account.id)}
+                          onClick={() => handleDeleteAvatar(account.id)}
                           className="text-white hover:text-red-400 transition-colors"
                           disabled={uploadingAvatar === account.id}
                         >
@@ -553,27 +545,42 @@ function RedditAccounts() {
                     className="font-medium text-[15px] hover:text-[#C69B7B] transition-colors inline-flex items-center gap-2 mb-1"
                   >
                     u/{account.username}
+                    {account.is_gold && (
+                      <span className="text-amber-400" title="Reddit Premium">
+                        <Star size={14} />
+                      </span>
+                    )}
+                    {account.is_mod && (
+                      <span className="text-green-400" title="Moderator">
+                        <Shield size={14} />
+                      </span>
+                    )}
+                    {account.verified && (
+                      <span className="text-blue-400" title="Verified">
+                        <BadgeCheck size={14} />
+                      </span>
+                    )}
                     <ExternalLink size={14} className="text-gray-400" />
                   </a>
                   <div className="flex items-center gap-4 md:hidden mt-2">
-                    <div className="flex items-center gap-1 text-amber-400">
+                    <div className="flex items-center gap-1 text-amber-400" title="Total Karma">
                       <Star size={14} />
-                      <span className="text-sm">{account.karma_score || '—'}</span>
+                      <span className="text-sm">{account.total_karma || account.karma_score || '—'}</span>
                     </div>
-                    <div className="flex items-center gap-1 text-gray-400">
+                    <div className="flex items-center gap-1 text-gray-400" title="Total Posts">
                       <MessageCircle size={14} />
                       <span className="text-sm">{account.total_posts || '—'}</span>
                     </div>
-                    <div className={`flex items-center gap-1 ${account.posts_today > 0 ? 'text-emerald-400' : 'text-gray-400'}`}>
+                    <div className={`flex items-center gap-1 ${(account.posts_today ?? 0) > 0 ? 'text-emerald-400' : 'text-gray-400'}`} title="Posts Today">
                       <Activity size={14} />
-                      <span className="text-sm">{account.posts_today || '0'}</span>
+                      <span className="text-sm">{account.posts_today ?? 0}</span>
                     </div>
                   </div>
                 </div>
 
-                <div className="hidden md:flex items-center justify-center gap-1 text-amber-400">
+                <div className="hidden md:flex items-center justify-center gap-1 text-amber-400" title={`Link: ${account.link_karma || 0}\nComment: ${account.comment_karma || 0}\nAwardee: ${account.awardee_karma || 0}\nAwarder: ${account.awarder_karma || 0}`}>
                   <Star size={16} />
-                  <span>{account.karma_score || '—'}</span>
+                  <span>{account.total_karma || account.karma_score || '—'}</span>
                 </div>
 
                 <div className="hidden md:flex items-center justify-center gap-1 text-gray-400">
@@ -581,9 +588,9 @@ function RedditAccounts() {
                   <span>{account.total_posts || '—'}</span>
                 </div>
 
-                <div className={`hidden md:flex items-center justify-center gap-1 ${account.posts_today > 0 ? 'text-emerald-400' : 'text-gray-400'}`}>
+                <div className={`hidden md:flex items-center justify-center gap-1 ${(account.posts_today ?? 0) > 0 ? 'text-emerald-400' : 'text-gray-400'}`}>
                   <Activity size={16} />
-                  <span>{account.posts_today || '0'}</span>
+                  <span>{account.posts_today ?? 0}</span>
                 </div>
 
                 <div className="absolute md:static top-4 right-4">
@@ -646,18 +653,24 @@ function RedditAccounts() {
                             <div className="flex items-start gap-4">
                               {(post.preview_url || post.thumbnail) ? (
                                 <img 
-                                  src={post.preview_url || post.thumbnail}
+                                  src={post.preview_url || post.thumbnail || getAvatarSrc(account)}
                                   alt=""
                                   className="w-20 h-20 rounded-md object-cover bg-[#111111]"
                                   onError={(e) => {
                                     const target = e.target as HTMLImageElement;
-                                    target.src = account.avatar_url || getAccountAvatar(account.username);
+                                    // Try thumbnail if preview failed
+                                    if (target.src === post.preview_url && post.thumbnail) {
+                                      target.src = post.thumbnail;
+                                    } else {
+                                      // Fall back to avatar only if both preview and thumbnail fail
+                                      target.src = getAvatarSrc(account);
+                                    }
                                   }}
                                 />
                               ) : (
                                 <div className="w-20 h-20 rounded-md bg-[#111111] flex items-center justify-center">
                                   <img 
-                                    src={account.avatar_url || getAccountAvatar(account.username)}
+                                    src={getAvatarSrc(account)}
                                     alt=""
                                     className="w-12 h-12"
                                     onError={(e) => {

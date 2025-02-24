@@ -265,8 +265,8 @@ function Calendar() {
       const validAccountIds = filters.accounts.filter(isValidUUID);
       
       // Get start and end dates for the view
-      let startDate = new Date(currentDate);
-      let endDate = new Date(currentDate);
+      const startDate = new Date(currentDate);
+      const endDate = new Date(currentDate);
       switch (view) {
         case 'month':
           startDate.setDate(1);

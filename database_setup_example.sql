@@ -62,6 +62,14 @@ CREATE TABLE public.reddit_accounts (
   last_karma_check timestamp with time zone NULL DEFAULT now(),
   total_posts_24h integer NULL DEFAULT 0,
   last_post_sync timestamp with time zone NULL DEFAULT now(),
+  access_token text,
+  refresh_token text,
+  token_expiry timestamptz,
+  client_id text,
+  client_secret text,
+  scope text[] DEFAULT '{identity,read,submit,subscribe,history,mysubreddits,privatemessages,save,vote,edit,flair,report}'::text[],
+  is_active boolean DEFAULT true,
+  last_used_at timestamptz DEFAULT now(),
   CONSTRAINT reddit_accounts_pkey PRIMARY KEY (id),
   CONSTRAINT reddit_accounts_user_id_username_key UNIQUE (user_id, username),
   CONSTRAINT reddit_accounts_user_id_fkey FOREIGN KEY (user_id) REFERENCES profiles(id) ON DELETE CASCADE
@@ -196,6 +204,21 @@ CREATE TABLE public.subscriptions (
   CONSTRAINT subscriptions_user_id_fkey FOREIGN KEY (user_id) REFERENCES profiles(id) ON DELETE CASCADE
 ) TABLESPACE pg_default;
 
+-- Create table for tracking API usage
+CREATE TABLE public.reddit_api_usage (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  reddit_account_id uuid NOT NULL,
+  endpoint text NOT NULL,
+  requests_count integer DEFAULT 0,
+  window_start timestamptz DEFAULT now(),
+  reset_at timestamptz,
+  created_at timestamptz DEFAULT now(),
+  updated_at timestamptz DEFAULT now(),
+  CONSTRAINT reddit_api_usage_pkey PRIMARY KEY (id),
+  CONSTRAINT reddit_api_usage_reddit_account_id_endpoint_key UNIQUE (reddit_account_id, endpoint),
+  CONSTRAINT reddit_api_usage_reddit_account_id_fkey FOREIGN KEY (reddit_account_id) REFERENCES reddit_accounts(id) ON DELETE CASCADE
+) TABLESPACE pg_default;
+
 -- Row Level Security Policies
 
 CREATE POLICY "Users can view own profile" ON public.profiles FOR SELECT TO authenticated USING (auth.uid() = id);
@@ -221,5 +244,30 @@ CREATE POLICY "Authenticated users can update subreddits" ON public.subreddits F
 
 CREATE POLICY "Users can view own subscription" ON public.subscriptions FOR SELECT TO authenticated USING (user_id = auth.uid());
 CREATE POLICY "Users can update own subscription" ON public.subscriptions FOR UPDATE TO authenticated USING (user_id = auth.uid());
+
+-- Add RLS policies for the new table
+CREATE POLICY "Users can view own reddit api usage" ON public.reddit_api_usage 
+  FOR SELECT TO authenticated 
+  USING (EXISTS (
+    SELECT 1 FROM reddit_accounts 
+    WHERE reddit_accounts.id = reddit_api_usage.reddit_account_id 
+    AND reddit_accounts.user_id = auth.uid()
+  ));
+
+CREATE POLICY "Users can update own reddit api usage" ON public.reddit_api_usage 
+  FOR UPDATE TO authenticated 
+  USING (EXISTS (
+    SELECT 1 FROM reddit_accounts 
+    WHERE reddit_accounts.id = reddit_api_usage.reddit_account_id 
+    AND reddit_accounts.user_id = auth.uid()
+  ));
+
+CREATE POLICY "Users can create reddit api usage" ON public.reddit_api_usage 
+  FOR INSERT TO authenticated 
+  WITH CHECK (EXISTS (
+    SELECT 1 FROM reddit_accounts 
+    WHERE reddit_accounts.id = reddit_api_usage.reddit_account_id 
+    AND reddit_accounts.user_id = auth.uid()
+  ));
 
 -- Add any additional policies as needed

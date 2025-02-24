@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Download, FolderPlus, X, ChevronDown, ChevronUp, Search, Calendar, Users, Activity } from 'lucide-react';
+import { Download, FolderPlus, X, ChevronDown, ChevronUp, Search, Calendar, Users, Activity, Send, ChevronRight } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import SubredditAnalysis from '../pages/SubredditAnalysis';
 import { getSubredditInfo, getSubredditPosts, cleanRedditImageUrl } from '../lib/reddit';
@@ -70,7 +70,49 @@ function ProjectSubreddits({ projectId }: ProjectSubredditsProps) {
   // Function to refresh subreddit data
   const refreshSubredditData = async (subreddit: ProjectSubreddit['subreddit']) => {
     try {
+      console.log(`Refreshing data for r/${subreddit.name}...`);
       const info = await getSubredditInfo(subreddit.name);
+      
+      if (info) {
+        console.log(`Updated data for r/${subreddit.name}:`, {
+          subscribers: info.subscribers,
+          active_users: info.active_users
+        });
+        
+        // Update the subreddit in the database with new data
+        const { error } = await supabase
+          .from('subreddits')
+          .update({
+            subscriber_count: info.subscribers,
+            active_users: info.active_users,
+            icon_img: info.icon_img,
+            community_icon: info.community_icon
+          })
+          .eq('id', subreddit.id);
+
+        if (error) {
+          console.error(`Error updating r/${subreddit.name} in database:`, error);
+          return null;
+        }
+
+        // Update local state
+        setSubreddits(prev => prev.map(s => {
+          if (s.subreddit.id === subreddit.id) {
+            return {
+              ...s,
+              subreddit: {
+                ...s.subreddit,
+                subscriber_count: info.subscribers,
+                active_users: info.active_users,
+                icon_img: info.icon_img,
+                community_icon: info.community_icon
+              }
+            };
+          }
+          return s;
+        }));
+      }
+      
       return info;
     } catch (err) {
       console.error(`Error refreshing data for r/${subreddit.name}:`, err);
@@ -133,7 +175,15 @@ function ProjectSubreddits({ projectId }: ProjectSubredditsProps) {
   };
 
   const getSubredditIcon = (subreddit: ProjectSubreddit['subreddit']): string => {
-    // Always use generated placeholder for consistency
+    // Use community icon first if available
+    if (subreddit.community_icon) {
+      return subreddit.community_icon;
+    }
+    // Fallback to icon_img if available
+    if (subreddit.icon_img) {
+      return subreddit.icon_img;
+    }
+    // Final fallback to generated placeholder
     return `https://api.dicebear.com/7.x/shapes/svg?seed=${subreddit.name}&backgroundColor=111111&radius=12`;
   };
 
@@ -160,6 +210,17 @@ function ProjectSubreddits({ projectId }: ProjectSubredditsProps) {
         .order('created_at', { ascending: false });
 
       if (error) throw error;
+      
+      // Debug log with proper type casting
+      const debugData = (data as unknown as DatabaseProjectSubreddit[])?.map(item => {
+        const subredditData = Array.isArray(item.subreddit) ? item.subreddit[0] : item.subreddit;
+        return {
+          name: subredditData.name,
+          icon_img: subredditData.icon_img,
+          community_icon: subredditData.community_icon
+        };
+      });
+      console.log('Fetched project subreddits:', debugData);
       
       // Transform the data to match the ProjectSubreddit interface
       const transformedData = (data as unknown as DatabaseProjectSubreddit[]).map(item => {
@@ -244,7 +305,7 @@ function ProjectSubreddits({ projectId }: ProjectSubredditsProps) {
       // If no cache, perform analysis
       const [info, posts] = await Promise.all([
         getSubredditInfo(subredditName),
-        getSubredditPosts(subredditName)
+        getSubredditPosts(subredditName, 'top', 500, 'month')
       ]);
 
       const result = await analyzeSubredditData(
@@ -312,7 +373,7 @@ function ProjectSubreddits({ projectId }: ProjectSubredditsProps) {
       {/* Subreddits Table */}
       <div className="bg-[#111111] rounded-lg overflow-hidden">
         {/* Table Header */}
-        <div className="hidden md:grid grid-cols-[2fr_1.5fr_1fr_auto_80px_120px] gap-4 px-6 py-4 border-b border-[#222222] text-sm text-gray-400">
+        <div className="hidden md:grid grid-cols-[2fr_1.5fr_1fr_auto_80px_200px] gap-4 px-6 py-4 border-b border-[#222222] text-sm text-gray-400">
           <div className="hidden md:block">Subreddit</div>
           <div className="hidden md:block">Community Stats</div>
           <div className="hidden md:block">Marketing-Friendly</div>
@@ -327,7 +388,7 @@ function ProjectSubreddits({ projectId }: ProjectSubredditsProps) {
             <div key={saved.id}>
               <div 
                 onClick={() => toggleSubredditExpansion(saved.subreddit.name)}
-                className="flex flex-col md:grid md:grid-cols-[2fr_1.5fr_1fr_auto_80px_120px] gap-4 p-4 md:px-6 md:py-4 items-start md:items-center hover:bg-[#1A1A1A] transition-colors cursor-pointer"
+                className="flex flex-col md:grid md:grid-cols-[2fr_1.5fr_1fr_auto_80px_200px] gap-4 p-4 md:px-6 md:py-4 items-start md:items-center hover:bg-[#1A1A1A] transition-colors cursor-pointer"
               >
                 {/* Subreddit Name with Icon */}
                 <div className="flex items-center gap-3 w-full min-w-0">
@@ -336,7 +397,9 @@ function ProjectSubreddits({ projectId }: ProjectSubredditsProps) {
                       src={getSubredditIcon(saved.subreddit)}
                       alt={saved.subreddit.name}
                       className="w-full h-full object-cover"
+                      loading="lazy"
                       onError={(e) => {
+                        console.warn(`Failed to load icon for r/${saved.subreddit.name}:`, e);
                         const target = e.target as HTMLImageElement;
                         target.src = `https://api.dicebear.com/7.x/shapes/svg?seed=${saved.subreddit.name}&backgroundColor=111111&radius=12`;
                       }}
@@ -348,15 +411,15 @@ function ProjectSubreddits({ projectId }: ProjectSubredditsProps) {
                 </div>
 
                 {/* Community Stats */}
-                <div className="flex flex-col text-sm mt-2 md:mt-0 min-w-0">
+                <div className="hidden md:flex flex-col text-sm mt-2 lg:mt-0">
                   <div className="flex items-center gap-1.5 text-gray-400">
                     <Users size={14} />
                     <span>{formatNumber(saved.subreddit.subscriber_count)}</span>
                   </div>
                   {saved.subreddit.active_users > 0 && (
-                    <div className="flex items-center gap-1.5 text-emerald-400 mt-1 min-w-0">
+                    <div className="flex items-center gap-1.5 text-emerald-400 mt-1">
                       <Activity size={14} />
-                      <span className="truncate">{formatNumber(saved.subreddit.active_users)} online</span>
+                      <span>{formatNumber(saved.subreddit.active_users)} online</span>
                     </div>
                   )}
                 </div>
@@ -395,19 +458,32 @@ function ProjectSubreddits({ projectId }: ProjectSubredditsProps) {
                 </div>
 
                 {/* Actions */}
-                <div className="flex items-center gap-1 mt-4 md:mt-0 md:justify-end">
-                  <button 
-                    className="text-gray-400 hover:text-white p-2 rounded-full hover:bg-white/10"
-                    title="Remove from Project"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      removeProjectSubreddit(saved.id);
-                    }}
+                <div className="flex items-center gap-2 mt-4 md:mt-0 md:justify-end w-full md:w-auto">
+                  <a
+                    href={`https://reddit.com/r/${saved.subreddit.name}/submit`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={e => e.stopPropagation()}
+                    className="bg-[#1A1A1A] hover:bg-[#252525] text-gray-200 flex items-center gap-2 h-9 px-4 text-sm whitespace-nowrap rounded-md transition-colors border border-[#333333]"
+                    title="Post to Subreddit"
                   >
-                    <X size={20} />
-                  </button>
-                  <div className="text-gray-400 p-2">
-                    {expandedSubreddit === saved.subreddit.name ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
+                    <Send size={16} className="text-gray-400" />
+                    <span>Post</span>
+                  </a>
+                  <div className="flex items-center gap-1 ml-2">
+                    <button 
+                      className="text-gray-400 hover:text-white p-2 rounded-full hover:bg-white/10"
+                      title="Remove from Project"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        removeProjectSubreddit(saved.id);
+                      }}
+                    >
+                      <X size={20} />
+                    </button>
+                    <div className="text-gray-400 p-2">
+                      {expandedSubreddit === saved.subreddit.name ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
+                    </div>
                   </div>
                 </div>
               </div>
@@ -416,10 +492,23 @@ function ProjectSubreddits({ projectId }: ProjectSubredditsProps) {
               {expandedSubreddit === saved.subreddit.name && (
                 <div className="border-t border-[#222222] bg-[#0A0A0A] p-6" onClick={e => e.stopPropagation()}>
                   {saved.subreddit.analysis_data ? (
-                    <AnalysisCard 
-                      analysis={saved.subreddit.analysis_data}
-                      mode="saved"
-                    />
+                    <>
+                      <AnalysisCard 
+                        analysis={saved.subreddit.analysis_data}
+                        mode="saved"
+                      />
+                      <div className="mt-6">
+                        <a
+                          href={`https://reddit.com/r/${saved.subreddit.name}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-[#C69B7B] hover:text-[#B38A6A] transition-colors inline-flex items-center gap-2"
+                        >
+                          View all posts in r/{saved.subreddit.name}
+                          <ChevronRight size={16} />
+                        </a>
+                      </div>
+                    </>
                   ) : analyzing ? (
                     <div className="text-center py-8 text-gray-400">
                       Analyzing subreddit...

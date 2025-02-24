@@ -6,12 +6,15 @@ export async function syncRedditAccountPosts(accountId: string): Promise<void> {
     // Get account info
     const { data: account, error: accountError } = await supabase
       .from('reddit_accounts')
-      .select('username, last_post_sync')
+      .select('*')
       .eq('id', accountId)
       .single();
 
     if (accountError) throw accountError;
     if (!account) throw new Error('Account not found');
+
+    // Set up the API client with the account's credentials
+    await redditApi.setAccountAuth(accountId);
 
     // Fetch recent posts from Reddit
     const posts = await redditApi.getUserPosts(
@@ -53,10 +56,19 @@ export async function syncRedditAccountPosts(accountId: string): Promise<void> {
       if (insertError) throw insertError;
     }
 
-    // Update last sync time
+    // Update account stats
     const { error: updateError } = await supabase
       .from('reddit_accounts')
-      .update({ last_post_sync: new Date().toISOString() })
+      .update({
+        last_post_sync: new Date().toISOString(),
+        total_posts: posts.length,
+        posts_today: posts.filter(post => {
+          const postDate = new Date(post.created_utc * 1000);
+          const today = new Date();
+          return postDate.toDateString() === today.toDateString();
+        }).length,
+        karma_score: posts.length > 0 ? posts[0].post_karma || 0 : account.karma_score
+      })
       .eq('id', accountId);
 
     if (updateError) throw updateError;

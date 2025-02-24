@@ -242,9 +242,14 @@ function SpyGlass() {
           active_users: frequencyData.active_users,
           marketing_friendly_score: 0, // Will be calculated later during analysis
           posting_requirements: {
+            allowedTypes: [],
             restrictions: [],
-            bestTimes: [],
-            frequency: 1
+            recommendations: []
+          },
+          posting_frequency: {
+            postTypes: [],
+            timing: [],
+            topics: []
           },
           allowed_content: [],
           best_practices: [],
@@ -260,7 +265,7 @@ function SpyGlass() {
         .single();
 
       if (upsertError) throw upsertError;
-      if (!savedSubreddit) throw new Error('Failed to save subreddit');
+      if (!savedSubreddit) throw new Error('Failed to save subreddit data');
 
       // Save to user's list if not already saved
       const { error: savedError } = await supabase

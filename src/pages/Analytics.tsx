@@ -54,6 +54,20 @@ ChartJS.register(
   Filler
 );
 
+// Insert custom debounce hook
+function useDebounce<T>(value: T, delay: number): T {
+  const [debouncedValue, setDebouncedValue] = React.useState(value);
+  React.useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedValue(value);
+    }, delay);
+    return () => {
+      clearTimeout(handler);
+    };
+  }, [value, delay]);
+  return debouncedValue;
+}
+
 interface DateRange {
   startDate: Date;
   endDate: Date;
@@ -120,6 +134,7 @@ function Analytics() {
     projects: []
   });
   const [filterSearch, setFilterSearch] = useState('');
+  const debouncedFilterSearch = useDebounce(filterSearch, 300);
 
   // Fetch filter options
   useEffect(() => {
@@ -218,11 +233,19 @@ function Analytics() {
         postsByDate[date] = (postsByDate[date] || 0) + 1;
 
         if (post.subreddits) {
-          postsBySubreddit[post.subreddits.name] = (postsBySubreddit[post.subreddits.name] || 0) + 1;
+          const subreddit = Array.isArray(post.subreddits) ? post.subreddits[0] : post.subreddits;
+          const subredditName = subreddit?.name;
+          if (subredditName) {
+            postsBySubreddit[subredditName] = (postsBySubreddit[subredditName] || 0) + 1;
+          }
         }
 
         if (post.reddit_accounts) {
-          postsByAccount[post.reddit_accounts.username] = (postsByAccount[post.reddit_accounts.username] || 0) + 1;
+          const account = Array.isArray(post.reddit_accounts) ? post.reddit_accounts[0] : post.reddit_accounts;
+          const username = account?.username;
+          if (username) {
+            postsByAccount[username] = (postsByAccount[username] || 0) + 1;
+          }
         }
       });
 
@@ -276,6 +299,7 @@ function Analytics() {
     link.href = URL.createObjectURL(blob);
     link.download = `reddit-analytics-${format(dateRange.startDate, 'yyyy-MM-dd')}-to-${format(dateRange.endDate, 'yyyy-MM-dd')}.csv`;
     link.click();
+    setTimeout(() => { URL.revokeObjectURL(link.href); }, 100);
   };
 
   // Chart data preparation
@@ -324,7 +348,8 @@ function Analytics() {
   if (error) {
     return (
       <div className="p-8 text-center">
-        <div className="text-red-400">Error loading analytics data</div>
+        <div className="text-red-400 mb-4">Error loading analytics data: {String(error)}</div>
+        <button onClick={() => refetch()} className="secondary px-4 py-2 rounded">Retry</button>
       </div>
     );
   }
@@ -394,7 +419,7 @@ function Analytics() {
               </div>
               <div className="space-y-2">
                 {filterOptions.accounts
-                  .filter(acc => acc.name.toLowerCase().includes(filterSearch.toLowerCase()))
+                  .filter(acc => acc.name.toLowerCase().includes(debouncedFilterSearch.toLowerCase()))
                   .map(account => (
                     <button
                       key={account.id}
@@ -425,7 +450,7 @@ function Analytics() {
               </div>
               <div className="space-y-2">
                 {filterOptions.subreddits
-                  .filter(sub => sub.name.toLowerCase().includes(filterSearch.toLowerCase()))
+                  .filter(sub => sub.name.toLowerCase().includes(debouncedFilterSearch.toLowerCase()))
                   .map(subreddit => (
                     <button
                       key={subreddit.id}
@@ -456,7 +481,7 @@ function Analytics() {
               </div>
               <div className="space-y-2">
                 {filterOptions.projects
-                  .filter(proj => proj.name.toLowerCase().includes(filterSearch.toLowerCase()))
+                  .filter(proj => proj.name.toLowerCase().includes(debouncedFilterSearch.toLowerCase()))
                   .map(project => (
                     <button
                       key={project.id}
@@ -494,6 +519,8 @@ function Analytics() {
             onChange={date => date && setDateRange(prev => ({ ...prev, startDate: date }))}
             className="bg-[#0A0A0A] border-none rounded-md px-4 h-10 text-white"
             dateFormat="MMM d, yyyy"
+            maxDate={dateRange.endDate}
+            aria-label="Select start date"
           />
           <span className="text-gray-400">to</span>
           <DatePicker
@@ -501,6 +528,8 @@ function Analytics() {
             onChange={date => date && setDateRange(prev => ({ ...prev, endDate: date }))}
             className="bg-[#0A0A0A] border-none rounded-md px-4 h-10 text-white"
             dateFormat="MMM d, yyyy"
+            minDate={dateRange.startDate}
+            aria-label="Select end date"
           />
         </div>
       </div>
@@ -613,41 +642,22 @@ function Analytics() {
                 options={{
                   responsive: true,
                   maintainAspectRatio: false,
+                  interaction: { mode: 'index', intersect: false },
                   scales: {
                     y: {
                       beginAtZero: true,
-                      border: {
-                        display: false
-                      },
-                      grid: {
-                        color: 'rgba(51, 51, 51, 0.5)'
-                      },
-                      ticks: {
-                        color: '#999999',
-                        font: {
-                          size: 11
-                        }
-                      }
+                      border: { display: false },
+                      grid: { color: 'rgba(51, 51, 51, 0.5)' },
+                      ticks: { color: '#999999', font: { size: 11 } }
                     },
                     x: {
-                      border: {
-                        display: false
-                      },
-                      grid: {
-                        color: 'rgba(51, 51, 51, 0.5)'
-                      },
-                      ticks: {
-                        color: '#999999',
-                        font: {
-                          size: 11
-                        }
-                      }
+                      border: { display: false },
+                      grid: { color: 'rgba(51, 51, 51, 0.5)' },
+                      ticks: { color: '#999999', font: { size: 11 } }
                     }
                   },
                   plugins: {
-                    legend: {
-                      display: false
-                    },
+                    legend: { display: false },
                     tooltip: {
                       backgroundColor: '#111111',
                       borderColor: '#333333',
@@ -656,12 +666,8 @@ function Analytics() {
                       bodyColor: '#C69B7B',
                       padding: 12,
                       cornerRadius: 8,
-                      bodyFont: {
-                        family: 'inherit'
-                      },
-                      titleFont: {
-                        family: 'inherit'
-                      }
+                      bodyFont: { family: 'inherit' },
+                      titleFont: { family: 'inherit' }
                     }
                   }
                 }}
@@ -747,41 +753,22 @@ function Analytics() {
                 options={{
                   responsive: true,
                   maintainAspectRatio: false,
+                  interaction: { mode: 'index', intersect: false },
                   scales: {
                     y: {
                       beginAtZero: true,
-                      border: {
-                        display: false
-                      },
-                      grid: {
-                        color: 'rgba(51, 51, 51, 0.5)'
-                      },
-                      ticks: {
-                        color: '#999999',
-                        font: {
-                          size: 11
-                        }
-                      }
+                      border: { display: false },
+                      grid: { color: 'rgba(51, 51, 51, 0.5)' },
+                      ticks: { color: '#999999', font: { size: 11 } }
                     },
                     x: {
-                      border: {
-                        display: false
-                      },
-                      grid: {
-                        color: 'rgba(51, 51, 51, 0.5)'
-                      },
-                      ticks: {
-                        color: '#999999',
-                        font: {
-                          size: 11
-                        }
-                      }
+                      border: { display: false },
+                      grid: { color: 'rgba(51, 51, 51, 0.5)' },
+                      ticks: { color: '#999999', font: { size: 11 } }
                     }
                   },
                   plugins: {
-                    legend: {
-                      display: false
-                    },
+                    legend: { display: false },
                     tooltip: {
                       backgroundColor: '#111111',
                       borderColor: '#333333',
@@ -790,12 +777,8 @@ function Analytics() {
                       bodyColor: '#C69B7B',
                       padding: 12,
                       cornerRadius: 8,
-                      bodyFont: {
-                        family: 'inherit'
-                      },
-                      titleFont: {
-                        family: 'inherit'
-                      }
+                      bodyFont: { family: 'inherit' },
+                      titleFont: { family: 'inherit' }
                     }
                   }
                 }}

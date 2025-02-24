@@ -114,29 +114,43 @@ function calculateEngagementMetrics(posts: SubredditPost[]) {
 function analyzeRuleMarketingImpact(rule: { title: string; description: string }): 'high' | 'medium' | 'low' {
   const text = `${rule.title} ${rule.description}`.toLowerCase();
   
-  // Keywords that indicate high marketing impact
+  // High impact keywords indicate significant marketing restrictions
   const highImpactKeywords = [
-    'spam', 'promotion', 'advertising', 'marketing', 'self-promotion',
-    'commercial', 'business', 'selling', 'merchandise', 'affiliate'
+    'no promotion',
+    'no advertising',
+    'no marketing',
+    'no self-promotion',
+    'no solicitation',
+    'banned',
+    'prohibited',
+    'not allowed',
+    'spam'
   ];
-  
-  // Keywords that indicate medium marketing impact
+
+  // Medium impact keywords indicate partial restrictions
   const mediumImpactKeywords = [
-    'quality', 'format', 'title', 'flair', 'tags',
-    'submission', 'guidelines', 'requirements', 'posting'
+    'limited',
+    'restricted',
+    'guidelines',
+    'approval',
+    'permission',
+    'ratio',
+    'self-promotion saturday',
+    'promotional content',
+    'advertising guidelines'
   ];
-  
-  // Check for high impact keywords first
+
+  // Check for high impact restrictions first
   if (highImpactKeywords.some(keyword => text.includes(keyword))) {
     return 'high';
   }
-  
-  // Then check for medium impact keywords
+
+  // Then check for medium impact restrictions
   if (mediumImpactKeywords.some(keyword => text.includes(keyword))) {
     return 'medium';
   }
-  
-  // Default to low impact
+
+  // Default to low impact if no restrictions found
   return 'low';
 }
 
@@ -200,116 +214,182 @@ function getRecommendedContentTypes(posts: SubredditPost[]): string[] {
 
 function calculateMarketingScore(input: SubredditAnalysisInput): number {
   let score = 50; // Base score
+  let factors: { name: string; score: number; weight: number; }[] = [];
   
-  // Factor 1: Community Size and Activity (15+15 points)
-  const subscriberScore = Math.min(input.subscribers / 1000000, 1) * 15;
-  const activityScore = input.subscribers > 0 ? Math.min(input.active_users / input.subscribers, 1) * 15 : 0;
-  score += subscriberScore + activityScore;
+  // Factor 1: Community Size (0-15 points)
+  // Logarithmic scale to better handle both small and large communities
+  const subscriberLog = Math.log10(input.subscribers + 1);
+  const subscriberScore = Math.min((subscriberLog / 6) * 15, 15); // 1M subscribers = 15 points
+  factors.push({ name: 'Community Size', score: subscriberScore, weight: 15 });
 
-  // Factor 2: Engagement Quality (up to 30 points)
-  const totalEngagement = input.engagement_metrics.avg_score + input.engagement_metrics.avg_comments;
-  const engagementRatio = input.subscribers > 0 ? (totalEngagement / input.subscribers) * 100 : 0;
-  const engagementScore = Math.min(engagementRatio, 30);
-  score += engagementScore;
+  // Factor 2: Community Activity (0-15 points)
+  // Measures active users as a percentage of subscribers with diminishing returns
+  const activityRatio = input.subscribers > 0 ? (input.active_users / input.subscribers) : 0;
+  const activityScore = Math.min((Math.sqrt(activityRatio) * 15), 15);
+  factors.push({ name: 'Community Activity', score: activityScore, weight: 15 });
 
-  // Factor 3: Rule Restrictions (- max 20 points)
-  const highImpactRules = input.rules.filter((r: { marketingImpact: string }) => r.marketingImpact === 'high').length;
-  const mediumImpactRules = input.rules.filter((r: { marketingImpact: string }) => r.marketingImpact === 'medium').length;
-  score -= (highImpactRules * 4) + (mediumImpactRules * 2);
+  // Factor 3: Engagement Quality (0-30 points)
+  // Combines post score and comments with diminishing returns
+  const avgEngagement = input.engagement_metrics.avg_score + (input.engagement_metrics.avg_comments * 2);
+  const engagementRatio = input.subscribers > 0 ? (avgEngagement / Math.sqrt(input.subscribers)) : 0;
+  const engagementScore = Math.min((engagementRatio * 5), 30);
+  factors.push({ name: 'Engagement Quality', score: engagementScore, weight: 30 });
 
-  // Factor 4: Post Frequency and Timing (10 points)
-  const postFrequencyScore = Math.min(input.posts_per_day / 10, 1) * 10;
-  score += postFrequencyScore;
+  // Factor 4: Content Flexibility (0-20 points)
+  // Starts at max and subtracts based on rule restrictions
+  let flexibilityScore = 20;
+  const highImpactRules = input.rules.filter(r => r.marketingImpact === 'high').length;
+  const mediumImpactRules = input.rules.filter(r => r.marketingImpact === 'medium').length;
+  flexibilityScore -= (highImpactRules * 3);
+  flexibilityScore -= (mediumImpactRules * 1.5);
+  flexibilityScore = Math.max(0, flexibilityScore);
+  factors.push({ name: 'Content Flexibility', score: flexibilityScore, weight: 20 });
 
-  return Math.max(0, Math.min(100, Math.round(score)));
+  // Factor 5: Activity Frequency (0-20 points)
+  // Rewards consistent daily activity but doesn't overly penalize lower frequency
+  const postsPerDayScore = Math.min(Math.sqrt(input.posts_per_day) * 8, 20);
+  factors.push({ name: 'Activity Frequency', score: postsPerDayScore, weight: 20 });
+
+  // Calculate weighted average
+  const totalWeight = factors.reduce((sum, factor) => sum + factor.weight, 0);
+  const weightedScore = factors.reduce((sum, factor) => sum + (factor.score * (factor.weight / totalWeight)), 0);
+
+  // Apply final adjustments
+  let finalScore = weightedScore;
+
+  // Bonus for very active communities (>10% engagement rate)
+  if (engagementRatio > 0.1) {
+    finalScore *= 1.1;
+  }
+
+  // Penalty for extremely restrictive communities (>5 high impact rules)
+  if (highImpactRules > 5) {
+    finalScore *= 0.9;
+  }
+
+  // Ensure score is between 0 and 100
+  return Math.max(0, Math.min(100, Math.round(finalScore)));
 }
 
 export async function analyzeSubredditData(
   info: SubredditInfo,
   posts: SubredditPost[],
-  onProgress: (progress: AnalysisProgress) => void
+  onProgress: (progress: AnalysisProgress) => void,
+  onBasicAnalysisReady?: (result: AnalysisResult) => void
 ): Promise<AnalysisResult> {
-  try {
-    // Step 1: Prepare data
-    onProgress({
-      status: 'Initializing analysis...',
-      progress: 20,
-      indeterminate: false
-    });
+  let basicResult: AnalysisResult | null = null;
+  let aiAnalysisStarted = false;
 
-    // Sort posts by engagement score (75% upvotes, 25% comments)
+  try {
+    // Phase 1: Immediate Basic Analysis
+    onProgress({ status: 'Calculating basic metrics...', progress: 20, indeterminate: false });
+
+    // Handle case of no posts
+    if (!posts.length) {
+      basicResult = {
+        info: {
+          ...info,
+          rules: info.rules.map(rule => ({
+            ...rule,
+            marketingImpact: analyzeRuleMarketingImpact(rule)
+          }))
+        },
+        posts: [],
+        analysis: {
+          marketingFriendliness: {
+            score: 50,
+            reasons: ['New or inactive subreddit - not enough data for detailed analysis'],
+            recommendations: ['Start by creating high-quality content to build engagement']
+          },
+          postingLimits: {
+            frequency: 0,
+            bestTimeToPost: ['No posting pattern established yet'],
+            contentRestrictions: info.rules.map(rule => rule.description)
+          },
+          contentStrategy: {
+            recommendedTypes: ['text', 'image', 'link'],
+            topics: [],
+            style: 'Focus on building community engagement',
+            dos: [
+              'Create initial content to set the tone',
+              'Engage with any early subscribers',
+              'Cross-promote in related subreddits'
+            ],
+            donts: [
+              'Avoid spamming to grow quickly',
+              'Don\'t post low-quality content'
+            ]
+          },
+          titleTemplates: {
+            patterns: [],
+            examples: [],
+            effectiveness: 0
+          },
+          strategicAnalysis: {
+            strengths: [`${formatNumber(info.subscribers)} subscribers base`],
+            weaknesses: ['Limited posting history'],
+            opportunities: ['Fresh start to build community'],
+            risks: ['May need time to gain traction']
+          },
+          gamePlan: {
+            immediate: [
+              'Create welcome/introduction post',
+              'Set up subreddit rules and guidelines',
+              'Design subreddit appearance'
+            ],
+            shortTerm: [
+              'Post regular content to build activity',
+              'Engage with early subscribers',
+              'Cross-promote appropriately'
+            ],
+            longTerm: [
+              'Build moderator team',
+              'Develop content calendar',
+              'Create community events'
+            ]
+          }
+        }
+      };
+
+      if (onBasicAnalysisReady) {
+        onBasicAnalysisReady(basicResult);
+      }
+      
+      onProgress({ status: 'Basic analysis complete for new subreddit', progress: 100, indeterminate: false });
+      return basicResult;
+    }
+
     const scoredPosts = posts.map(post => ({
       ...post,
       engagement_score: (post.score * 0.75 + post.num_comments * 0.25)
     }));
 
-    // Get posts from the last month, fallback to all posts if none are recent enough
+    // Optimize post filtering
     const oneMonthAgo = Date.now() - 30 * 24 * 60 * 60 * 1000;
     let recentPosts = scoredPosts.filter(post => post.created_utc * 1000 > oneMonthAgo);
-    
-    // If we don't have enough recent posts, use all posts
     if (recentPosts.length < 50) {
       recentPosts = scoredPosts;
     }
-
-    // Sort by engagement score and get top 500
     const topPosts = recentPosts
       .sort((a, b) => b.engagement_score - a.engagement_score)
       .slice(0, 500);
+    const basicAnalysisPosts = topPosts.slice(0, 100);
 
-    // For AI analysis, use a subset of the most engaged posts to keep processing time reasonable
-    const aiAnalysisPosts = topPosts.slice(0, 100);
+    onProgress({ status: 'Processing engagement metrics...', progress: 35, indeterminate: false });
 
-    const input = prepareAnalysisInput(info, aiAnalysisPosts);
-    const engagement = calculateEngagementMetrics(topPosts);
+    const input = prepareAnalysisInput(info, basicAnalysisPosts);
+    let engagement = calculateEngagementMetrics(topPosts) || {
+      avg_comments: 0,
+      avg_score: 0,
+      peak_hours: [9, 12, 15, 18],
+      interaction_rate: 0,
+      posts_per_hour: new Array(24).fill(0)
+    };
 
-    onProgress({
-      status: 'Analyzing engagement metrics...',
-      progress: 35,
-      indeterminate: false
-    });
+    onProgress({ status: 'Generating basic insights...', progress: 45, indeterminate: false });
 
-    if (!engagement) {
-      throw new Error('Not enough post data for analysis');
-    }
-
-    // Step 2: AI Analysis
-    onProgress({
-      status: 'Processing posting patterns...',
-      progress: 50,
-      indeterminate: false
-    });
-
-    const aiAnalysis = await analyzeSubreddit(input);
-
-    onProgress({
-      status: 'Generating content strategy...',
-      progress: 65,
-      indeterminate: false
-    });
-
-    onProgress({
-      status: 'Finalizing recommendations...',
-      progress: 80,
-      indeterminate: false
-    });
-
-    // Step 3: Transform results
-    onProgress({
-      status: 'Compiling analysis report...',
-      progress: 90,
-      indeterminate: false
-    });
-
-    // Ensure we include all necessary post data for the heatmap
-    const postsForHeatmap = topPosts.map(post => ({
-      title: post.title,
-      score: post.score,
-      num_comments: post.num_comments,
-      created_utc: post.created_utc
-    }));
-
-    const result: AnalysisResult = {
+    // Immediately calculate and return basic metrics
+    basicResult = {
       info: {
         ...info,
         rules: info.rules.map(rule => ({
@@ -317,52 +397,170 @@ export async function analyzeSubredditData(
           marketingImpact: analyzeRuleMarketingImpact(rule)
         }))
       },
-      posts: postsForHeatmap,
+      posts: topPosts.map(post => ({
+        title: post.title,
+        score: post.score,
+        num_comments: post.num_comments,
+        created_utc: post.created_utc
+      })),
       analysis: {
+        marketingFriendliness: {
+          score: calculateMarketingScore(input),
+          reasons: [
+            `Community of ${formatNumber(info.subscribers)} members with ${formatNumber(info.active_users)} currently active`,
+            `Average engagement rate: ${Math.round(engagement.interaction_rate)} interactions per post`
+          ],
+          recommendations: [
+            'Detailed recommendations loading...',
+            'AI analysis in progress...'
+          ]
+        },
+        postingLimits: {
+          frequency: input.posts_per_day,
+          bestTimeToPost: formatBestPostingTimes(engagement.peak_hours),
+          contentRestrictions: info.rules
+            .filter(rule => analyzeRuleMarketingImpact(rule) !== 'low')
+            .map(rule => rule.description)
+        },
+        contentStrategy: {
+          recommendedTypes: getRecommendedContentTypes(topPosts),
+          topics: ['Analyzing common topics...'],
+          style: 'Analyzing posting patterns and community preferences...',
+          dos: [
+            `Post during peak hours: ${formatBestPostingTimes(engagement.peak_hours)[0]}`,
+            `Aim for ${Math.round(engagement.avg_comments)} or more comments per post`,
+            'Additional insights loading...'
+          ],
+          donts: [
+            ...info.rules
+              .filter(rule => analyzeRuleMarketingImpact(rule) === 'high')
+              .map(rule => rule.title),
+            'Additional restrictions loading...'
+          ]
+        },
+        titleTemplates: {
+          patterns: ['Analyzing successful title patterns...'],
+          examples: ['Loading examples from top posts...'],
+          effectiveness: 0
+        },
+        strategicAnalysis: {
+          strengths: [
+            `Active community with ${formatNumber(info.active_users)} online users`,
+            `Average of ${Math.round(input.posts_per_day)} posts per day`,
+            'Detailed strengths analysis loading...'
+          ],
+          weaknesses: ['Analyzing potential challenges...'],
+          opportunities: ['Identifying growth opportunities...'],
+          risks: ['Evaluating potential risks...']
+        },
+        gamePlan: {
+          immediate: [
+            'Follow posting time patterns',
+            'Match community engagement levels',
+            'Detailed strategy loading...'
+          ],
+          shortTerm: ['Analyzing optimal approach...'],
+          longTerm: ['Developing long-term recommendations...']
+        }
+      }
+    };
+
+    // Immediately notify with basic analysis
+    if (onBasicAnalysisReady) {
+      onBasicAnalysisReady(basicResult);
+    }
+
+    onProgress({ status: 'Basic analysis complete, starting AI analysis...', progress: 50, indeterminate: false });
+
+    // Phase 2: Detailed AI Analysis
+    aiAnalysisStarted = true;
+    
+    // Run AI analysis with retries and timeout
+    const aiAnalysis = await (async () => {
+      const MAX_RETRIES = 2;
+      const RETRY_DELAY = 2000;
+      let lastError: Error | null = null;
+
+      for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+        try {
+          onProgress({ 
+            status: attempt > 0 ? `Retrying AI analysis (attempt ${attempt + 1})...` : 'Running AI analysis...', 
+            progress: 55 + (attempt * 5), 
+            indeterminate: false 
+          });
+
+          return await analyzeSubreddit(input);
+        } catch (error) {
+          lastError = error instanceof Error ? error : new Error(String(error));
+          
+          if (attempt < MAX_RETRIES) {
+            await new Promise(resolve => setTimeout(resolve, RETRY_DELAY * Math.pow(2, attempt)));
+            continue;
+          }
+        }
+      }
+
+      throw lastError || new Error('AI analysis failed after retries');
+    })();
+
+    onProgress({ status: 'AI analysis complete, finalizing recommendations...', progress: 80, indeterminate: false });
+
+    // Merge AI analysis details into the basic result
+    const finalResult: AnalysisResult = {
+      ...basicResult,
+      analysis: {
+        ...basicResult.analysis,
         marketingFriendliness: {
           score: Math.round(aiAnalysis.marketingFriendliness.score),
           reasons: aiAnalysis.marketingFriendliness.reasons,
           recommendations: aiAnalysis.marketingFriendliness.recommendations
         },
         postingLimits: {
-          frequency: aiAnalysis.postingLimits.frequency,
-          bestTimeToPost: formatBestPostingTimes(engagement.peak_hours),
+          ...basicResult.analysis.postingLimits,
           contentRestrictions: aiAnalysis.postingLimits.contentRestrictions
         },
         contentStrategy: {
-          recommendedTypes: getRecommendedContentTypes(topPosts),
+          ...basicResult.analysis.contentStrategy,
           topics: aiAnalysis.contentStrategy.topics,
           style: aiAnalysis.contentStrategy.style,
           dos: aiAnalysis.contentStrategy.dos,
           donts: aiAnalysis.contentStrategy.donts
         },
-        titleTemplates: {
-          patterns: aiAnalysis.titleTemplates.patterns,
-          examples: aiAnalysis.titleTemplates.examples,
-          effectiveness: aiAnalysis.titleTemplates.effectiveness
-        },
-        strategicAnalysis: {
-          strengths: aiAnalysis.strategicAnalysis.strengths,
-          weaknesses: aiAnalysis.strategicAnalysis.weaknesses,
-          opportunities: aiAnalysis.strategicAnalysis.opportunities,
-          risks: aiAnalysis.strategicAnalysis.risks
-        },
-        gamePlan: {
-          immediate: aiAnalysis.gamePlan.immediate,
-          shortTerm: aiAnalysis.gamePlan.shortTerm,
-          longTerm: aiAnalysis.gamePlan.longTerm
-        }
+        titleTemplates: aiAnalysis.titleTemplates,
+        strategicAnalysis: aiAnalysis.strategicAnalysis,
+        gamePlan: aiAnalysis.gamePlan
       }
     };
 
-    onProgress({
-      status: 'Analysis complete!',
-      progress: 100,
-      indeterminate: false
-    });
+    onProgress({ status: 'Analysis complete!', progress: 100, indeterminate: false });
+    return finalResult;
 
-    return result;
   } catch (error) {
+    console.error('Analysis error:', error);
+
+    // If we have basic results but AI analysis failed, return basic results with error status
+    if (basicResult && aiAnalysisStarted) {
+      onProgress({ 
+        status: 'Basic analysis complete, but detailed AI analysis failed. Using basic insights only.', 
+        progress: 100, 
+        indeterminate: false 
+      });
+      return {
+        ...basicResult,
+        analysis: {
+          ...basicResult.analysis,
+          marketingFriendliness: {
+            ...basicResult.analysis.marketingFriendliness,
+            recommendations: [
+              ...basicResult.analysis.marketingFriendliness.recommendations,
+              'Note: Detailed AI analysis failed. These are preliminary recommendations only.'
+            ]
+          }
+        }
+      };
+    }
+
+    // Otherwise, propagate the error
     if (error instanceof AIAnalysisError) {
       throw error;
     }
@@ -371,4 +569,11 @@ export async function analyzeSubredditData(
     }
     throw new Error('Failed to analyze subreddit data');
   }
+}
+
+// Helper function to format numbers (used in the analysis)
+function formatNumber(num: number): string {
+  if (num >= 1000000) return `${(num / 1000000).toFixed(1)}M`;
+  if (num >= 1000) return `${(num / 1000).toFixed(1)}K`;
+  return num.toString();
 }

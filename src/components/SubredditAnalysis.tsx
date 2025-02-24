@@ -50,6 +50,7 @@ function SubredditAnalysis({ analysis, isLoading, error }: SubredditAnalysisProp
   const [showDetailedRules, setShowDetailedRules] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [isSaved, setIsSaved] = useState(false);
 
   const handleSave = async (e: React.MouseEvent) => {
     e.preventDefault();
@@ -74,71 +75,78 @@ function SubredditAnalysis({ analysis, isLoading, error }: SubredditAnalysisProp
           marketing_friendly_score: analysis.analysis.marketingFriendliness.score,
           allowed_content: analysis.analysis.contentStrategy.recommendedTypes,
           posting_requirements: {
-            restrictions: analysis.analysis.postingGuidelines.restrictions,
-            bestTimes: analysis.analysis.postingGuidelines.bestTimes
+            restrictions: analysis.analysis.contentStrategy.donts,
+            bestTimes: analysis.analysis.postingLimits.bestTimeToPost
           },
           posting_frequency: {
-            frequency: analysis.analysis.postingGuidelines.frequency,
+            frequency: analysis.analysis.postingLimits.frequency,
             recommendedTypes: analysis.analysis.contentStrategy.recommendedTypes
           },
           best_practices: analysis.analysis.contentStrategy.dos,
           rules_summary: analysis.info.rules ? JSON.stringify(analysis.info.rules) : null,
           title_template: analysis.analysis.titleTemplates.patterns[0] || null,
           last_analyzed_at: new Date().toISOString(),
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+          total_posts_24h: 0, // Will be updated by background job
+          last_post_sync: null,
+          icon_img: null,
+          community_icon: null,
           analysis_data: {
             subreddit: analysis.info.name,
             subscribers: analysis.info.subscribers,
             activeUsers: analysis.info.active_users,
             rules: analysis.info.rules,
             marketingFriendliness: analysis.analysis.marketingFriendliness,
-            postingGuidelines: {
-              allowedTypes: analysis.analysis.contentStrategy.recommendedTypes,
-              restrictions: analysis.analysis.postingGuidelines.restrictions,
-              recommendations: analysis.analysis.postingGuidelines.bestTimes
+            postingLimits: {
+              frequency: analysis.analysis.postingLimits.frequency,
+              bestTimeToPost: analysis.analysis.postingLimits.bestTimeToPost,
+              contentRestrictions: analysis.analysis.postingLimits.contentRestrictions
             },
             contentStrategy: {
-              postTypes: analysis.analysis.contentStrategy.recommendedTypes,
-              timing: analysis.analysis.postingGuidelines.bestTimes.map(time => {
-                const match = time.match(/(\d+):00\s*(AM|PM)/);
-                if (!match) return { hour: 0, timezone: 'UTC' };
-                let hour = parseInt(match[1]);
-                if (match[2] === 'PM' && hour !== 12) hour += 12;
-                if (match[2] === 'AM' && hour === 12) hour = 0;
-                return { hour, timezone: 'UTC' };
-              }),
-              topics: analysis.analysis.contentStrategy.topics
+              recommendedTypes: analysis.analysis.contentStrategy.recommendedTypes,
+              topics: analysis.analysis.contentStrategy.topics,
+              dos: analysis.analysis.contentStrategy.dos,
+              donts: analysis.analysis.contentStrategy.donts
             },
-            strategicAnalysis: {
-              strengths: analysis.analysis.strategicAnalysis.strengths,
-              weaknesses: analysis.analysis.strategicAnalysis.weaknesses,
-              opportunities: analysis.analysis.strategicAnalysis.opportunities
-            }
+            strategicAnalysis: analysis.analysis.strategicAnalysis,
+            titleTemplates: analysis.analysis.titleTemplates,
+            gamePlan: analysis.analysis.gamePlan
           }
         }, {
-          onConflict: 'name'
-        });
+          onConflict: 'name',
+          ignoreDuplicates: false
+        })
+        .select()
+        .single();
 
-      if (subredditError) throw subredditError;
-      
-      const typedData = subredditData as SavedSubreddit[] | null;
-      if (!typedData || typedData.length === 0) {
-        throw new Error('Failed to save subreddit data');
+      if (subredditError) {
+        console.error('Subreddit upsert error:', subredditError);
+        throw subredditError;
       }
       
-      const savedSubreddit = typedData[0];
+      if (!subredditData) {
+        console.error('No subreddit data returned from upsert');
+        throw new Error('Failed to save subreddit data');
+      }
 
       // Then, create the saved_subreddits entry with user_id
       const { error: savedError } = await supabase
         .from('saved_subreddits')
         .upsert({
           user_id: user.id,
-          subreddit_id: savedSubreddit.id,
+          subreddit_id: subredditData.id,
           created_at: new Date().toISOString()
         }, {
           onConflict: 'user_id,subreddit_id'
         });
 
-      if (savedError) throw savedError;
+      if (savedError) {
+        console.error('Saved subreddit error:', savedError);
+        throw savedError;
+      }
+
+      setIsSaved(true);
     } catch (err) {
       console.error('Error saving subreddit:', err);
       setSaveError('Failed to save analysis');
@@ -199,7 +207,7 @@ function SubredditAnalysis({ analysis, isLoading, error }: SubredditAnalysisProp
     info,
     analysis: {
       marketingFriendliness,
-      postingGuidelines,
+      postingLimits,
       contentStrategy,
       titleTemplates,
       strategicAnalysis,
@@ -224,11 +232,15 @@ function SubredditAnalysis({ analysis, isLoading, error }: SubredditAnalysisProp
           <div className="flex items-center gap-4">
             <button
               onClick={handleSave}
-              disabled={saving}
-              className="flex items-center gap-2 px-4 py-2 bg-[#C69B7B] hover:bg-[#B38A6A] text-white rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              disabled={saving || isSaved}
+              className={`flex items-center gap-2 px-4 py-2 rounded-md transition-colors disabled:cursor-not-allowed ${
+                isSaved 
+                  ? 'bg-emerald-600 text-white opacity-50'
+                  : 'bg-[#C69B7B] hover:bg-[#B38A6A] text-white disabled:opacity-50'
+              }`}
             >
               <Save size={20} />
-              {saving ? 'Saving...' : 'Save Analysis'}
+              {saving ? 'Saving...' : isSaved ? 'Saved' : 'Save to List'}
             </button>
             <span className="px-3 py-1 rounded-full bg-gradient-to-r from-[#C69B7B] to-[#E6B17E] text-white text-sm font-medium">
               {marketingFriendliness.score}% Marketing-Friendly
@@ -271,7 +283,7 @@ function SubredditAnalysis({ analysis, isLoading, error }: SubredditAnalysisProp
               <h3 className="font-medium">Posting Requirements</h3>
             </div>
             <ul className="space-y-2 text-gray-400 text-sm">
-              {postingGuidelines.restrictions.map((restriction, index) => (
+              {postingLimits.contentRestrictions.map((restriction: string, index: number) => (
                 <li key={index} className="flex items-start gap-2">
                   <span className="text-[#C69B7B]">•</span>
                   <span>{restriction}</span>
@@ -287,7 +299,7 @@ function SubredditAnalysis({ analysis, isLoading, error }: SubredditAnalysisProp
               <h3 className="font-medium">Best Posting Times</h3>
             </div>
             <ul className="space-y-2 text-gray-400 text-sm">
-              {postingGuidelines.bestTimes.map((time, index) => (
+              {postingLimits.bestTimeToPost.map((time: string, index: number) => (
                 <li key={index} className="flex items-start gap-2">
                   <span className="text-[#C69B7B]">•</span>
                   <span>{time}</span>
@@ -296,7 +308,7 @@ function SubredditAnalysis({ analysis, isLoading, error }: SubredditAnalysisProp
             </ul>
           </div>
 
-          {/* Content Strategy */}
+          {/* Content Types */}
           <div className="space-y-3">
             <div className="flex items-center gap-2">
               <Type className="h-5 w-5 text-[#C69B7B]" />

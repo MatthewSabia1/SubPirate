@@ -17,11 +17,24 @@ export interface AnalysisData {
     postTypes: string[];
     timing: Array<{ hour: number; timezone: string }>;
     topics: string[];
+    dos: string[];
+    donts: string[];
   };
   strategicAnalysis: {
     strengths: string[];
     weaknesses: string[];
     opportunities: string[];
+    risks: string[];
+  };
+  titleTemplates?: {
+    patterns: string[];
+    examples: string[];
+    effectiveness: number;
+  };
+  gamePlan?: {
+    immediate: string[];
+    shortTerm: string[];
+    longTerm: string[];
   };
 }
 

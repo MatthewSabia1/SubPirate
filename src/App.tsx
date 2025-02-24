@@ -14,6 +14,7 @@ import ProjectView from './pages/ProjectView';
 import SavedList from './pages/SavedList';
 import SpyGlass from './pages/SpyGlass';
 import RedditAccounts from './pages/RedditAccounts';
+import RedditOAuthCallback from './pages/RedditOAuthCallback';
 import { Menu } from 'lucide-react';
 
 // Create a client
@@ -74,6 +75,11 @@ function App() {
         <Router>
           <Routes>
             <Route path="/login" element={<Login />} />
+            <Route path="/auth/reddit/callback" element={
+              <PrivateRoute>
+                <RedditOAuthCallback />
+              </PrivateRoute>
+            } />
             <Route path="/" element={
               <PrivateRoute>
                 <Dashboard />

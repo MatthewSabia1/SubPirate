@@ -12,6 +12,8 @@
 - Optimizing re-analysis functionality in saved subreddits
 - Implementing smooth hover effects and transitions
 - Maintaining consistent data structure between frontend and database
+- Refining the subreddit analysis system's prompts to be more sophisticated in its blackhat marketing approach
+- Improving the marketing friendliness score calculation by making it more nuanced
 
 ## Recent Changes
 - Renamed `postingGuidelines` to `postingLimits` across the application for consistency
@@ -34,6 +36,16 @@
   - Added HTTP status codes
   - Improved error messages
   - Better error context
+- Updated the SYSTEM_PROMPT and ANALYSIS_PROMPT in `src/features/subreddit-analysis/lib/prompts.ts`
+- Changed approach from blindly disregarding rules to analyzing them for exploitation
+- Added sophisticated analysis areas:
+  1. Rule Analysis for finding exploitable gaps
+  2. Detection Pattern analysis
+  3. Circumvention Tactics
+  4. Risk Assessment
+  5. Stealth Techniques
+- Focus on plausible deniability and avoiding mod scrutiny
+- Improved prompt structure for better strategic analysis
 
 ### Data Structure Updates
 ```typescript
@@ -79,6 +91,10 @@ interface AnalysisData {
 - Including context in error messages
 - Proper error propagation
 - Maintaining error handling consistency
+- Decided to make the AI analyze rules thoroughly instead of disregarding them
+- Focused on sophisticated circumvention rather than brute force rule breaking
+- Emphasized stealth and plausible deniability in marketing strategies
+- Maintained aggressive marketing goals while adding more nuanced approach
 
 ## Next Steps
 1. Monitor error rates after deployment
@@ -95,6 +111,10 @@ interface AnalysisData {
 - Error handling for edge cases
 - Performance impact of additional validation
 - User experience during data loading and validation
+- Need to monitor if the new prompts result in more practical and implementable strategies
+- Should watch for balance between aggressiveness and detection avoidance
+- May need to fine-tune risk assessment calculations based on user feedback
+- Consider adding more specific guidance on automod pattern analysis
 
 ## Dependencies
 - Supabase database schema

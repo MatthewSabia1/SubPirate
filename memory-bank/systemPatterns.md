@@ -371,3 +371,213 @@ Features:
 - Rounded corners
 - Dividers between items (#222222)
 - Overflow handling 
+
+## Data Structure Patterns
+
+### Subreddit Analysis Data
+The application follows a consistent data structure pattern for subreddit analysis:
+
+```typescript
+interface AnalysisData {
+  // Basic Information
+  subreddit: string;
+  subscribers: number;
+  activeUsers: number;
+  rules?: any[];
+
+  // Marketing Analysis
+  marketingFriendliness: {
+    score: number;
+    reasons: string[];
+    recommendations: string[];
+  };
+
+  // Posting Strategy
+  postingLimits: {
+    frequency: number;
+    bestTimeToPost: string[];
+    contentRestrictions: string[];
+  };
+
+  // Content Strategy
+  contentStrategy: {
+    recommendedTypes: string[];
+    topics: string[];
+    dos: string[];
+    donts: string[];
+  };
+
+  // Analysis Results
+  strategicAnalysis: {
+    strengths: string[];
+    weaknesses: string[];
+    opportunities: string[];
+  };
+
+  // Optional Components
+  titleTemplates?: {
+    patterns: string[];
+    examples: string[];
+    effectiveness: number;
+  };
+  gamePlan?: {
+    immediate: string[];
+    shortTerm: string[];
+    longTerm: string[];
+  };
+}
+```
+
+### Data Flow
+1. OpenRouter AI Service
+   - Generates analysis with consistent schema
+   - Validates against TypeScript interface
+   - Returns structured data
+
+2. Frontend Components
+   - Use consistent property paths
+   - Implement validation checks
+   - Handle optional properties safely
+
+3. Database Storage
+   - Maps to Supabase schema
+   - Preserves complete analysis data
+   - Handles data versioning
+
+### Validation Patterns
+```typescript
+// Component-level validation
+if (!analysis?.postingLimits?.contentRestrictions || 
+    !analysis?.marketingFriendliness?.score || 
+    !analysis?.contentStrategy?.recommendedTypes) {
+  // Handle incomplete data
+}
+
+// Database-level validation
+interface SavedSubreddit {
+  id: string;
+  name: string;
+  subscriber_count: number;
+  active_users: number;
+  marketing_friendly_score: number;
+  allowed_content: string[];
+  posting_requirements: {
+    restrictions: string[];
+    recommendations: string[];
+  };
+  posting_frequency: {
+    timing: Array<{ hour: number; timezone: string }>;
+    postTypes: string[];
+  };
+  best_practices: string[];
+  analysis_data: AnalysisData;
+}
+```
+
+### Error Handling Patterns
+1. API Service Errors
+   - Retry logic for transient failures
+   - Specific error messages for different scenarios
+   - Graceful degradation
+
+2. Data Validation Errors
+   - Early validation in components
+   - User-friendly error messages
+   - Recovery options when possible
+
+3. Save Operation Errors
+   - Transaction-like operations
+   - Rollback on failure
+   - User feedback and retry options
+
+## Component Patterns
+
+### Analysis Display
+- Consistent grid layout
+- Section-based organization
+- Progressive disclosure
+- Error boundaries
+
+### Data Input/Output
+- Type-safe interfaces
+- Validation before save
+- Optimistic updates
+- Error recovery
+
+## Best Practices
+
+### Data Structure
+1. Use consistent property naming
+2. Implement proper TypeScript interfaces
+3. Handle optional properties explicitly
+4. Validate data at boundaries
+
+### Error Handling
+1. Implement retry logic
+2. Provide specific error messages
+3. Handle edge cases gracefully
+4. Log errors for debugging
+
+### Component Design
+1. Use TypeScript for type safety
+2. Implement proper validation
+3. Handle loading states
+4. Provide error feedback
+
+### Database Operations
+1. Use transactions when needed
+2. Validate data before save
+3. Handle conflicts properly
+4. Maintain data integrity 
+
+## Prompt System Architecture
+- Location: `src/features/subreddit-analysis/lib/prompts.ts`
+- Two main components:
+  1. SYSTEM_PROMPT: Core instruction set for the AI
+  2. ANALYSIS_PROMPT: Task-specific instructions
+
+### Prompt Design Patterns
+1. Rule Analysis Pattern
+   - Thorough examination of rules
+   - Identification of exploitable gaps
+   - Loophole detection
+   
+2. Risk Assessment Pattern
+   - Risk-reward calculation
+   - Detection probability analysis
+   - Ban risk evaluation
+   
+3. Stealth Pattern
+   - Plausible deniability maintenance
+   - Organic content blending
+   - Mod scrutiny avoidance
+
+4. Circumvention Pattern
+   - Restriction bypass strategies
+   - Automod pattern analysis
+   - Detection avoidance techniques
+
+### AI Response Structure
+- JSON Schema conformant
+- Includes:
+  - Marketing friendliness score
+  - Rule exploitation strategies
+  - Risk assessments
+  - Tactical recommendations
+  - Stealth techniques
+
+## Key Technical Decisions
+1. Sophisticated Rule Analysis
+   - Analyze rather than disregard rules
+   - Focus on exploitation over violation
+   - Maintain plausible deniability
+
+2. Risk-Based Approach
+   - Calculate risk-reward ratios
+   - Assess detection probabilities
+   - Evaluate mod response patterns
+
+3. Stealth-First Design
+   - Blend with organic content
+   - Avoid obvious patterns
+   - Maintain legitimate appearance 

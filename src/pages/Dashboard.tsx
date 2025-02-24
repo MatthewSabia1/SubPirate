@@ -1,12 +1,16 @@
-import React, { useState, useCallback } from 'react';
-import { Search, Shield, Users, ExternalLink, AlertTriangle, Activity } from 'lucide-react';
+import React, { useState, useCallback, useEffect } from 'react';
+import { Search, Shield, Users, ExternalLink, AlertTriangle, Activity, Bookmark, BookmarkCheck } from 'lucide-react';
 import { getSubredditInfo, getSubredditPosts, searchSubreddits, SubredditInfo, RedditAPIError, cleanRedditImageUrl } from '../lib/reddit';
 import { analyzeSubredditData, AnalysisProgress, AnalysisResult } from '../lib/analysis';
 import { useNavigate } from 'react-router-dom';
 import ProgressBar from '../components/ProgressBar';
-import SubredditAnalysis from '../components/SubredditAnalysis';
+import AnalysisCard from '../features/subreddit-analysis/components/analysis-card';
+import { supabase } from '../lib/supabase';
+import { useAuth } from '../contexts/AuthContext';
 
 function Dashboard() {
+  const { user } = useAuth();
+  const [savedSubreddits, setSavedSubreddits] = useState<Set<string>>(new Set());
   const [subredditInput, setSubredditInput] = useState('');
   const [searchInput, setSearchInput] = useState('');
   const [searchResults, setSearchResults] = useState<SubredditInfo[]>([]);
@@ -20,17 +24,44 @@ function Dashboard() {
   const [analysisResult, setAnalysisResult] = useState<AnalysisResult | null>(null);
   const navigate = useNavigate();
 
+  useEffect(() => {
+    const searchTimer = setTimeout(async () => {
+      if (!searchInput?.trim()) {
+        setSearchResults([]);
+        return;
+      }
+
+      setLoading(true);
+      setError(null);
+
+      try {
+        const results = await searchSubreddits(searchInput);
+        setSearchResults(results);
+      } catch (err) {
+        if (err instanceof RedditAPIError) {
+          setError(err.message);
+        } else if (err instanceof Error) {
+          setError(err.message || 'An unexpected error occurred while searching. Please try again later.');
+        } else {
+          setError('An unexpected error occurred while searching. Please try again later.');
+        }
+      } finally {
+        setLoading(false);
+      }
+    }, 300);
+
+    return () => clearTimeout(searchTimer);
+  }, [searchInput]);
+
   const getSubredditIcon = (subreddit: SubredditInfo) => {
     try {
-      // Try community icon first if it's not a stylesheet
-      if (subreddit.community_icon && 
-          !subreddit.community_icon.includes('styles/') && 
-          !subreddit.community_icon.includes('.css')) {
+      // Try community icon first
+      if (subreddit.community_icon) {
         const cleanIcon = cleanRedditImageUrl(subreddit.community_icon);
         if (cleanIcon) return cleanIcon;
       }
       
-      // Try icon_img next if available
+      // Try icon_img next
       if (subreddit.icon_img) {
         const cleanIcon = cleanRedditImageUrl(subreddit.icon_img);
         if (cleanIcon) return cleanIcon;
@@ -77,7 +108,7 @@ function Dashboard() {
         indeterminate: false
       });
       
-      const posts = await getSubredditPosts(cleanSubreddit);
+      const posts = await getSubredditPosts(cleanSubreddit, 'top', 500, 'month');
 
       const result = await analyzeSubredditData(
         info,
@@ -106,32 +137,7 @@ function Dashboard() {
     }
   };
 
-  const handleSearch = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!searchInput || loading) return;
-
-    setLoading(true);
-    setError(null);
-    setSearchResults([]);
-
-    try {
-      const results = await searchSubreddits(searchInput);
-      setSearchResults(results);
-    } catch (err) {
-      if (err instanceof RedditAPIError) {
-        setError(err.message);
-      } else if (err instanceof Error) {
-        setError(err.message || 'An unexpected error occurred while searching. Please try again later.');
-      } else {
-        setError('An unexpected error occurred while searching. Please try again later.');
-      }
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const filteredResults = searchResults
-    .filter(subreddit => showNSFW ? true : !subreddit.over18)
     .sort((a, b) => {
       if (sortBy === 'subscribers') {
         return b.subscribers - a.subscribers;
@@ -143,6 +149,128 @@ function Dashboard() {
     if (num >= 1000000) return `${(num / 1000000).toFixed(1)}M`;
     if (num >= 1000) return `${(num / 1000).toFixed(1)}K`;
     return num.toString();
+  };
+
+  // Add function to check if a subreddit is saved
+  const checkIfSaved = async () => {
+    if (!user) return;
+    
+    try {
+      const { data, error } = await supabase
+        .from('saved_subreddits')
+        .select(`
+          subreddit_id,
+          subreddits!inner (
+            name
+          )
+        `)
+        .eq('user_id', user.id);
+
+      if (error) throw error;
+      
+      // Define type for the Supabase response
+      interface SavedSubredditRow {
+        subreddit_id: string;
+        subreddits: {
+          name: string;
+        };
+      }
+      
+      const savedNames = data?.reduce<string[]>((names, row: any) => {
+        if (row.subreddits?.name) {
+          names.push(row.subreddits.name);
+        }
+        return names;
+      }, []) || [];
+      
+      setSavedSubreddits(new Set(savedNames));
+    } catch (err) {
+      console.error('Error checking saved subreddits:', err);
+    }
+  };
+
+  // Load saved subreddits on mount
+  useEffect(() => {
+    checkIfSaved();
+  }, [user]);
+
+  // Add save/unsave functionality
+  const handleSaveToggle = async (subreddit: SubredditInfo) => {
+    if (!user) {
+      console.error('User must be logged in to save subreddits');
+      return;
+    }
+
+    try {
+      if (savedSubreddits.has(subreddit.name)) {
+        // Remove from saved - first get the subreddit_id
+        const { data: subredditData, error: subredditError } = await supabase
+          .from('subreddits')
+          .select('id')
+          .eq('name', subreddit.name)
+          .single();
+
+        if (subredditError) throw subredditError;
+
+        // Then delete the saved_subreddits entry
+        const { error } = await supabase
+          .from('saved_subreddits')
+          .delete()
+          .eq('user_id', user.id)
+          .eq('subreddit_id', subredditData.id);
+
+        if (error) {
+          console.error('Error removing subreddit:', error);
+          throw error;
+        }
+        
+        setSavedSubreddits(prev => {
+          const next = new Set(prev);
+          next.delete(subreddit.name);
+          return next;
+        });
+      } else {
+        // First ensure the subreddit exists in the subreddits table
+        const { data: existingSubreddit, error: subredditError } = await supabase
+          .from('subreddits')
+          .upsert({
+            name: subreddit.name,
+            subscriber_count: subreddit.subscribers,
+            active_users: subreddit.active_users,
+            icon_img: subreddit.icon_img,
+            community_icon: subreddit.community_icon,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          }, {
+            onConflict: 'name'
+          })
+          .select()
+          .single();
+
+        if (subredditError) {
+          console.error('Error upserting subreddit:', subredditError);
+          throw subredditError;
+        }
+
+        // Now save to saved_subreddits
+        const { error: saveError } = await supabase
+          .from('saved_subreddits')
+          .insert({
+            user_id: user.id,
+            subreddit_id: existingSubreddit.id,
+            created_at: new Date().toISOString()
+          });
+
+        if (saveError) {
+          console.error('Error saving subreddit:', saveError);
+          throw saveError;
+        }
+        
+        setSavedSubreddits(prev => new Set([...prev, subreddit.name]));
+      }
+    } catch (err) {
+      console.error('Error toggling save:', err);
+    }
   };
 
   return (
@@ -196,7 +324,7 @@ function Dashboard() {
 
           {analysisResult && (
             <div className="mt-8">
-              <SubredditAnalysis 
+              <AnalysisCard 
                 analysis={analysisResult}
                 isLoading={analyzing}
                 error={analyzeError}
@@ -210,28 +338,23 @@ function Dashboard() {
       <div className="bg-[#0f0f0f] rounded-2xl p-8">
         <h2 className="text-2xl font-semibold mb-8">Discover Subreddits</h2>
         <div className="space-y-6">
-          <form onSubmit={handleSearch}>
-            <div className="relative">
-              <input 
-                type="text" 
-                value={searchInput}
-                onChange={(e) => setSearchInput(e.target.value)}
-                placeholder="Search subreddits by keywords..."
-                className="w-full h-[52px] bg-[#050505] rounded-lg pl-4 pr-[120px] text-white placeholder-gray-500 border-none focus:ring-1 focus:ring-[#C69B7B]"
-                disabled={loading}
-              />
-              <div className="absolute right-2 top-1/2 -translate-y-1/2">
-                <button 
-                  type="submit" 
-                  className="bg-[#C69B7B] hover:bg-[#B38A6A] h-10 px-6 rounded-lg text-base font-medium text-white flex items-center gap-2 transition-colors"
-                  disabled={loading}
-                >
-                  <Search size={16} />
-                  {loading ? 'Searching...' : 'Search'}
-                </button>
-              </div>
+          <div className="relative">
+            <input 
+              type="text" 
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
+              placeholder="Search subreddits by keywords..."
+              className="w-full h-[52px] bg-[#050505] rounded-lg pl-4 pr-[120px] text-white placeholder-gray-500 border-none focus:ring-1 focus:ring-[#C69B7B]"
+              disabled={loading}
+            />
+            <div className="absolute right-4 top-1/2 -translate-y-1/2">
+              {loading && (
+                <div className="text-gray-400">
+                  Searching...
+                </div>
+              )}
             </div>
-          </form>
+          </div>
 
           {searchResults.length > 0 && (
             <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
@@ -246,17 +369,6 @@ function Dashboard() {
                   <option value="name">Name</option>
                 </select>
               </div>
-              <button
-                onClick={() => setShowNSFW(!showNSFW)}
-                className={`h-10 px-4 text-base rounded-lg transition-colors flex items-center gap-2 ${
-                  showNSFW 
-                    ? 'bg-[#0A0A0A] text-white' 
-                    : 'bg-[#0A0A0A] text-gray-400 hover:text-white'
-                }`}
-              >
-                <Shield size={16} className={showNSFW ? 'text-white' : 'text-gray-400'} />
-                Show NSFW
-              </button>
             </div>
           )}
 
@@ -295,11 +407,16 @@ function Dashboard() {
                     <img 
                       src={getSubredditIcon(subreddit)}
                       alt={`r/${subreddit.name}`}
-                      className="w-12 h-12 rounded-lg bg-[#1A1A1A] group-hover:bg-[#222222] transition-colors"
+                      className="w-12 h-12 rounded-lg bg-[#1A1A1A] group-hover:bg-[#222222] transition-colors object-cover"
                       onError={(e) => {
                         const target = e.target as HTMLImageElement;
-                        target.src = `https://api.dicebear.com/7.x/shapes/svg?seed=${subreddit.name}&backgroundColor=111111&radius=12`;
+                        if (subreddit.icon_img && target.src !== subreddit.icon_img) {
+                          target.src = subreddit.icon_img;
+                        } else {
+                          target.src = `https://api.dicebear.com/7.x/shapes/svg?seed=${subreddit.name}&backgroundColor=111111&radius=12`;
+                        }
                       }}
+                      loading="lazy"
                     />
                   </a>
                   <div className="flex-1 min-w-0">
@@ -313,43 +430,112 @@ function Dashboard() {
                         r/{subreddit.name}
                         <ExternalLink size={14} className="text-gray-400" />
                       </a>
-                      {subreddit.over18 && (
-                        <span className="px-2 py-0.5 text-xs bg-red-900/50 text-red-400 rounded flex items-center gap-1">
-                          <Shield size={12} />
-                          NSFW
-                        </span>
-                      )}
                     </div>
                     <p className="text-gray-400 text-sm mb-2 line-clamp-2">
                       {subreddit.description}
                     </p>
-                    <div className="flex items-center gap-4 text-sm">
-                      <div className="flex items-center gap-1 text-gray-400">
-                        <Users size={14} />
-                        <span>{formatNumber(subreddit.subscribers)} members</span>
+                    <div className="flex items-center gap-3 text-sm">
+                      <div className="flex items-center gap-2.5">
+                        <div className="flex items-center gap-1.5 bg-[#1A1A1A] px-2.5 py-1 rounded-md">
+                          <Users size={14} className="text-gray-400" />
+                          <span className="text-gray-300 font-medium">{formatNumber(subreddit.subscribers)}</span>
+                          {subreddit.active_users > 0 && (
+                            <>
+                              <span className="text-gray-600 mx-1.5">•</span>
+                              <Activity size={14} className="text-emerald-400" />
+                              <span className="text-emerald-400 font-medium">{formatNumber(subreddit.active_users)} online</span>
+                            </>
+                          )}
+                        </div>
                       </div>
-                      {subreddit.active_users > 0 && (
-                        <>
-                          <span className="text-gray-600">•</span>
-                          <div className="flex items-center gap-1 text-emerald-400">
-                            <Activity size={14} />
-                            <span>{formatNumber(subreddit.active_users)} online</span>
-                          </div>
-                        </>
-                      )}
                     </div>
                   </div>
-                  <button 
-                    onClick={() => {
-                      setSubredditInput(subreddit.name);
-                      const fakeEvent = { preventDefault: () => {} };
-                      handleAnalyzeSubreddit(fakeEvent as React.FormEvent);
-                    }}
-                    className="bg-[#C69B7B] hover:bg-[#B38A6A] h-9 px-4 rounded-md text-sm font-medium text-white transition-colors whitespace-nowrap flex items-center gap-2"
-                  >
-                    <Search size={16} />
-                    Analyze
-                  </button>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <button
+                      onClick={() => handleSaveToggle(subreddit)}
+                      className={`h-9 px-3 flex items-center gap-1.5 rounded-md transition-colors whitespace-nowrap ${
+                        savedSubreddits.has(subreddit.name)
+                          ? 'bg-[#C69B7B] text-white hover:bg-[#B38A6A]'
+                          : 'bg-[#1A1A1A] text-gray-400 hover:text-white hover:bg-[#222222]'
+                      }`}
+                      title={savedSubreddits.has(subreddit.name) ? 'Remove from saved' : 'Save for later'}
+                    >
+                      {savedSubreddits.has(subreddit.name) ? (
+                        <>
+                          <BookmarkCheck size={16} />
+                          <span className="text-sm font-medium">Saved</span>
+                        </>
+                      ) : (
+                        <>
+                          <Bookmark size={16} />
+                          <span className="text-sm font-medium">Save</span>
+                        </>
+                      )}
+                    </button>
+                    <button 
+                      onClick={async () => {
+                        setSubredditInput(subreddit.name);
+                        setAnalyzing(true);
+                        setAnalyzeError(null);
+                        setAnalysisResult(null);
+                        setAnalyzeProgress({
+                          status: 'Validating subreddit...',
+                          progress: 0,
+                          indeterminate: true
+                        });
+
+                        try {
+                          const cleanSubreddit = subreddit.name.trim().replace(/^r\//, '');
+                          
+                          setAnalyzeProgress({
+                            status: 'Fetching subreddit information...',
+                            progress: 20,
+                            indeterminate: false
+                          });
+                          
+                          const info = await getSubredditInfo(cleanSubreddit);
+
+                          setAnalyzeProgress({
+                            status: 'Collecting recent posts...',
+                            progress: 40,
+                            indeterminate: false
+                          });
+                          
+                          const posts = await getSubredditPosts(cleanSubreddit, 'top', 500, 'month');
+
+                          const result = await analyzeSubredditData(
+                            info,
+                            posts,
+                            (progress) => setAnalyzeProgress(progress)
+                          );
+
+                          localStorage.setItem(
+                            `analysis:${cleanSubreddit}`,
+                            JSON.stringify(result)
+                          );
+
+                          setAnalysisResult(result);
+                        } catch (err) {
+                          if (err instanceof RedditAPIError) {
+                            setAnalyzeError(err.message);
+                          } else if (err instanceof Error) {
+                            setAnalyzeError(err.message || 'An unexpected error occurred. Please try again later.');
+                          } else {
+                            setAnalyzeError('An unexpected error occurred. Please try again later.');
+                          }
+                          setAnalysisResult(null);
+                        } finally {
+                          setAnalyzing(false);
+                          setAnalyzeProgress(null);
+                        }
+                      }}
+                      className="bg-[#C69B7B] hover:bg-[#B38A6A] h-9 px-4 rounded-md text-sm font-medium text-white transition-colors whitespace-nowrap flex items-center gap-2"
+                      disabled={analyzing}
+                    >
+                      <Search size={16} />
+                      {analyzing ? 'Analyzing...' : 'Analyze'}
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>

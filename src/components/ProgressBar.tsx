@@ -6,29 +6,28 @@ interface ProgressBarProps {
   indeterminate?: boolean;
 }
 
-function ProgressBar({ progress, status, indeterminate = false }: ProgressBarProps) {
+const ProgressBar: React.FC<ProgressBarProps> = ({ progress, status, indeterminate }) => {
   return (
     <div className="space-y-2">
-      <div className="h-2 bg-[#111111] rounded-full overflow-hidden">
+      <div className="flex items-center justify-between">
+        <div className="text-sm text-gray-400">{status}</div>
+        <div className="text-sm font-medium">{progress}%</div>
+      </div>
+      <div className="h-1 bg-[#111111] rounded-full overflow-hidden">
         <div 
-          className={`h-full transition-all duration-500 ease-out ${
-            indeterminate 
-              ? 'bg-gradient-to-r from-[#2B543A] via-[#4CAF50] to-[#2B543A] bg-[length:200%_100%] animate-gradient'
-              : 'bg-[#4CAF50]'
+          className={`h-full transition-all duration-300 ease-out bg-[#4CAF50] ${
+            indeterminate ? 'animate-progress-indeterminate' : ''
           }`}
           style={{ 
-            width: `${indeterminate ? '100' : progress}%`,
+            width: `${progress}%`,
+            backgroundImage: indeterminate 
+              ? 'linear-gradient(to right, transparent 0%, #4CAF50 50%, transparent 100%)' 
+              : undefined
           }}
         />
       </div>
-      <div className="flex justify-between items-center text-sm">
-        <span className="text-gray-400">{status}</span>
-        {!indeterminate && (
-          <span className="text-[#4CAF50] font-medium">{Math.round(progress)}%</span>
-        )}
-      </div>
     </div>
   );
-}
+};
 
 export default ProgressBar;

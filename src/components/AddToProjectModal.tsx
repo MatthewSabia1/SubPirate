@@ -54,6 +54,7 @@ function AddToProjectModal({ isOpen, onClose, subredditId, subredditName }: AddT
 
   const handleAddToProject = async (projectId: string) => {
     setSaving(true);
+    setError(null);
     try {
       // Check if subreddit is already in project
       const { data: existing, error: checkError } = await supabase
@@ -70,18 +71,37 @@ function AddToProjectModal({ isOpen, onClose, subredditId, subredditName }: AddT
         return;
       }
 
-      const { error } = await supabase
+      const { error: insertError } = await supabase
         .from('project_subreddits')
         .insert({
           project_id: projectId,
           subreddit_id: subredditId
         });
 
-      if (error) throw error;
-      onClose();
+      if (insertError) {
+        if (insertError.code === '23505') { // Unique constraint violation
+          setError('This subreddit is already in the selected project');
+        } else if (insertError.code === '23503') { // Foreign key violation
+          setError('Failed to add subreddit. Please try saving it first.');
+        } else {
+          throw insertError;
+        }
+        return;
+      }
+
+      // Show success message before closing
+      setError(null);
+      setTimeout(() => onClose(), 500);
     } catch (err) {
       console.error('Error adding to project:', err);
-      setError('Failed to add subreddit to project');
+      const error = err as any;
+      if (error.code === '23505') {
+        setError('This subreddit is already in the project');
+      } else if (error.code === '23503') {
+        setError('Failed to add subreddit. Please try saving it first.');
+      } else {
+        setError(error.message || 'Failed to add subreddit to project');
+      }
     } finally {
       setSaving(false);
     }
@@ -89,41 +109,104 @@ function AddToProjectModal({ isOpen, onClose, subredditId, subredditName }: AddT
 
   const handleCreateProject = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newProjectName.trim() || !user) return;
+    if (!newProjectName.trim()) return;
 
     setSaving(true);
+    setError(null);
     try {
+      // First check if a project with this name already exists for the user
+      const { data: existingProject } = await supabase
+        .from('projects')
+        .select('id')
+        .eq('name', newProjectName.trim())
+        .eq('user_id', user?.id)
+        .maybeSingle();
+
+      if (existingProject) {
+        setError('A project with this name already exists');
+        setSaving(false);
+        return;
+      }
+
+      // First ensure the subreddit exists in the database
+      const { data: existingSubreddit } = await supabase
+        .from('subreddits')
+        .select('id')
+        .eq('id', subredditId)
+        .maybeSingle();
+
+      if (!existingSubreddit) {
+        setError('Subreddit not found in database. Please try saving it first.');
+        return;
+      }
+
       // Create new project
       const { data: project, error: projectError } = await supabase
         .from('projects')
         .insert({
           name: newProjectName.trim(),
           description: newProjectDescription.trim() || null,
-          user_id: user.id
+          user_id: user?.id
         })
-        .select()
+        .select('id')
         .single();
 
-      if (projectError) throw projectError;
+      if (projectError) {
+        if (projectError.code === '23505') { // Unique constraint violation
+          setError('A project with this name already exists');
+          return;
+        }
+        throw projectError;
+      }
+      
       if (!project) throw new Error('Failed to create project');
 
-      // Add subreddit to the new project
-      const { error: linkError } = await supabase
+      // Add subreddit to new project with error handling
+      const { error: addError } = await supabase
         .from('project_subreddits')
         .insert({
           project_id: project.id,
           subreddit_id: subredditId
         });
 
-      if (linkError) throw linkError;
+      if (addError) {
+        // Handle different error cases
+        if (addError.code === '23505') { // Unique constraint violation
+          setError('This subreddit is already in the project');
+        } else if (addError.code === '23503') { // Foreign key violation
+          // Cleanup the created project
+          await supabase
+            .from('projects')
+            .delete()
+            .eq('id', project.id);
+          setError('Failed to add subreddit to project. Please try saving it first.');
+        } else {
+          // Cleanup the created project for other errors
+          await supabase
+            .from('projects')
+            .delete()
+            .eq('id', project.id);
+          throw addError;
+        }
+        return;
+      }
 
-      // Clear form and close modal
-      setNewProjectName('');
-      setNewProjectDescription('');
-      onClose();
+      setError(null);
+      setTimeout(() => onClose(), 500);
     } catch (err) {
       console.error('Error creating project:', err);
-      setError('Failed to create project');
+      const error = err as any;
+      
+      // Provide more specific error messages based on error codes
+      if (error.code === '23505') {
+        setError('A project with this name already exists');
+      } else if (error.code === '23503') {
+        setError('Failed to add subreddit to project. Please try saving it first.');
+      } else if (error.message?.includes('foreign key')) {
+        setError('Invalid subreddit or project reference');
+      } else {
+        setError(error.message || 'Failed to create project');
+      }
     } finally {
       setSaving(false);
     }

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Download, FolderPlus, X, ChevronDown, ChevronUp, Search, Calendar, Users, Activity, RefreshCw } from 'lucide-react';
+import { Download, FolderPlus, X, ChevronDown, ChevronUp, Search, Calendar, Users, Activity, RefreshCw, Send, ChevronRight } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import AnalysisCard from '../features/subreddit-analysis/components/analysis-card';
 import AddToProjectModal from '../components/AddToProjectModal';
@@ -43,6 +43,7 @@ function SavedList() {
   // Fetch saved subreddits when user changes
   useEffect(() => {
     if (user) {
+      console.log('User authenticated, fetching saved subreddits...'); // Debug log
       fetchSavedSubreddits();
     }
   }, [user]);
@@ -56,12 +57,35 @@ function SavedList() {
 
   const fetchSavedSubreddits = async () => {
     try {
+      console.log('Starting to fetch saved subreddits...'); // Debug log
       const { data, error } = await supabase
         .from('saved_subreddits_with_icons')
-        .select('*')
+        .select(`
+          id,
+          subreddit_id,
+          name,
+          created_at,
+          subscriber_count,
+          active_users,
+          marketing_friendly_score,
+          allowed_content,
+          icon_img,
+          community_icon,
+          analysis_data
+        `)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
+      
+      console.log('Fetched subreddits data:', {
+        count: data?.length || 0,
+        subreddits: data?.map(s => ({
+          id: s.id,
+          name: s.name,
+          subreddit_id: s.subreddit_id
+        }))
+      }); // Detailed debug log
+      
       setSavedSubreddits(data || []);
     } catch (err) {
       console.error('Error fetching saved subreddits:', err);
@@ -158,6 +182,8 @@ function SavedList() {
       return a.name.localeCompare(b.name);
     });
 
+  console.log('Filtered subreddits:', filteredSubreddits); // Debug log for filtered data
+
   const formatNumber = (num: number): string => {
     if (num >= 1000000) return `${(num / 1000000).toFixed(1)}M`;
     if (num >= 1000) return `${(num / 1000).toFixed(1)}K`;
@@ -251,7 +277,7 @@ function SavedList() {
         {/* Subreddits Table */}
         <div className="bg-[#0f0f0f] rounded-lg overflow-hidden">
           {/* Table Header */}
-          <div className="hidden lg:grid grid-cols-[minmax(200px,2fr)_minmax(150px,1.5fr)_minmax(100px,1fr)_minmax(200px,auto)_80px_120px] gap-4 px-6 py-4 border-b border-[#222222] text-sm text-gray-400">
+          <div className="hidden lg:grid grid-cols-[minmax(200px,2fr)_minmax(150px,1.5fr)_minmax(100px,1fr)_minmax(200px,auto)_80px_220px] gap-4 px-6 py-4 border-b border-[#222222] text-sm text-gray-400">
             <div>Subreddit</div>
             <div className="hidden md:block">Community Stats</div>
             <div>Marketing-Friendly</div>
@@ -265,7 +291,7 @@ function SavedList() {
               <div key={saved.id}>
                 <div
                   onClick={() => toggleSubredditExpansion(saved)}
-                  className="flex flex-col lg:grid lg:grid-cols-[minmax(200px,2fr)_minmax(150px,1.5fr)_minmax(100px,1fr)_minmax(200px,auto)_80px_120px] gap-4 p-4 lg:px-6 lg:py-4 items-start lg:items-center hover:bg-[#1A1A1A] transition-colors cursor-pointer"
+                  className="flex flex-col lg:grid lg:grid-cols-[minmax(200px,2fr)_minmax(150px,1.5fr)_minmax(100px,1fr)_minmax(200px,auto)_80px_220px] gap-4 p-4 lg:px-6 lg:py-4 items-start lg:items-center hover:bg-[#1A1A1A] transition-colors cursor-pointer"
                 >
                   {/* Subreddit Name & Icon */}
                   <div className="flex items-center gap-3 w-full min-w-0">
@@ -347,40 +373,70 @@ function SavedList() {
                   </div>
 
                   {/* Actions */}
-                  <div className="flex items-center gap-1 mt-4 lg:mt-0 justify-end">
-                    <button
+                  <div className="flex items-center gap-2 mt-4 lg:mt-0 justify-end w-full lg:w-auto">
+                    <a
+                      href={`https://reddit.com/r/${saved.name}/submit`}
+                      target="_blank"
+                      rel="noopener noreferrer"
                       onClick={e => {
                         e.stopPropagation();
-                        setSelectedSubreddit({
-                          id: saved.subreddit_id,
-                          name: saved.name,
-                        });
+                        e.preventDefault();
+                        window.open(`https://reddit.com/r/${saved.name}/submit`, '_blank');
                       }}
-                      className="text-gray-400 hover:text-white p-2 rounded-full hover:bg-white/10"
-                      title="Add to Project"
+                      className="bg-[#1A1A1A] hover:bg-[#252525] text-gray-200 flex items-center gap-2 h-9 px-4 text-sm whitespace-nowrap rounded-md transition-colors border border-[#333333]"
+                      title="Post to Subreddit"
                     >
-                      <FolderPlus size={20} />
-                    </button>
-                    <button
-                      onClick={e => {
-                        e.stopPropagation();
-                        removeSavedSubreddit(saved.id);
-                      }}
-                      className="text-gray-400 hover:text-white p-2 rounded-full hover:bg-white/10"
-                      title="Remove from List"
-                    >
-                      <X size={20} />
-                    </button>
-                    <div className="text-gray-400 p-2">
-                      {expandedSubreddit === saved.name ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
+                      <Send size={16} className="text-gray-400" />
+                      <span>Post</span>
+                    </a>
+                    <div className="flex items-center gap-1 ml-2">
+                      <button
+                        onClick={e => {
+                          e.stopPropagation();
+                          setSelectedSubreddit({
+                            id: saved.subreddit_id,
+                            name: saved.name,
+                          });
+                        }}
+                        className="text-gray-400 hover:text-white p-2 rounded-full hover:bg-white/10"
+                        title="Add to Project"
+                      >
+                        <FolderPlus size={20} />
+                      </button>
+                      <button
+                        onClick={e => {
+                          e.stopPropagation();
+                          removeSavedSubreddit(saved.id);
+                        }}
+                        className="text-gray-400 hover:text-white p-2 rounded-full hover:bg-white/10"
+                        title="Remove from List"
+                      >
+                        <X size={20} />
+                      </button>
+                      <div className="text-gray-400 p-2">
+                        {expandedSubreddit === saved.name ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
+                      </div>
                     </div>
                   </div>
                 </div>
 
-                {expandedSubreddit === saved.name && saved.analysis_data && (
+                {expandedSubreddit === saved.name && (
                   <div className="border-t border-[#222222] bg-[#0A0A0A] p-4 lg:p-6">
                     {saved.analysis_data ? (
-                      <AnalysisCard analysis={saved.analysis_data} mode="saved" />
+                      <>
+                        <AnalysisCard analysis={saved.analysis_data} mode="saved" />
+                        <div className="mt-6">
+                          <a
+                            href={`https://reddit.com/r/${saved.name}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-[#C69B7B] hover:text-[#B38A6A] transition-colors inline-flex items-center gap-2"
+                          >
+                            View all posts in r/{saved.name}
+                            <ChevronRight size={16} />
+                          </a>
+                        </div>
+                      </>
                     ) : (
                       <div className="text-center py-6 text-gray-400">No analysis data available</div>
                     )}
