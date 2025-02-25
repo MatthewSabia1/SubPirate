@@ -21,6 +21,7 @@ import Pricing from './pages/Pricing';
 import LandingPage from './pages/LandingPage';
 import { Menu } from 'lucide-react';
 import { useRedirectHandler } from './lib/useRedirectHandler';
+import { ErrorBoundary } from 'react-error-boundary';
 
 // Create a client
 const queryClient = new QueryClient({
@@ -73,80 +74,102 @@ function PrivateRoute({ children }: { children: React.ReactNode }) {
   );
 }
 
+// Simple error fallback component
+function ErrorFallback({ error, resetErrorBoundary }: { error: Error, resetErrorBoundary: () => void }) {
+  return (
+    <div className="flex flex-col items-center justify-center min-h-screen p-4 bg-gray-900 text-white">
+      <h1 className="text-2xl font-bold mb-4">Something went wrong</h1>
+      <p className="mb-4 text-red-400">{error.message}</p>
+      <button 
+        onClick={resetErrorBoundary}
+        className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+      >
+        Try again
+      </button>
+    </div>
+  );
+}
+
 function App() {
-  // Use the redirect handler on all routes
-  useRedirectHandler();
+  // Use the redirect handler on all routes with error protection
+  try {
+    useRedirectHandler();
+  } catch (error) {
+    console.error("Failed to initialize redirect handler:", error);
+  }
   
   return (
-    <AuthProvider>
-      <FeatureAccessProvider>
-        <QueryClientProvider client={queryClient}>
-          <Router>
-            <Routes>
-              <Route path="/" element={<LandingPage />} />
-              <Route path="/login" element={<Login />} />
-              <Route path="/pricing" element={<Pricing />} />
-              <Route path="/auth/callback" element={<AuthCallback />} />
-              <Route path="/auth/reddit/callback" element={
-                <PrivateRoute>
-                  <RedditOAuthCallback />
-                </PrivateRoute>
-              } />
-              <Route path="/dashboard" element={
-                <PrivateRoute>
-                  <Dashboard />
-                </PrivateRoute>
-              } />
-              <Route path="/saved" element={
-                <PrivateRoute>
-                  <SavedList />
-                </PrivateRoute>
-              } />
-              <Route path="/settings" element={
-                <PrivateRoute>
-                  <Settings />
-                </PrivateRoute>
-              } />
-              <Route path="/analytics" element={
-                <PrivateRoute>
-                  <Analytics />
-                </PrivateRoute>
-              } />
-              <Route path="/analysis/:subreddit" element={
-                <PrivateRoute>
-                  <SubredditAnalysis />
-                </PrivateRoute>
-              } />
-              <Route path="/projects" element={
-                <PrivateRoute>
-                  <Projects />
-                </PrivateRoute>
-              } />
-              <Route path="/projects/:projectId" element={
-                <PrivateRoute>
-                  <ProjectView />
-                </PrivateRoute>
-              } />
-              <Route path="/calendar" element={
-                <PrivateRoute>
-                  <Calendar />
-                </PrivateRoute>
-              } />
-              <Route path="/spyglass" element={
-                <PrivateRoute>
-                  <SpyGlass />
-                </PrivateRoute>
-              } />
-              <Route path="/accounts" element={
-                <PrivateRoute>
-                  <RedditAccounts />
-                </PrivateRoute>
-              } />
-            </Routes>
-          </Router>
-        </QueryClientProvider>
-      </FeatureAccessProvider>
-    </AuthProvider>
+    <ErrorBoundary FallbackComponent={ErrorFallback}>
+      <AuthProvider>
+        <FeatureAccessProvider>
+          <QueryClientProvider client={queryClient}>
+            <Router>
+              <Routes>
+                <Route path="/" element={<LandingPage />} />
+                <Route path="/login" element={<Login />} />
+                <Route path="/pricing" element={<Pricing />} />
+                <Route path="/auth/callback" element={<AuthCallback />} />
+                <Route path="/auth/reddit/callback" element={
+                  <PrivateRoute>
+                    <RedditOAuthCallback />
+                  </PrivateRoute>
+                } />
+                <Route path="/dashboard" element={
+                  <PrivateRoute>
+                    <Dashboard />
+                  </PrivateRoute>
+                } />
+                <Route path="/saved" element={
+                  <PrivateRoute>
+                    <SavedList />
+                  </PrivateRoute>
+                } />
+                <Route path="/settings" element={
+                  <PrivateRoute>
+                    <Settings />
+                  </PrivateRoute>
+                } />
+                <Route path="/analytics" element={
+                  <PrivateRoute>
+                    <Analytics />
+                  </PrivateRoute>
+                } />
+                <Route path="/analysis/:subreddit" element={
+                  <PrivateRoute>
+                    <SubredditAnalysis />
+                  </PrivateRoute>
+                } />
+                <Route path="/projects" element={
+                  <PrivateRoute>
+                    <Projects />
+                  </PrivateRoute>
+                } />
+                <Route path="/projects/:projectId" element={
+                  <PrivateRoute>
+                    <ProjectView />
+                  </PrivateRoute>
+                } />
+                <Route path="/calendar" element={
+                  <PrivateRoute>
+                    <Calendar />
+                  </PrivateRoute>
+                } />
+                <Route path="/spyglass" element={
+                  <PrivateRoute>
+                    <SpyGlass />
+                  </PrivateRoute>
+                } />
+                <Route path="/accounts" element={
+                  <PrivateRoute>
+                    <RedditAccounts />
+                  </PrivateRoute>
+                } />
+              </Routes>
+            </Router>
+          </QueryClientProvider>
+        </FeatureAccessProvider>
+      </AuthProvider>
+    </ErrorBoundary>
   );
 }
 
