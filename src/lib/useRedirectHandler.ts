@@ -40,24 +40,26 @@ export function useRedirectHandler() {
           // Only redirect if we're not already on the callback page
           if (!window.location.pathname.includes('/auth/callback')) {
             console.log('Redirecting to callback handler');
-            const callbackUrl = window.location.hostname === 'subpirate.com'
-              ? 'https://subpirate.com/auth/callback'
-              : '/auth/callback';
+            
+            // Ensure we're using the correct path format
+            const basePath = window.location.hostname === 'subpirate.com'
+              ? 'https://subpirate.com'
+              : '';
               
-            // Ensure we have a clean URL without any trailing spaces
-            const cleanCallbackUrl = callbackUrl.trim();
+            // Build the callback URL with proper path handling
+            const callbackPath = '/auth/callback';
+            const cleanCallbackUrl = `${basePath}${callbackPath}`.trim();
             
             // Ensure we properly append the hash
             const redirectUrl = `${cleanCallbackUrl}${hash}`;
             
             console.log('Redirecting to:', redirectUrl.replace(/access_token=([^&]+)/, 'access_token=REDACTED'));
             
+            // Use replace for a clean redirect
             if (window.location.hostname === 'subpirate.com') {
-              // In production, use window.location.replace for a clean redirect
               window.location.replace(redirectUrl);
             } else {
-              // In development, use navigate
-              navigate(redirectUrl);
+              navigate(callbackPath + hash);
             }
           } else {
             console.log('Already on callback page, not redirecting');
