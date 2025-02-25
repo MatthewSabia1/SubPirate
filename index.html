@@ -11,6 +11,35 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#1E293B" />
     <title>SubPirate</title>
+    
+    <!-- Handle authentication redirects that might land on root -->
+    <script type="text/javascript">
+      (function() {
+        // Check if we have auth-related fragments in the URL
+        const hash = window.location.hash;
+        const hasAuthParams = hash && (
+          hash.includes('access_token') || 
+          hash.includes('id_token') || 
+          hash.includes('refresh_token') || 
+          hash.includes('error_description')
+        );
+        
+        // Only process if we're at the root with hash params
+        if (window.location.pathname === '/' && hasAuthParams) {
+          console.log('Auth redirect detected in index.html:', hash);
+          
+          // Store the hash so our app can access it later
+          try {
+            sessionStorage.setItem('supabase-auth-hash', hash);
+            
+            // Redirect to the auth callback handler
+            window.location.replace('/auth/callback' + hash);
+          } catch (error) {
+            console.error('Error handling auth redirect:', error);
+          }
+        }
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

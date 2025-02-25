@@ -1,0 +1,7 @@
+# Netlify redirects file
+
+# Redirect social auth callback
+/auth/* /index.html 200
+
+# Redirect all paths to index.html for client-side routing
+/* /index.html 200 

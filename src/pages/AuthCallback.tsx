@@ -1,17 +1,35 @@
 import React, { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 
 export default function AuthCallback() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
+  const location = useLocation();
 
   useEffect(() => {
-    // First, check if we already have a session
-    const checkSession = async () => {
+    const handleAuthentication = async () => {
       try {
-        // Get the current session
+        // Check if we're coming back from an OAuth redirect with a fragment
+        let currentHash = location.hash;
+
+        // Check if we have a stored hash from the index.html script
+        const storedHash = sessionStorage.getItem('supabase-auth-hash');
+        if (storedHash && !currentHash) {
+          console.log("Found stored hash from redirect:", storedHash);
+          currentHash = storedHash;
+          // Clean up
+          sessionStorage.removeItem('supabase-auth-hash');
+        }
+
+        if (currentHash) {
+          console.log("Hash fragment detected:", currentHash);
+          // Give Supabase a moment to process the hash
+          await new Promise(resolve => setTimeout(resolve, 500));
+        }
+
+        // First, check if we already have a session
         const { data, error } = await supabase.auth.getSession();
         
         if (error) {
@@ -23,13 +41,43 @@ export default function AuthCallback() {
           navigate('/dashboard', { replace: true });
           return;
         }
+
+        // If no session yet, check if we have access token in the URL
+        // This ensures we don't miss tokens even if event doesn't fire
+        const hashParams = new URLSearchParams(currentHash.substring(1));
+        const accessToken = hashParams.get('access_token');
+        
+        if (accessToken) {
+          console.log("Access token found in URL");
+          try {
+            // Attempt to set the session manually if needed
+            const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+            if (!sessionError && sessionData?.session) {
+              console.log("Session established after token detection");
+              navigate('/dashboard', { replace: true });
+              return;
+            } else {
+              // Wait a bit longer for Supabase to process the token
+              console.log("No session yet, waiting a bit longer...");
+              await new Promise(resolve => setTimeout(resolve, 1500));
+              const { data: retryData } = await supabase.auth.getSession();
+              if (retryData?.session) {
+                console.log("Session established on retry");
+                navigate('/dashboard', { replace: true });
+                return;
+              }
+            }
+          } catch (err) {
+            console.error("Error processing URL token:", err);
+          }
+        }
       } catch (err) {
-        console.error('Error checking session:', err);
-        // We'll continue with auth state change listener
+        console.error('Error in handleAuthentication:', err);
+        setError("Authentication failed. Please try again.");
       }
     };
 
-    checkSession();
+    handleAuthentication();
 
     // Listen for auth state changes
     const { data: authListener } = supabase.auth.onAuthStateChange(
@@ -78,7 +126,7 @@ export default function AuthCallback() {
       authListener.subscription.unsubscribe();
       clearTimeout(timeoutId);
     };
-  }, [navigate, loading]);
+  }, [navigate, loading, location]);
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-black text-white">

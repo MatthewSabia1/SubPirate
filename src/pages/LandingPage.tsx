@@ -20,8 +20,7 @@ import {
   Eye
 } from 'lucide-react';
 import Logo from '../components/Logo';
-import Testimonials from '../components/Testimonials';
-import FeaturesSection from '../components/FeaturesSection';
+import { useRedirectHandler } from '../hooks/useRedirectHandler';
 
 // Define styles outside the component
 const customStyles = `
@@ -117,6 +116,9 @@ const customStyles = `
 `;
 
 const LandingPage = () => {
+  // Add this to handle OAuth redirects that might end up at the root URL
+  useRedirectHandler();
+
   // Add the styles to the document head
   React.useEffect(() => {
     const styleElement = document.createElement('style');
