@@ -99,18 +99,32 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const signInWithGoogle = async () => {
-    const { data, error } = await supabase.auth.signInWithOAuth({
-      provider: 'google',
-      options: {
-        redirectTo: `${window.location.origin}/auth/callback`
+    console.log('Initiating Google OAuth authentication');
+    try {
+      const redirectUrl = `${window.location.origin}/auth/callback`;
+      console.log('Using redirect URL:', redirectUrl);
+      
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: redirectUrl,
+          queryParams: {
+            prompt: 'select_account', // Force account selection even if already logged in
+          }
+        }
+      });
+      
+      if (error) {
+        console.error('Google OAuth error:', error);
+        throw new Error(error.message);
       }
-    });
-    
-    if (error) {
-      throw new Error(error.message);
+      
+      console.log('Google OAuth initiated successfully, redirect URL:', data?.url);
+      return data;
+    } catch (error) {
+      console.error('Error in signInWithGoogle:', error);
+      throw error;
     }
-    
-    return data;
   };
 
   const signOut = async () => {

@@ -57,8 +57,19 @@ function Login() {
     setGoogleLoading(true);
     
     try {
-      await signInWithGoogle();
-      // Note: No navigate here as OAuth flow will redirect the user
+      console.log('Starting Google authentication process...');
+      const { url } = await signInWithGoogle() || { url: null };
+      
+      if (url) {
+        console.log('Google OAuth URL received, redirecting...');
+        // URL redirection will be handled by Supabase automatically
+        // No need to call window.location.href = url
+      } else {
+        console.error('No redirect URL received from Supabase');
+        setError('Authentication failed: No redirect URL received');
+        setGoogleLoading(false);
+      }
+      // Note: No navigate here as OAuth flow will handle redirection
     } catch (err) {
       console.error('Google auth error:', err);
       if (err instanceof Error) {
