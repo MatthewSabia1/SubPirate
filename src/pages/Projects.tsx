@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Plus, Settings, ChevronRight, Trash2, Share2, AlertTriangle } from 'lucide-react';
 import ShareProjectModal from '../components/ShareProjectModal';
 import ProjectSettingsModal from '../components/ProjectSettingsModal';
+import CreateProjectModal from '../components/CreateProjectModal';
 import { supabase } from '../lib/supabase';
 
 interface Project {
@@ -17,6 +18,7 @@ function Projects() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -80,6 +82,17 @@ function Projects() {
     return `https://api.dicebear.com/7.x/shapes/svg?seed=${project.name}&backgroundColor=111111`;
   };
 
+  const handleCreateProject = async (projectData: { name: string; description: string | null; image_url: string | null }) => {
+    try {
+      // The project is already created in the CreateProjectModal component
+      // Just refresh the projects list
+      fetchProjects();
+    } catch (err) {
+      console.error('Error after project creation:', err);
+      setError('Failed to refresh projects');
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -92,7 +105,9 @@ function Projects() {
     <div className="max-w-[1200px] mx-auto px-4 md:px-8">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
         <h1 className="text-2xl md:text-4xl font-bold truncate">Projects</h1>
-        <button className="primary flex items-center justify-center gap-2 text-sm md:text-base h-10 md:h-11">
+        <button 
+          onClick={() => setIsCreateModalOpen(true)}
+          className="primary flex items-center justify-center gap-2 text-sm md:text-base h-10 md:h-11">
           <Plus size={20} />
           New Project
         </button>
@@ -111,7 +126,9 @@ function Projects() {
           <p className="text-gray-400 mb-6">
             Create your first project to start analyzing subreddits
           </p>
-          <button className="primary flex items-center justify-center gap-2 mx-auto h-10 md:h-11">
+          <button 
+            onClick={() => setIsCreateModalOpen(true)}
+            className="primary flex items-center justify-center gap-2 mx-auto h-10 md:h-11">
             <Plus size={20} />
             New Project
           </button>
@@ -209,6 +226,12 @@ function Projects() {
           />
         </>
       )}
+
+      <CreateProjectModal
+        isOpen={isCreateModalOpen}
+        onClose={() => setIsCreateModalOpen(false)}
+        onSubmit={handleCreateProject}
+      />
     </div>
   );
 }
