@@ -1,5 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
+import { createBillingPortalSession } from '../lib/stripe/client';
+import { getSubscriptionStatus } from '../lib/stripe/subscription';
 
 function Settings() {
   const { user, updateProfile } = useAuth();
@@ -9,6 +11,20 @@ function Settings() {
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [subscription, setSubscription] = useState<any>(null);
+  const [portalLoading, setPortalLoading] = useState(false);
+
+  useEffect(() => {
+    async function loadSubscription() {
+      try {
+        const sub = await getSubscriptionStatus();
+        setSubscription(sub);
+      } catch (error) {
+        console.error('Error loading subscription:', error);
+      }
+    }
+    loadSubscription();
+  }, []);
 
   const handleProfileUpdate = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -39,6 +55,27 @@ function Settings() {
     }
   };
 
+  const handleManageSubscription = async () => {
+    setPortalLoading(true);
+    try {
+      if (!subscription) {
+        window.location.href = '/pricing';
+        return;
+      }
+
+      const session = await createBillingPortalSession({
+        customerId: subscription.stripe_customer_id,
+        returnUrl: window.location.href,
+      });
+      
+      window.location.href = session.url;
+    } catch (error) {
+      console.error('Error opening billing portal:', error);
+    } finally {
+      setPortalLoading(false);
+    }
+  };
+
   return (
     <div className="max-w-3xl">
       <h1 className="text-4xl font-bold mb-8">Account Settings</h1>
@@ -51,27 +88,78 @@ function Settings() {
               <h2 className="text-xl font-semibold mb-1">Subscription</h2>
               <p className="text-gray-500 text-sm">Manage your subscription</p>
             </div>
-            <span className="px-2 py-1 text-xs bg-green-900/30 text-green-400 rounded-md">Active</span>
+            {subscription && (
+              <span className={`px-2 py-1 text-xs rounded-md ${
+                subscription.status === 'active' || subscription.status === 'trialing'
+                  ? 'bg-green-900/30 text-green-400'
+                  : 'bg-yellow-900/30 text-yellow-400'
+              }`}>
+                {subscription.status === 'trialing' ? 'Trial' : subscription.status}
+              </span>
+            )}
           </div>
 
           <div className="mt-6 space-y-6">
-            <div className="flex justify-between items-start">
-              <div>
-                <div className="text-gray-500 mb-1">Plan</div>
-                <div className="text-lg">Pro Plan</div>
-              </div>
-              <div className="text-right">
-                <div className="text-gray-500 mb-1">Price</div>
-                <div className="text-lg">$9.99/month</div>
-              </div>
-            </div>
+            {subscription ? (
+              <>
+                <div className="flex justify-between items-start">
+                  <div>
+                    <div className="text-gray-500 mb-1">Plan</div>
+                    <div className="text-lg">Pro Plan</div>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-gray-500 mb-1">Price</div>
+                    <div className="text-lg">
+                      ${subscription && subscription.stripe_price_id 
+                        ? ((subscription.unit_amount || 0) / 100).toFixed(2)
+                        : '9.99'}/month
+                    </div>
+                  </div>
+                </div>
 
-            <div>
-              <div className="text-gray-500 mb-1">Current Period Ends</div>
-              <div className="text-lg">March 20, 2025</div>
-            </div>
+                {subscription.trial_end && (
+                  <div>
+                    <div className="text-gray-500 mb-1">Trial Ends</div>
+                    <div className="text-lg">
+                      {new Date(subscription.trial_end).toLocaleDateString()}
+                    </div>
+                  </div>
+                )}
 
-            <button className="secondary w-full">Cancel Subscription</button>
+                <div>
+                  <div className="text-gray-500 mb-1">Current Period Ends</div>
+                  <div className="text-lg">
+                    {new Date(subscription.current_period_end).toLocaleDateString()}
+                  </div>
+                </div>
+
+                {subscription.cancel_at_period_end && (
+                  <div className="bg-yellow-900/30 text-yellow-400 p-4 rounded-lg">
+                    <p className="text-sm">
+                      Your subscription will end on {new Date(subscription.current_period_end).toLocaleDateString()}
+                    </p>
+                  </div>
+                )}
+
+                <button 
+                  className="secondary w-full" 
+                  onClick={handleManageSubscription}
+                  disabled={portalLoading}
+                >
+                  {portalLoading ? 'Loading...' : 'Manage Subscription'}
+                </button>
+              </>
+            ) : (
+              <div className="text-center">
+                <p className="text-gray-500 mb-4">No active subscription</p>
+                <button 
+                  className="primary w-full" 
+                  onClick={() => window.location.href = '/pricing'}
+                >
+                  View Plans
+                </button>
+              </div>
+            )}
           </div>
         </div>
 

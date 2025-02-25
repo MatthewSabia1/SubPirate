@@ -18,6 +18,16 @@
 - Removing engagement metrics from marketing friendliness scoring
 - Improving title template generation
 - Making AI output more consistent and focused
+- Implementing Stripe subscription management
+- Addressing Supabase 406 errors in subscription queries
+- Fixing Stripe checkout session creation (400 error)
+- Improving error handling in subscription flow
+- Enhancing subscription data storage and association with users
+- Implementing robust webhook handling for Stripe events
+- Configuring Stripe to use test mode for development
+- Fixing foreign key constraint issues in the database
+- Resolving Stripe synchronization script errors
+- Fixing Supabase RPC function 404 errors and permission issues
 
 ## Recent Changes
 - Renamed `postingGuidelines` to `postingLimits` across the application for consistency
@@ -50,6 +60,55 @@
   5. Stealth Techniques
 - Focus on plausible deniability and avoiding mod scrutiny
 - Improved prompt structure for better strategic analysis
+- Fixed Supabase 406 errors by changing `.select()` calls to use `*` and replacing `.single()` with `.maybeSingle()`
+- Resolved Stripe Checkout 400 errors by removing undefined parameters and enhancing customer metadata
+- Improved error handling with try/catch blocks throughout the subscription flow
+- Enhanced logging for subscription-related operations
+- Updated webhook handler to properly associate subscriptions with users
+- Implemented proper user ID storage in Stripe customer metadata
+- Modified API endpoints to work with Vite instead of Next.js
+- Changed environment variable access from `process.env` to `import.meta.env` for Vite compatibility
+
+### Stripe Integration Fixes
+- Fixed several critical issues with Stripe integration:
+  1. Resolved foreign key constraint errors in the database schema
+  2. Fixed sync-products.js script to use ES modules syntax instead of CommonJS
+  3. Updated SQL script to remove references to non-existent columns
+  4. Created comprehensive Quick Fix Guide for Stripe integration issues
+  5. Fixed issue with query approach for finding missing prices in subscriptions
+  6. Updated environment variable references to use VITE_ prefix
+  7. Enhanced error handling in synchronization script
+  8. Improved database fixes to ensure proper product and price relationships
+  9. Fixed Stripe Customer Portal configuration
+  10. Documented common Stripe integration issues and solutions
+  11. Created comprehensive Stripe database cleanup script to remove test products/prices
+  12. Added detailed documentation on managing Stripe products and prices in the database
+  13. Fixed orphaned prices and products in the database
+
+### Stripe Database Cleanup (Completed)
+- Successfully executed the Stripe database cleanup process:
+  1. Created and executed comprehensive cleanup script (`docs/stripe-db-cleanup.sql`)
+  2. Reduced database from 56 products to 8 essential products (4 tier products + 4 legacy products)
+  3. Reduced from 47 prices to 5 essential prices (4 tier prices + 1 referenced price)
+  4. Updated orphaned prices to have valid product references
+  5. Ensured all products have proper descriptions and are marked as active
+  6. Created detailed documentation in `docs/stripe-db-cleanup-guide.md`
+  7. Enhanced sync script to prevent future database clutter with test products
+  8. Added filtering logic in sync script to identify and exclude test products/prices
+  9. Added official product and price ID tracking in the sync script
+  10. Verified subscription pricing is working correctly after cleanup
+
+### Stripe Test Mode Configuration Updates
+- Modified Stripe client to always use test API keys during development
+- Added `useTestMode = true` configuration option in client.ts
+- Enhanced webhook server to force test mode
+- Updated webhook signature verification with better error handling
+- Added detailed logging for webhook events and payload handling
+- Added test mode visual indicator in Pricing UI
+- Added fallback price IDs for each plan to ensure consistent checkout flow
+- Created specific environment variables for test mode in .env
+- Enhanced error logging in Stripe client for better debugging
+- Modified package.json scripts to use test mode environment variables
 
 ### Data Structure Updates
 ```typescript
@@ -86,6 +145,18 @@ interface AnalysisData {
    - Improved error handling with retries
    - Enhanced response validation
 
+4. `Pricing.tsx`
+   - Added test mode indicator banner
+   - Added fallback price IDs for each subscription tier
+   - Enhanced error logging for checkout process
+   - Added detailed troubleshooting information
+
+5. `client.ts` (Stripe)
+   - Forced test mode during development
+   - Added clear logging for API keys being used
+   - Enhanced error handling for checkout session creation
+   - Added detailed request/response logging
+
 ## Active Decisions
 - Using `postingLimits` as the standard property name for posting-related data
 - Maintaining consistent property paths across components
@@ -99,6 +170,16 @@ interface AnalysisData {
 - Focused on sophisticated circumvention rather than brute force rule breaking
 - Emphasized stealth and plausible deniability in marketing strategies
 - Maintained aggressive marketing goals while adding more nuanced approach
+- Storing user IDs in Stripe customer metadata for reliable association
+- Using Stripe webhooks as the source of truth for subscription status
+- Implementing robust error handling throughout the subscription flow
+- Using `maybeSingle()` instead of `single()` for Supabase queries that might return no results
+- Using wildcard `*` for Supabase select queries to avoid 406 errors
+- Using test mode for all Stripe operations during development
+- Implementing clear test mode indicators in the UI to avoid confusion
+- Using specific test price IDs for consistent checkout flow
+- Maintaining separate environment variables for test and production
+- Enhancing webhook handlers to properly process test events
 
 ## Next Steps
 1. Monitor error rates after deployment
@@ -109,6 +190,18 @@ interface AnalysisData {
 6. Monitor error reporting effectiveness
 7. Consider adding error tracking analytics
 8. Update documentation with new error handling patterns
+9. Testing the complete subscription lifecycle
+10. Verifying webhook handling for all events
+11. Testing customer portal functionality
+12. Improving error messages for failed payments
+13. Documenting the webhook setup process
+14. Creating a subscription management guide
+15. Implementing proper production mode switching when ready to launch
+16. Creating a deployment checklist for Stripe production configuration
+17. Monitor database after Stripe cleanup script execution
+18. Ensure subscription flow works with cleaned database
+19. Consider regular database maintenance procedures
+20. Schedule periodic reviews of the Stripe products and prices database
 
 ## Current Considerations
 - Backward compatibility with existing saved analyses
@@ -119,18 +212,38 @@ interface AnalysisData {
 - Should watch for balance between aggressiveness and detection avoidance
 - May need to fine-tune risk assessment calculations based on user feedback
 - Consider adding more specific guidance on automod pattern analysis
+- Need to ensure Stripe webhook is correctly set up
+- Monitor subscription events in Stripe dashboard
+- Consider adding retry logic for failed webhooks
+- Add user notifications for subscription events
+- Implement subscription analytics and monitoring
+- Process for switching to production Stripe mode when ready to launch
+- Maintaining test/production separation in development
+- Handling webhook verification in different environments
 
 ## Dependencies
 - Supabase database schema
 - OpenRouter API integration
 - Frontend component structure
 - TypeScript type system
+- Stripe API for subscriptions and payments
+- Webhook server for handling Stripe events
 
 ## Recent Insights
 - Consistent property naming improves maintainability
 - Strong typing prevents runtime errors
 - Proper validation improves user experience
 - Centralized error handling reduces code duplication
+- Forcing test mode for Stripe prevents accidental charges
+- Visual indicators for test mode improve developer experience
+- Fallback price IDs ensure consistent checkout flow
+- Detailed error logging speeds up debugging
+- Proper webhook signature verification is critical for security
+- Regular database maintenance is necessary to keep Stripe data clean
+- Clear documentation of database schema and expected data is vital
+- SQL transactions are essential for database maintenance operations
+- Filtering test products/prices during synchronization prevents database clutter
+- Maintaining a list of official product/price IDs ensures proper tracking
 
 ## Current Focus
 Working on enhancing the subreddit analysis system, specifically:
@@ -596,3 +709,16 @@ We have successfully updated the subscription pricing structure in both Stripe a
 - Successfully processing test subscriptions
 - Proper error handling for edge cases
 - Clean user experience with feedback messages
+
+### User Usage Stats Fix
+- Fixed 404 errors with the Supabase RPC function `get_user_usage_stats`:
+  1. Created new migration file `20240225_create_usage_tracking_fix.sql` with idempotent operations
+  2. Fixed missing RPC function implementation in Supabase
+  3. Added explicit permission grants for authenticated and anonymous users
+  4. Implemented proper error handling in the function
+  5. Created DROP statements for existing functions to avoid conflicts
+  6. Made the migration script safe to run multiple times
+  7. Added appropriate security definer settings for the functions
+  8. Added explicit row-level security policies for the user_usage_stats table
+  9. Verified successful implementation by executing the script
+  10. Fixed console errors that were appearing during application usage

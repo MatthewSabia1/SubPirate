@@ -20,11 +20,16 @@
 - **Storage**: Supabase Storage
 - **Real-time**: Supabase Realtime
 - **AI**: OpenRouter
+- **Payments**: Stripe API (Test Mode)
+- **Usage Tracking**: Custom Supabase RPC functions and tables
 
 ### External APIs
 - **Reddit API**: Direct REST integration with batching
 - **OpenRouter API**: AI analysis
 - **DiceBear**: Avatar generation
+- **Stripe API**: Subscription and payment processing
+  - Test Mode configuration for development
+  - Separate webhook server for event handling
 
 ## Application Routes
 
@@ -41,7 +46,8 @@ routes: [
       { path: '/saved', element: <SavedSubreddits /> },
       { path: '/analysis/:subreddit', element: <SubredditAnalysis /> },
       { path: '/settings', element: <Settings /> },
-      { path: '/profile', element: <Profile /> }
+      { path: '/profile', element: <Profile /> },
+      { path: '/pricing', element: <Pricing /> }
     ]
   },
   { path: '/login', element: <Login /> },
@@ -72,6 +78,13 @@ PUT /api/projects/:id
 DELETE /api/projects/:id
 ```
 
+#### Stripe Webhooks (Separate Express Server)
+```typescript
+// Webhook endpoints
+POST /api/stripe/webhook
+GET /api/test
+```
+
 ## Development Environment
 
 ### Required Tools
@@ -79,6 +92,7 @@ DELETE /api/projects/:id
 - npm/yarn
 - Git
 - VS Code (recommended)
+- Stripe CLI (for webhook testing)
 
 ### VS Code Extensions
 - ESLint
@@ -88,10 +102,73 @@ DELETE /api/projects/:id
 
 ### Environment Variables
 ```
+# Supabase Configuration
 VITE_SUPABASE_URL=
 VITE_SUPABASE_ANON_KEY=
-VITE_OPENROUTER_API_KEY=
+VITE_SUPABASE_SERVICE_ROLE_KEY=
+VITE_SUPABASE_JWT_SECRET=
+VITE_SUPABASE_CONNECTION_STRING=
+VITE_SUPABASE_ACCESS_TOKEN=
+
+# Reddit API Configuration
+VITE_REDDIT_APP_ID=
+VITE_REDDIT_APP_SECRET=
+
+# Stripe Configuration
+# Test API keys (use these during development)
+VITE_STRIPE_TEST_SECRET_KEY=
+VITE_STRIPE_TEST_PUBLISHABLE_KEY=
+
+# Production API keys (do not use during development)
+VITE_STRIPE_SECRET_KEY=
+VITE_STRIPE_PUBLISHABLE_KEY=
+
+# Local development webhook secret from Stripe CLI
+VITE_STRIPE_WEBHOOK_SECRET=
+# Test environment webhook secret
+VITE_STRIPE_TEST_WEBHOOK_SECRET=
+# Production webhook secret
+VITE_STRIPE_PROD_WEBHOOK_SECRET=
+VITE_STRIPE_BASE_URL=
 ```
+
+### Development Scripts
+```json
+{
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
+    "preview": "vite preview",
+    "stripe:webhook": "ts-node scripts/setup-stripe-webhook.ts",
+    "server": "node server.js",
+    "webhook": "node webhook-server.js",
+    "dev:webhook": "cross-env NODE_ENV=development STRIPE_TEST_MODE=true concurrently \"npm run dev\" \"npm run webhook\" \"stripe listen --forward-to http://localhost:4242/api/stripe/webhook\""
+  }
+}
+```
+
+## Stripe Integration
+
+### Test Mode Configuration
+- Forced test mode in client.ts with `useTestMode = true`
+- Webhook server running on port 4242 (separate from Vite)
+- Test price IDs for each subscription tier as fallbacks
+- Visual indicators in the UI to show test mode
+- Enhanced error logging for debugging
+
+### Webhook Setup
+- Express server with raw JSON body parsing
+- Proper signature verification using Stripe webhooks.constructEvent
+- Event handling for checkout.session.completed, customer.subscription.created, etc.
+- Testing with Stripe CLI forwarding to localhost
+
+### Subscription Flow
+1. User selects plan on Pricing page
+2. createCheckoutSession called with plan ID and user info
+3. Redirect to Stripe Checkout
+4. On success, redirect back to app
+5. Webhook events update user subscription status
 
 ## Dependencies
 
@@ -106,9 +183,9 @@ VITE_OPENROUTER_API_KEY=
   "@supabase/supabase-js": "^2.0.0",
   "tailwindcss": "^3.0.0",
   "lucide-react": "^0.300.0",
-  "lucide-react": "^0.300.0",
   "chart.js": "^4.4.1",
-  "react-chartjs-2": "^5.2.0"
+  "react-chartjs-2": "^5.2.0",
+  "stripe": "^14.0.0"
 }
 ```
 
@@ -281,6 +358,63 @@ begin
   where id = row_id;
 end;
 $$ language plpgsql;
+```
+
+#### subscriptions
+```sql
+create table subscriptions (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid references profiles(id) on delete cascade,
+  customer_id text not null,
+  subscription_id text not null unique,
+  status text not null,
+  price_id text,
+  product_id text,
+  current_period_end timestamptz,
+  current_period_start timestamptz,
+  created_at timestamptz default now(),
+  updated_at timestamptz default now(),
+  
+  -- Ensure we only store one subscription per customer
+  unique(user_id, customer_id)
+);
+
+-- Indexes for quick lookups
+create index idx_subscriptions_user_id on subscriptions(user_id);
+create index idx_subscriptions_subscription_id on subscriptions(subscription_id);
+create index idx_subscriptions_status on subscriptions(status);
+```
+
+#### prices
+```sql
+create table prices (
+  id text primary key,  -- price_id from Stripe
+  product_id text not null,
+  active boolean default true,
+  currency text not null,
+  description text,
+  type text not null,
+  unit_amount integer not null,
+  interval text,
+  interval_count integer,
+  metadata jsonb default '{}',
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
+);
+```
+
+#### products
+```sql
+create table products (
+  id text primary key,  -- product_id from Stripe
+  active boolean default true,
+  name text not null,
+  description text,
+  image text,
+  metadata jsonb default '{}',
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
+);
 ```
 
 ### Relationship Tables
@@ -736,5 +870,70 @@ POST /api/reanalyze-subreddit
 2. Implement responsive design
 3. Follow accessibility guidelines
 4. Maintain consistent theming
+
+## User Usage Tracking
+
+### Core Tables
+```sql
+-- User profiles
+profiles (
+  id UUID PRIMARY KEY REFERENCES auth.users,
+  username TEXT,
+  email TEXT,
+  avatar_url TEXT,
+  created_at TIMESTAMPTZ,
+  updated_at TIMESTAMPTZ
+)
+
+-- Projects
+projects (
+  id UUID PRIMARY KEY,
+  name TEXT,
+  description TEXT,
+  user_id UUID REFERENCES profiles,
+  created_at TIMESTAMPTZ,
+  updated_at TIMESTAMPTZ
+)
+
+-- Subscription management
+subscriptions (
+  id UUID PRIMARY KEY,
+  user_id UUID REFERENCES profiles,
+  stripe_customer_id TEXT,
+  stripe_subscription_id TEXT,
+  tier TEXT,
+  status TEXT,
+  current_period_end TIMESTAMPTZ,
+  created_at TIMESTAMPTZ,
+  updated_at TIMESTAMPTZ
+)
+
+-- Usage tracking
+user_usage_stats (
+  id UUID PRIMARY KEY,
+  user_id UUID REFERENCES auth.users,
+  subreddit_analysis_count INTEGER,
+  month_start TIMESTAMPTZ,
+  month_end TIMESTAMPTZ, 
+  created_at TIMESTAMPTZ,
+  updated_at TIMESTAMPTZ,
+  UNIQUE(user_id, month_start)
+)
+```
+
+### Stored Procedures/Functions
+```sql
+-- Increment usage statistics
+increment_usage_stat(
+  user_id_param UUID,
+  stat_name TEXT,
+  increment_by INTEGER
+) RETURNS VOID
+
+-- Get user usage statistics
+get_user_usage_stats(
+  user_id_param UUID
+) RETURNS JSON
+```
 
 // ... rest of existing content ... 

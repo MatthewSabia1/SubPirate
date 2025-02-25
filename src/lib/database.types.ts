@@ -15,18 +15,27 @@ export type Database = {
           display_name: string | null
           created_at: string
           updated_at: string
+          stripe_customer_id: string | null
+          email: string | null
+          full_name: string | null
         }
         Insert: {
           id: string
           display_name?: string | null
           created_at?: string
           updated_at?: string
+          stripe_customer_id?: string | null
+          email?: string | null
+          full_name?: string | null
         }
         Update: {
           id?: string
           display_name?: string | null
           created_at?: string
           updated_at?: string
+          stripe_customer_id?: string | null
+          email?: string | null
+          full_name?: string | null
         }
       }
       projects: {
@@ -283,7 +292,7 @@ export type Database = {
           stripe_customer_id: string
           stripe_subscription_id: string | null
           stripe_price_id: string | null
-          status: Database['public']['Enums']['subscription_status']
+          status: string
           trial_start: string | null
           trial_end: string | null
           current_period_start: string | null
@@ -298,7 +307,7 @@ export type Database = {
           stripe_customer_id: string
           stripe_subscription_id?: string | null
           stripe_price_id?: string | null
-          status: Database['public']['Enums']['subscription_status']
+          status: string
           trial_start?: string | null
           trial_end?: string | null
           current_period_start?: string | null
@@ -313,7 +322,7 @@ export type Database = {
           stripe_customer_id?: string
           stripe_subscription_id?: string | null
           stripe_price_id?: string | null
-          status?: Database['public']['Enums']['subscription_status']
+          status?: string
           trial_start?: string | null
           trial_end?: string | null
           current_period_start?: string | null

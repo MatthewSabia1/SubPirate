@@ -20,9 +20,27 @@ flowchart LR
     Frontend --> RedditAPI[Reddit API]
     Frontend --> OpenRouterAPI[OpenRouter API]
     Frontend --> Supabase
+    Frontend --> StripeAPI[Stripe API]
     RedditAPI --> Analysis
     OpenRouterAPI --> Analysis
     Analysis --> Supabase
+    StripeAPI --> Webhook[Webhook Server]
+    Webhook --> Supabase
+```
+
+### Subscription Flow
+```mermaid
+flowchart TD
+    User[User] --> PricingPage[Pricing Page]
+    PricingPage --> SelectPlan[Select Plan]
+    SelectPlan --> CreateSession[Create Checkout Session]
+    CreateSession --> StripeCheckout[Stripe Checkout]
+    StripeCheckout --> Success{Success?}
+    Success -->|Yes| RedirectApp[Redirect to App]
+    Success -->|No| RedirectPricing[Return to Pricing]
+    StripeCheckout --> WebhookEvents[Webhook Events]
+    WebhookEvents --> UpdateStatus[Update Subscription Status]
+    UpdateStatus --> DatabaseUpdate[Update Database]
 ```
 
 ## Component Structure
@@ -46,6 +64,12 @@ flowchart LR
    - FilterSort
    - Icons
 
+4. **Subscription Components**
+   - Pricing
+   - PricingCard
+   - TestModeIndicator
+   - SubscriptionStatus
+
 ## Design Patterns
 
 ### 1. Component Patterns
@@ -65,12 +89,60 @@ flowchart LR
 - Graceful degradation
 - User-friendly messages
 - Detailed logging
+- Enhanced error diagnostics in test mode
 
 ### 4. Performance Patterns
 - Code splitting
 - Lazy loading
 - Memoization
 - Debounced API calls
+
+### 5. Stripe Integration Patterns
+- Test/Production mode separation
+- Fallback price IDs for reliability
+- Forced test mode during development
+- Visual indicators for test environment
+- Webhook server for event handling
+- Comprehensive logging for debugging
+
+### 6. Database Patterns
+- Idempotent migrations for safety
+  - Use IF EXISTS/IF NOT EXISTS clauses
+  - DROP before CREATE for functions/triggers
+  - Explicit permission grants for security
+  - Security definer functions when needed
+  - Row-level security policies for data protection
+- Transaction-based operations for atomicity
+- Proper indexing for performance
+- Clear and consistent schema design
+- Explicit foreign key constraints
+- Regular database maintenance
+
+### 7. User Usage Tracking Pattern
+```mermaid
+flowchart TD
+    UserAction[User Action] --> CheckTier[Check Subscription Tier]
+    CheckTier --> LimitCheck{Check Usage Limits}
+    LimitCheck -->|Within Limits| IncrementCounter[Increment Usage Counter]
+    LimitCheck -->|Exceeded| ShowUpgrade[Show Upgrade Prompt]
+    IncrementCounter --> PerformAction[Perform Action]
+    ShowUpgrade --> UpgradePath[Upgrade Path]
+    
+    subgraph UsageTracking[Usage Tracking System]
+        IncrementCounter --> IncrementFunction[increment_usage_stat]
+        IncrementFunction --> UpdateDB[Update user_usage_stats]
+        GetLimits[get_user_usage_stats] --> ReadDB[Read user_usage_stats]
+    end
+    
+    CheckTier --> GetLimits
+```
+
+This pattern ensures usage tracking is:
+1. **Reliable**: SQL functions handle database consistency
+2. **Secure**: Row-level security enforces data access
+3. **Scalable**: Indexed tables for fast access
+4. **Maintainable**: Clear separation of concerns
+5. **Resilient**: Error handling at multiple levels
 
 ## Technical Decisions
 
@@ -79,11 +151,15 @@ flowchart LR
 - **TypeScript**: Type safety
 - **Tailwind**: Styling
 - **Supabase**: Backend
+- **Express**: Webhook server
 
 ### 2. API Integration
 - **Reddit API**: Direct REST calls
 - **OpenRouter**: AI analysis
 - **Supabase**: Real-time data
+- **Stripe API**: Subscription management
+   - Test mode during development
+   - Webhook events for state management
 
 ### 3. Data Storage
 - **Supabase Tables**:
@@ -92,14 +168,38 @@ flowchart LR
   - project_subreddits
   - saved_subreddits
   - user_settings
+  - subscriptions
+  - payment_history
 
 ### 4. Authentication
 - Supabase Auth
 - JWT tokens
 - Role-based access
+- Subscription-based feature access
 
-## Code Organization
+### 5. Environment Separation
+- Development with forced test mode
+- Test environment with test API keys
+- Production with live API keys
+- Clear visual indicators per environment
 
+## Testing Strategies
+
+### 1. Unit Testing
+- Component tests
+- Utility function tests
+- Mock API responses
+
+### 2. Integration Testing
+- User flow tests
+- API integration tests
+- Database interactions
+
+### 3. Subscription Testing
+- Mock Stripe events
+- Webhook verification tests
+- Success/failure flow tests
+- Using Stripe CLI for local webhook testing
 ### Directory Structure
 ```
 src/
@@ -724,6 +824,101 @@ interface SavedSubreddit {
    - Maintain legitimate appearance 
 
 ## Stripe Integration Architecture
+
+### Subscription Flow
+```mermaid
+flowchart LR
+    User --> Checkout[Stripe Checkout]
+    Checkout --> StripeAPI[Stripe API]
+    StripeAPI --> Webhook[Webhook Endpoint]
+    Webhook --> Database[Supabase Database]
+    User --> Portal[Customer Portal]
+    Portal --> StripeAPI
+    User --> App[Application]
+    App --> Database
+```
+
+### User Association Pattern
+The system uses a reliable pattern to associate Stripe customers with application users:
+
+1. **Metadata Association**: 
+   - User ID is stored in Stripe customer metadata during checkout
+   - Webhook handlers extract user ID from metadata
+   - Database records are linked using this ID
+
+2. **Event-Based Architecture**:
+   - Stripe webhooks serve as the source of truth
+   - Application reacts to webhook events
+   - Database is synchronized based on event data
+
+3. **Implementation**:
+```typescript
+// Storing user ID in metadata during checkout
+const sessionParams = {
+  customer_creation: 'always',
+  customer_email: userEmail,
+  customer_data: {
+    metadata: {
+      userId: userId
+    }
+  },
+  subscription_data: {
+    metadata: {
+      userId: userId
+    }
+  }
+};
+
+// Extracting user ID from webhook event
+const userId = event.data.object.customer?.metadata?.userId || 
+               event.data.object.metadata?.userId;
+
+// Database synchronization
+if (userId) {
+  const { data, error } = await supabase
+    .from('subscriptions')
+    .upsert({
+      user_id: userId,
+      subscription_id: subscriptionId,
+      status: status,
+      // Other fields...
+    });
+}
+```
+
+### Error Handling Pattern
+The subscription system implements a robust error handling pattern:
+
+1. **Graceful Degradation**:
+   - Use of `.maybeSingle()` instead of `.single()` for queries
+   - Default to free tier when subscription lookup fails
+   - Fallback strategies for missing data
+
+2. **Comprehensive Logging**:
+   - Detailed error capture at each step
+   - User ID included in logs for traceability
+   - Structured error objects with context
+
+3. **Query Pattern Improvements**:
+   - Using wildcard `*` for select queries to avoid 406 errors
+   - Simplified query structure to prevent column mismatch errors
+   - Consistent error handling across subscription-related functions
+
+### Customer Portal Integration
+The system implements a standard pattern for customer portal access:
+
+1. **Session Creation**:
+   - Generate a portal session for the current user
+   - Pass return URL for seamless experience
+   - Handle errors with graceful fallbacks
+
+2. **Implementation**:
+```typescript
+const portalSession = await stripe.billingPortal.sessions.create({
+  customer: customerId,
+  return_url: returnUrl
+});
+```
 
 ### Database Schema
 

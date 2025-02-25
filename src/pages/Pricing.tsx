@@ -2,8 +2,10 @@ import React from 'react';
 import { PricingCard } from '../components/pricing/PricingCard';
 import { getActiveProducts, getActivePrices, createCheckoutSession } from '../lib/stripe/client';
 import type { Stripe } from 'stripe';
+import { useAuth } from '../contexts/AuthContext';
 
 export default function Pricing() {
+  const { user } = useAuth();
   const [products, setProducts] = React.useState<Stripe.Product[]>([]);
   const [prices, setPrices] = React.useState<Stripe.Price[]>([]);
   const [loading, setLoading] = React.useState(true);
@@ -16,6 +18,13 @@ export default function Pricing() {
           getActiveProducts(),
           getActivePrices()
         ]);
+        
+        console.log('Fetched products:', productsData);
+        console.log('Fetched prices:', pricesData);
+        
+        // Log full product details to help with debugging
+        console.log('Full product details:', JSON.stringify(productsData, null, 2));
+        
         setProducts(productsData);
         setPrices(pricesData);
       } catch (err) {
@@ -39,6 +48,51 @@ export default function Pricing() {
     );
   }
 
+  // Hardcoded price IDs as fallbacks for each plan tier
+  // These are TEST price IDs confirmed to exist in your Stripe test account
+  const priceFallbacks = {
+    Starter: 'price_1QvzQXCtsTY6FiiZniXOiFkM', // Starter test mode price ID
+    Creator: 'price_1QvzQlCtsTY6FiiZdZlSfPJc', // Creator test mode price ID
+    Pro: 'price_1QvzQyCtsTY6FiiZD1DOaPJi',     // Pro test mode price ID
+    Agency: 'price_1QvzRBCtsTY6FiiZEtKt3SYA'   // Agency test mode price ID
+  };
+
+  console.log('Using TEST price IDs as fallbacks:', priceFallbacks);
+
+  // Display a message at the top of the page indicating we're in test mode
+  const TestModeIndicator = () => (
+    <div className="bg-yellow-600 text-white text-center py-2 mb-4">
+      TEST MODE - Using Stripe test environment
+    </div>
+  );
+
+  // Since all products may have the same name "myproduct", assign a price to each plan
+  // This function will try to match by position in the array, falling back to the hardcoded IDs
+  const getProductPriceId = (planIndex: number, fallbackPriceId: string) => {
+    try {
+      // Sort prices by unit_amount to assign different prices to different plan tiers
+      const sortedPrices = [...prices].sort((a, b) => {
+        const aAmount = a.unit_amount || 0;
+        const bAmount = b.unit_amount || 0;
+        return aAmount - bAmount;
+      });
+      
+      // If we have enough prices, assign based on index
+      if (sortedPrices.length > planIndex) {
+        const price = sortedPrices[planIndex];
+        console.log(`Assigned price for plan index ${planIndex}:`, price);
+        return price.id;
+      }
+      
+      // Fall back to the hardcoded price ID
+      console.log(`Using fallback price for plan index ${planIndex}:`, fallbackPriceId);
+      return fallbackPriceId;
+    } catch (error) {
+      console.error('Error matching price for plan:', error);
+      return fallbackPriceId;
+    }
+  };
+
   const plans = [
     {
       name: 'Starter',
@@ -50,9 +104,7 @@ export default function Pricing() {
         'Export data in CSV format',
         'Email support',
       ],
-      priceId: prices.find((p) => 
-        p.product === products.find(prod => prod.name === 'Starter')?.id
-      )?.id,
+      priceId: getProductPriceId(0, priceFallbacks.Starter),
     },
     {
       name: 'Creator',
@@ -66,9 +118,7 @@ export default function Pricing() {
         'Priority email support',
       ],
       isPopular: true,
-      priceId: prices.find((p) => 
-        p.product === products.find(prod => prod.name === 'Creator')?.id
-      )?.id,
+      priceId: getProductPriceId(1, priceFallbacks.Creator),
     },
     {
       name: 'Pro',
@@ -82,9 +132,7 @@ export default function Pricing() {
         'Custom tracking metrics',
         'Priority 24/7 support',
       ],
-      priceId: prices.find((p) => 
-        p.product === products.find(prod => prod.name === 'Pro')?.id
-      )?.id,
+      priceId: getProductPriceId(2, priceFallbacks.Pro),
     },
     {
       name: 'Agency',
@@ -98,16 +146,24 @@ export default function Pricing() {
         'Dedicated account manager',
         'Training and onboarding',
       ],
-      priceId: prices.find((p) => 
-        p.product === products.find(prod => prod.name === 'Agency')?.id
-      )?.id,
+      priceId: getProductPriceId(3, priceFallbacks.Agency),
     },
   ];
 
   async function handleSelectPlan(priceId: string | undefined) {
     if (!priceId) {
       console.error('No price ID found for the selected plan');
-      alert('This plan is currently unavailable. Please try another plan or contact support.');
+      // Log more details about why the price ID wasn't found
+      console.log('Available products:', products);
+      console.log('Available prices:', prices);
+      
+      alert('Price ID not found. Please contact support.');
+      return;
+    }
+
+    if (!user) {
+      console.error('User is not authenticated');
+      alert('Please sign in to subscribe to a plan.');
       return;
     }
 
@@ -116,6 +172,7 @@ export default function Pricing() {
         priceId,
         successUrl: `${window.location.origin}/?checkout=success`,
         cancelUrl: `${window.location.origin}/pricing`,
+        userId: user.id,
       });
 
       if (!session?.url) {
@@ -123,14 +180,30 @@ export default function Pricing() {
       }
 
       window.location.href = session.url;
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error creating checkout session:', err);
-      alert('Failed to start checkout process. Please try again.');
+      
+      // Check for specific error cases and provide helpful messages
+      if (err.message && err.message.includes('exists in live mode, but a test mode key was used')) {
+        alert('Error: You are using price IDs from live mode with a test mode API key. Please contact support for assistance.');
+      } else if (err.message && err.message.includes('Tax ID collection')) {
+        // We have a fallback in place for this now, but just in case
+        alert('There was an issue with tax information collection. Please try again.');
+      } else if (err.message && err.message.includes('No such price')) {
+        alert('The selected pricing plan is unavailable. Please try another plan or contact support.');
+      } else if (err.message && err.message.includes('No such customer')) {
+        // A rare case but possible if the customer was deleted in Stripe
+        alert('Your customer information could not be found. Please contact support for assistance.');
+      } else {
+        // Generic error message for other cases
+        alert('Failed to start checkout process. Please try again or contact support if the issue persists.');
+      }
     }
   }
 
   return (
     <div className="min-h-screen bg-black">
+      <TestModeIndicator />
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-24">
         <div className="text-center mb-20">
           <h1 className="text-4xl md:text-5xl font-bold text-white mb-6">
