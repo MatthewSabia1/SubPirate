@@ -20,6 +20,7 @@ import AuthCallback from './pages/AuthCallback';
 import Pricing from './pages/Pricing';
 import LandingPage from './pages/LandingPage';
 import { Menu } from 'lucide-react';
+import { useRedirectHandler } from './lib/useRedirectHandler';
 
 // Create a client
 const queryClient = new QueryClient({
@@ -73,6 +74,9 @@ function PrivateRoute({ children }: { children: React.ReactNode }) {
 }
 
 function App() {
+  // Use the redirect handler on all routes
+  useRedirectHandler();
+  
   return (
     <AuthProvider>
       <FeatureAccessProvider>

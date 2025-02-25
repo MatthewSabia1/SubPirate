@@ -12,7 +12,7 @@
     <meta name="theme-color" content="#1E293B" />
     <title>SubPirate</title>
     
-    <!-- Handle authentication redirects that might land on root -->
+    <!-- Enhanced authentication redirects handler -->
     <script type="text/javascript">
       (function() {
         // Check if we have auth-related fragments in the URL
@@ -24,16 +24,30 @@
           hash.includes('error_description')
         );
         
-        // Only process if we're at the root with hash params
-        if (window.location.pathname === '/' && hasAuthParams) {
-          console.log('Auth redirect detected in index.html:', hash);
+        // Log to console for debugging
+        console.log('URL check in index.html', {
+          pathname: window.location.pathname,
+          hasHash: !!hash,
+          hasAuthParams,
+          hostname: window.location.hostname
+        });
+        
+        // If we're not already on the callback path and we have auth params
+        if (!window.location.pathname.includes('/auth/callback') && hasAuthParams) {
+          console.log('Auth redirect detected, redirecting to callback handler');
           
-          // Store the hash so our app can access it later
+          // Store the hash for the callback component to use
           try {
             sessionStorage.setItem('supabase-auth-hash', hash);
             
-            // Redirect to the auth callback handler
-            window.location.replace('/auth/callback' + hash);
+            // Try to directly redirect to the callback handler
+            if (window.location.hostname === 'subpirate.com') {
+              // In production, use absolute URL
+              window.location.href = 'https://subpirate.com/auth/callback' + hash;
+            } else {
+              // In development, use relative path
+              window.location.href = '/auth/callback' + hash;
+            }
           } catch (error) {
             console.error('Error handling auth redirect:', error);
           }
