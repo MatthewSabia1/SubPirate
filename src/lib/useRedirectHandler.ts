@@ -1,99 +1,66 @@
 import { useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { supabase } from './supabase';
+import { useNavigate, useLocation } from 'react-router-dom';
+import { supabase, debugAuthState } from './supabase';
 
 /**
- * Custom hook to handle authentication redirects.
- * This is particularly useful for handling OAuth redirects in production environments.
+ * Custom hook to handle authentication redirects, focusing on Google OAuth
  */
-export function useRedirectHandler() {
+export const useRedirectHandler = () => {
   const navigate = useNavigate();
-  
+  const location = useLocation();
+
   useEffect(() => {
-    // Wrap all the logic in try/catch to prevent crashing the app
-    try {
-      console.log('Initializing redirect handler');
-      
-      // Check if we have a hash in the URL that contains auth tokens
-      const hash = window.location.hash;
-      const hasAuthParams = hash && (
-        hash.includes('access_token') || 
-        hash.includes('id_token') || 
-        hash.includes('refresh_token') || 
-        hash.includes('error_description')
-      );
-      
-      console.log('Redirect handler check', { 
-        hash: hash ? 'present' : 'none',
-        hasAuthParams,
-        pathname: window.location.pathname,
-        url: window.location.href.replace(/access_token=([^&]+)/, 'access_token=REDACTED')
-      });
-      
-      if (hasAuthParams) {
-        console.log('Auth params detected in URL');
+    (async () => {
+      try {
+        console.log('Checking for authentication redirects...');
+        // Get current URL hash
+        const currentHash = window.location.hash;
+        const currentPathname = location.pathname;
         
-        // Store the hash for the callback component to use
-        try {
-          sessionStorage.setItem('supabase-auth-hash', hash);
-          
-          // Only redirect if we're not already on the callback page
-          if (!window.location.pathname.includes('/auth/callback')) {
-            console.log('Redirecting to callback handler');
-            
-            // Ensure we're using the correct path format
-            const basePath = window.location.hostname === 'subpirate.com'
-              ? 'https://subpirate.com'
-              : '';
-              
-            // Build the callback URL with proper path handling
-            const callbackPath = '/auth/callback';
-            const cleanCallbackUrl = `${basePath}${callbackPath}`.trim();
-            
-            // Ensure we properly append the hash
-            const redirectUrl = `${cleanCallbackUrl}${hash}`;
-            
-            console.log('Redirecting to:', redirectUrl.replace(/access_token=([^&]+)/, 'access_token=REDACTED'));
-            
-            // Use replace for a clean redirect
-            if (window.location.hostname === 'subpirate.com') {
-              window.location.replace(redirectUrl);
-            } else {
-              navigate(callbackPath + hash);
-            }
-          } else {
-            console.log('Already on callback page, not redirecting');
-          }
-        } catch (error) {
-          console.error('Error handling auth redirect:', error);
+        // Early return if we're already at the callback URL to prevent loops
+        if (currentPathname === '/auth/callback') {
+          console.log('Already at callback URL, not redirecting');
+          return;
         }
-      } else {
-        // Only check for session if we don't have auth params
-        // This prevents possible redirect loops
-        const checkForSession = async () => {
-          try {
-            // Let Supabase check for session in URL if present
-            const { data, error } = await supabase.auth.getSession();
-            
-            if (error) {
-              console.error('Error checking for session:', error);
-              return;
-            }
-            
-            if (data?.session && window.location.pathname === '/') {
-              console.log('Session detected and on root path, redirecting to dashboard');
-              navigate('/dashboard');
-            }
-          } catch (sessionError) {
-            console.error('Session check failed:', sessionError);
-          }
-        };
+
+        // Check if there's a hash in the URL that contains oauth authentication params
+        if (currentHash && (
+            currentHash.includes('access_token=') || 
+            currentHash.includes('error=') || 
+            currentHash.includes('code=')
+        )) {
+          console.log('Authentication parameters detected in URL hash');
+          
+          // We're coming back from an OAuth provider (likely Google)
+          // Store the hash in sessionStorage for the callback component
+          console.log('Storing hash in sessionStorage for the callback component');
+          sessionStorage.setItem('supabase-auth-hash', currentHash);
+          
+          // Redirect to callback URL
+          const basePath = window.location.origin; 
+          const callbackPath = '/auth/callback';
+          const cleanCallbackUrl = `${basePath}${callbackPath}`;
+          
+          console.log(`Redirecting to callback URL: ${cleanCallbackUrl}`);
+          
+          // Use replace instead of navigate for cleaner history
+          window.location.replace(cleanCallbackUrl);
+          return;
+        }
         
-        checkForSession();
+        // Check if we already have a session and are at root path
+        if (currentPathname === '/') {
+          const { data: { session } } = await supabase.auth.getSession();
+          if (session) {
+            console.log('User is already authenticated, redirecting to dashboard');
+            debugAuthState(); // Log detailed auth state
+            navigate('/dashboard');
+            return;
+          }
+        }
+      } catch (error) {
+        console.error('Error in redirect handler:', error);
       }
-    } catch (error) {
-      // If anything fails, log it but don't break the app
-      console.error('Redirect handler failed:', error);
-    }
-  }, [navigate]);
-} 
+    })();
+  }, [navigate, location]);
+}; 

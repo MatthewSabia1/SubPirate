@@ -1,50 +1,56 @@
 import { createClient } from '@supabase/supabase-js';
 import type { Database } from './database.types';
 
-// These environment variables are set in .env file
+// Get environment variables
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
-if (!supabaseUrl || !supabaseAnonKey) {
+if (!supabaseUrl || !supabaseKey) {
   throw new Error('Missing Supabase environment variables');
 }
 
-// Determine if we're in production based on the hostname
-const isProduction = window.location.hostname === 'subpirate.com';
-console.log(`Environment: ${isProduction ? 'Production' : 'Development'}`);
+// Detect if we're in production
+const isProduction = window.location.hostname !== 'localhost' && 
+                     !window.location.hostname.includes('127.0.0.1');
 
-// Configure Supabase client with environment-specific settings
-export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
+console.log(`Running in ${isProduction ? 'production' : 'development'} environment`);
+
+// Create Supabase client with specific auth configuration for Google OAuth
+export const supabase = createClient<Database>(supabaseUrl, supabaseKey, {
   auth: {
     autoRefreshToken: true,
     persistSession: true,
     detectSessionInUrl: true,
-    flowType: 'implicit',
-    // For debugging auth issues
-    debug: !isProduction,
+    flowType: 'pkce', // Use PKCE flow for better security
+    debug: !isProduction, // Only enable debug in development
   },
   global: {
-    fetch: (...args) => fetch(...args),
-  },
-  realtime: {
-    params: {
-      eventsPerSecond: 10,
+    headers: {
+      'x-application-name': 'subpirate',
     },
   },
+  realtime: {
+    timeout: 30000, // Increase timeout for realtime connections
+  }
 });
 
-// Helper function to debug auth state
-export async function debugAuthState() {
-  const { data, error } = await supabase.auth.getSession();
-  console.log('Current session:', data?.session ? 'Exists' : 'None');
-  if (data?.session) {
-    console.log('User logged in:', data.session.user.email);
-  }
-  return { data, error };
+// Debug helper to log current auth state
+export function debugAuthState() {
+  supabase.auth.getSession().then(({ data, error }) => {
+    if (error) {
+      console.error('Error getting session:', error);
+    } else {
+      console.log('Session exists:', !!data.session);
+      console.log('User logged in:', !!data.session?.user);
+    }
+  });
 }
 
-// Helper function to parse hash parameters - for debugging
+// Helper function to extract parameters from a hash string
 export function getHashParameters(hash: string) {
+  if (!hash) return {};
+  
+  // Remove the leading # if present
   const hashWithoutPrefix = hash.startsWith('#') ? hash.substring(1) : hash;
   const params = new URLSearchParams(hashWithoutPrefix);
   const result: Record<string, string> = {};
@@ -55,3 +61,6 @@ export function getHashParameters(hash: string) {
   
   return result;
 }
+
+// Export Supabase client as default
+export default supabase;
