@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { Users, AlertTriangle, Trash2, MessageCircle, Star, Activity, ExternalLink, Upload, X, ChevronDown, ChevronUp, Calendar, Shield, BadgeCheck } from 'lucide-react';
+import { Users, AlertTriangle, Trash2, MessageCircle, Star, Activity, ExternalLink, Upload, X, ChevronDown, ChevronUp, Calendar, Shield, BadgeCheck, ArrowLeftRight, EyeOff, ImageOff, RefreshCcw } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { redditApi, SubredditPost } from '../lib/redditApi';
 import { syncRedditAccountPosts } from '../lib/redditSync';
 import Modal from '../components/Modal';
 import { useAuth } from '../contexts/AuthContext';
+import RedditImage from '../components/RedditImage';
 
 interface RedditAccount {
   id: string;
@@ -53,17 +54,26 @@ function RedditAccounts() {
         a.id === account.id ? { ...a, refreshing: true } : a
       ));
 
-      const posts = await redditApi.getUserPosts(account.username);
-      const postKarma = posts.length > 0 ? posts[0].post_karma || 0 : 0;
-      
-      // Get posts count from our database
-      const { data: postsData } = await supabase
-        .from('reddit_posts')
-        .select('id')
-        .eq('reddit_account_id', account.id)
-        .gte('created_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString());
+      // First sync all posts for this account
+      await syncRedditAccountPosts(account.id);
 
+      // Then fetch posts directly using Reddit API for display
+      const posts = await redditApi.getUserPosts(account.username);
+      
+      // Get posts count from our database for the last 24 hours
+      const oneDayAgo = new Date();
+      oneDayAgo.setDate(oneDayAgo.getDate() - 1);
+      
+      const { data: postsData, error: postsError } = await supabase
+        .from('reddit_posts')
+        .select('id, title, url, selftext, score, num_comments, created_at')
+        .eq('reddit_account_id', account.id)
+        .gte('created_at', oneDayAgo.toISOString());
+
+      if (postsError) throw postsError;
+      
       const postsToday = postsData?.length || 0;
+      const postKarma = posts.length > 0 ? posts[0].post_karma || 0 : 0;
 
       // Update account stats in database
       const { error: updateError } = await supabase
@@ -72,12 +82,14 @@ function RedditAccounts() {
           karma_score: postKarma,
           total_posts: posts.length,
           posts_today: postsToday,
-          last_karma_check: new Date().toISOString()
+          last_karma_check: new Date().toISOString(),
+          last_post_check: new Date().toISOString()
         })
         .eq('id', account.id);
 
       if (updateError) throw updateError;
 
+      // Update the account in state with fresh data
       setAccounts(prev => prev.map(a => 
         a.id === account.id ? {
           ...a,
@@ -85,7 +97,12 @@ function RedditAccounts() {
           total_posts: posts.length,
           posts_today: postsToday,
           last_karma_check: new Date().toISOString(),
-          refreshing: false
+          last_post_check: new Date().toISOString(),
+          refreshing: false,
+          posts: {
+            recent: posts.filter(p => new Date(p.created_utc * 1000) >= oneDayAgo),
+            top: posts.sort((a, b) => b.score - a.score).slice(0, 10)
+          }
         } : a
       ));
     } catch (err) {
@@ -493,14 +510,11 @@ function RedditAccounts() {
               >
                 <div className="relative group">
                   <div className="w-10 h-10 rounded-lg bg-[#1A1A1A] overflow-hidden">
-                    <img 
+                    <RedditImage 
                       src={getAvatarSrc(account)}
                       alt={`u/${account.username}`}
                       className="w-full h-full object-cover"
-                      onError={(e) => {
-                        const target = e.target as HTMLImageElement;
-                        target.src = getAvatarSrc(account);
-                      }}
+                      fallbackSrc={getAccountAvatar(account.username)}
                     />
                     <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
                       <label className="cursor-pointer">
@@ -639,78 +653,93 @@ function RedditAccounts() {
                       >
                         Top Posts
                       </button>
+                      <button
+                        onClick={() => refreshAccountData(account)}
+                        disabled={account.refreshing}
+                        className={`text-sm px-3 py-1 rounded-full flex items-center gap-2 transition-colors
+                          ${account.refreshing 
+                            ? 'bg-gray-800 text-gray-400 cursor-not-allowed' 
+                            : 'bg-[#1A1A1A] text-gray-400 hover:text-white'
+                          }`}
+                      >
+                        <RefreshCcw size={14} className={account.refreshing ? 'animate-spin' : ''} />
+                        {account.refreshing ? 'Refreshing...' : 'Refresh'}
+                      </button>
                     </div>
 
                     {/* Posts List */}
                     {loadingPosts ? (
                       <div className="py-8 text-center text-gray-400">
-                        Loading posts...
+                        <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-[#C69B7B] mx-auto mb-4"></div>
+                        <p>Loading posts...</p>
                       </div>
                     ) : account.posts ? (
-                      <div className="divide-y divide-[#222222]">
-                        {account.posts[activeTab].map((post) => (
-                          <div key={post.id} className="py-4 hover:bg-[#111111] transition-colors">
-                            <div className="flex items-start gap-4">
-                              {(post.preview_url || post.thumbnail) ? (
-                                <img 
-                                  src={post.preview_url || post.thumbnail || getAvatarSrc(account)}
-                                  alt=""
-                                  className="w-20 h-20 rounded-md object-cover bg-[#111111]"
-                                  onError={(e) => {
-                                    const target = e.target as HTMLImageElement;
-                                    // Try thumbnail if preview failed
-                                    if (target.src === post.preview_url && post.thumbnail) {
-                                      target.src = post.thumbnail;
-                                    } else {
-                                      // Fall back to avatar only if both preview and thumbnail fail
-                                      target.src = getAvatarSrc(account);
-                                    }
-                                  }}
-                                />
-                              ) : (
-                                <div className="w-20 h-20 rounded-md bg-[#111111] flex items-center justify-center">
-                                  <img 
-                                    src={getAvatarSrc(account)}
+                      account.posts[activeTab].length > 0 ? (
+                        <div className="divide-y divide-[#222222]">
+                          {account.posts[activeTab].map((post) => (
+                            <div key={post.id} className="py-4 hover:bg-[#111111] transition-colors">
+                              <div className="flex items-start gap-4">
+                                {(post.preview_url || post.thumbnail) ? (
+                                  <RedditImage 
+                                    src={post.preview_url || post.thumbnail || getAvatarSrc(account)}
                                     alt=""
-                                    className="w-12 h-12"
-                                    onError={(e) => {
-                                      const target = e.target as HTMLImageElement;
-                                      target.src = getAccountAvatar(account.username);
-                                    }}
+                                    className="w-20 h-20 rounded-md object-cover bg-[#111111]"
+                                    fallbackSrc={getAvatarSrc(account)}
                                   />
-                                </div>
-                              )}
-                              <div className="flex-1 min-w-0">
-                                <a
-                                  href={post.url}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="text-[15px] font-medium hover:text-[#C69B7B] transition-colors line-clamp-2 mb-2"
-                                >
-                                  {post.title}
-                                </a>
-                                <div className="flex items-center gap-4 text-sm text-gray-400">
-                                  <div className="flex items-center gap-1">
-                                    <Users size={14} />
-                                    <span>{post.score} points</span>
+                                ) : (
+                                  <div className="w-20 h-20 rounded-md bg-[#111111] flex items-center justify-center">
+                                    <RedditImage 
+                                      src={getAvatarSrc(account)}
+                                      alt=""
+                                      className="w-12 h-12"
+                                      fallbackSrc={getAccountAvatar(account.username)}
+                                    />
                                   </div>
-                                  <div className="flex items-center gap-1">
-                                    <MessageCircle size={14} />
-                                    <span>{post.num_comments} comments</span>
-                                  </div>
-                                  <div className="flex items-center gap-1">
-                                    <Calendar size={14} />
-                                    <span>{formatDate(post.created_utc)}</span>
+                                )}
+                                <div className="flex-1 min-w-0">
+                                  <a
+                                    href={`https://reddit.com${post.url.startsWith('/r/') ? '' : '/r/' + post.subreddit}/comments/${post.id}`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="text-[15px] font-medium hover:text-[#C69B7B] transition-colors line-clamp-2 mb-2"
+                                  >
+                                    {post.title}
+                                  </a>
+                                  <div className="flex items-center gap-4 text-sm text-gray-400">
+                                    <div className="flex items-center gap-1">
+                                      <Users size={14} />
+                                      <span>{post.score} points</span>
+                                    </div>
+                                    <div className="flex items-center gap-1">
+                                      <MessageCircle size={14} />
+                                      <span>{post.num_comments} comments</span>
+                                    </div>
+                                    <div className="flex items-center gap-1">
+                                      <Calendar size={14} />
+                                      <span>{formatDate(post.created_utc)}</span>
+                                    </div>
                                   </div>
                                 </div>
                               </div>
                             </div>
-                          </div>
-                        ))}
-                      </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="py-8 text-center text-gray-400">
+                          <p>No {activeTab === 'recent' ? 'recent' : 'top'} posts found</p>
+                          <p className="text-sm mt-2">Try refreshing the data or checking another tab</p>
+                        </div>
+                      )
                     ) : (
                       <div className="py-8 text-center text-gray-400">
-                        Failed to load posts
+                        <AlertTriangle size={24} className="mx-auto mb-4" />
+                        <p>Failed to load posts</p>
+                        <button 
+                          onClick={() => refreshAccountData(account)}
+                          className="mt-4 px-4 py-2 bg-[#1A1A1A] hover:bg-[#252525] rounded text-sm"
+                        >
+                          Try Again
+                        </button>
                       </div>
                     )}
                   </div>

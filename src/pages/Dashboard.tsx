@@ -7,6 +7,7 @@ import ProgressBar from '../components/ProgressBar';
 import AnalysisCard from '../features/subreddit-analysis/components/analysis-card';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
+import RedditConnectModal from '../components/RedditConnectModal';
 
 function Dashboard() {
   const { user } = useAuth();
@@ -19,10 +20,17 @@ function Dashboard() {
   const [analyzeProgress, setAnalyzeProgress] = useState<AnalysisProgress | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [analyzeError, setAnalyzeError] = useState<string | null>(null);
-  const [showNSFW, setShowNSFW] = useState(false);
+  const [showNSFW, setShowNSFW] = useState(true);
   const [sortBy, setSortBy] = useState<'subscribers' | 'name'>('subscribers');
   const [analysisResult, setAnalysisResult] = useState<AnalysisResult | null>(null);
   const navigate = useNavigate();
+
+  // State for the Reddit connect modal
+  const [showRedditConnectModal, setShowRedditConnectModal] = useState(false);
+  // State to track if user has any Reddit accounts
+  const [hasRedditAccounts, setHasRedditAccounts] = useState(false);
+  // Add state to track if user has dismissed the modal
+  const [hasModalBeenDismissed, setHasModalBeenDismissed] = useState(false);
 
   // Show success message if redirected from successful checkout
   const [showSuccessMessage, setShowSuccessMessage] = useState(false);
@@ -35,8 +43,100 @@ function Dashboard() {
       window.history.replaceState({}, '', window.location.pathname);
       // Hide the message after 5 seconds
       setTimeout(() => setShowSuccessMessage(false), 5000);
+      
+      // Also check if the user has any connected Reddit accounts
+      checkForRedditAccounts();
+    } else {
+      // Check for Reddit accounts on initial load as well
+      checkForRedditAccounts();
     }
   }, []);
+  
+  // Check if user is new and needs to connect Reddit accounts
+  useEffect(() => {
+    if (user) {
+      checkForRedditAccounts();
+    }
+  }, [user]);
+  
+  const checkForRedditAccounts = async () => {
+    if (!user) return;
+    
+    try {
+      const { data, error } = await supabase
+        .from('reddit_accounts')
+        .select('id')
+        .eq('user_id', user.id)
+        .limit(1);
+        
+      if (error) throw error;
+      
+      const hasAccounts = data && data.length > 0;
+      
+      // If the accounts status has changed, update it
+      if (hasRedditAccounts !== hasAccounts) {
+        setHasRedditAccounts(hasAccounts);
+        
+        // If user now has accounts but previously didn't, remove the dismissed state
+        // This way if they disconnect all accounts in the future, they'll see the modal again
+        if (hasAccounts && !hasRedditAccounts) {
+          localStorage.removeItem('reddit_connect_modal_dismissed');
+          setHasModalBeenDismissed(false);
+        }
+      }
+      
+      // Check if we've stored the dismissed state
+      const dismissedState = localStorage.getItem('reddit_connect_modal_dismissed');
+      const modalDismissed = dismissedState === 'true';
+      setHasModalBeenDismissed(modalDismissed);
+      
+      // Show the Reddit connect modal under these conditions:
+      // 1. User was redirected from checkout success and has no accounts
+      // 2. User has no accounts AND hasn't dismissed the modal before
+      const urlParams = new URLSearchParams(window.location.search);
+      const isCheckoutSuccess = urlParams.get('checkout') === 'success';
+      
+      if ((isCheckoutSuccess && !hasAccounts) || (!hasAccounts && !modalDismissed)) {
+        setShowRedditConnectModal(true);
+      }
+    } catch (err) {
+      console.error('Error checking for Reddit accounts:', err);
+    }
+  };
+  
+  const handleConnectRedditAccount = () => {
+    // Generate a random state string for security
+    const state = Math.random().toString(36).substring(7);
+    
+    // Store state in session storage to verify on callback
+    sessionStorage.setItem('reddit_oauth_state', state);
+
+    // Construct the OAuth URL with expanded scopes
+    const params = new URLSearchParams({
+      client_id: import.meta.env.VITE_REDDIT_APP_ID,
+      response_type: 'code',
+      state,
+      redirect_uri: `${window.location.origin}/auth/reddit/callback`,
+      duration: 'permanent',
+      scope: [
+        'identity',
+        'read',
+        'submit',
+        'subscribe',
+        'history',
+        'mysubreddits',
+        'privatemessages',
+        'save',
+        'vote',
+        'edit',
+        'flair',
+        'report'
+      ].join(' ')
+    });
+
+    // Redirect to Reddit's OAuth page
+    window.location.href = `https://www.reddit.com/api/v1/authorize?${params}`;
+  };
 
   useEffect(() => {
     const searchTimer = setTimeout(async () => {
@@ -285,6 +385,20 @@ function Dashboard() {
     } catch (err) {
       console.error('Error toggling save:', err);
     }
+  };
+
+  // Update the modal close handler to remember when user dismisses the modal
+  const handleCloseModal = () => {
+    setShowRedditConnectModal(false);
+    setHasModalBeenDismissed(true);
+    localStorage.setItem('reddit_connect_modal_dismissed', 'true');
+  };
+
+  // Add a function to handle successful Reddit account connection
+  const handleSuccessfulConnection = () => {
+    // We'll call this after successfully connecting a Reddit account
+    // This will force a refresh of the account status
+    checkForRedditAccounts();
   };
 
   return (
@@ -563,6 +677,13 @@ function Dashboard() {
           )}
         </div>
       </div>
+      
+      {/* Reddit Connect Modal for new users */}
+      <RedditConnectModal
+        isOpen={showRedditConnectModal}
+        onClose={handleCloseModal}
+        onConnect={handleConnectRedditAccount}
+      />
     </div>
   );
 }

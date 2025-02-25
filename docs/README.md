@@ -106,44 +106,546 @@ flowchart TD
 
 ## Features
 
-SubPirate offers a range of powerful features designed to enhance Reddit marketing strategies:
+SubPirate offers a comprehensive suite of powerful features designed to enhance Reddit marketing strategies:
 
 ### Subreddit Analysis
-- AI-powered analysis of subreddit rules and content
-- Marketing-friendliness score calculation
-- Posting requirements identification
-- Best practices recommendations
-- Ideal posting times and frequency
+- **AI-powered Deep Analysis**: Uses the OpenRouter AI API (deepseek model) to analyze subreddit rules, content patterns, and posting behavior.
+- **Marketing Friendliness Score**: Sophisticated algorithm that evaluates how receptive a subreddit is to marketing content, with detailed scoring visualized from 0-100.
+- **Rule Impact Assessment**: Analyzes each subreddit rule and categorizes its marketing impact as high, medium, or low with specific explanations.
+- **Content Type Analysis**: Identifies allowed content types (text, image, video, link) with visual indicators and recommendations for which perform best.
+- **Posting Schedule Optimization**: Identifies ideal posting times and frequencies based on historical engagement data.
+- **Title Pattern Recognition**: Extracts common title patterns that succeed in each subreddit and provides customized templates.
+- **Strategic Recommendations**: Provides actionable recommendations for content strategy including dos and don'ts.
+- **SWOT Analysis**: Comprehensive strengths, weaknesses, opportunities, and threats analysis for marketing in each subreddit.
+- **Marketing Game Plan**: Structured immediate, short-term, and long-term action items for successful engagement.
+- **User-friendly Visualization**: Presents complex analysis data in an easy-to-understand format with progress tracking during analysis.
+- **Save & Compare**: Ability to save analyses for later reference and comparison.
+
+### SpyGlass
+- **Competitor Research Tool**: Analyze any Reddit user's posting patterns and subreddit engagement.
+- **Frequency Analysis**: Identifies which subreddits a user posts in most frequently with subscriber and active user counts.
+- **Content Performance Metrics**: Evaluates content performance across different subreddits.
+- **Historical Post Analysis**: Displays recent posts with engagement statistics.
+- **One-Click Analysis**: Instantly analyze any subreddit from the frequency list.
+- **Quick Saving**: Add any discovered subreddit to your saved list for future reference.
+- **Project Integration**: Add interesting subreddits directly to your marketing projects.
+- **Frequent Searches**: Track and quickly access your most common searches.
+- **Detailed Metrics**: View subscriber counts, active users, and engagement metrics for each subreddit.
+- **Real-time Data**: Fetches the most current data available from Reddit.
+- **Username Parsing**: Intelligent handling of usernames with or without the "u/" prefix.
+- **Rate Limit Management**: Sophisticated system to manage Reddit API rate limits for uninterrupted research.
+
+### Saved List
+- **Centralized Subreddit Collection**: Maintain a personalized list of marketing-relevant subreddits.
+- **Quick Access**: Fast navigation to full analysis of any saved subreddit.
+- **Custom Filtering and Sorting**: Filter by name or sort by date added or alphabetically.
+- **Batch Operations**: Export data in CSV format for external analysis or integration.
+- **One-Click Reanalysis**: Refresh analysis for any subreddit to get the latest insights.
+- **Post Count Tracking**: Monitor the number of posts in the last 24 hours for activity trends.
+- **Visual Indicators**: Content type badges and marketing score visualization for quick assessment.
+- **Expandable Details**: Toggle between compact and detailed views for each subreddit.
+- **Project Integration**: Add any saved subreddit to existing projects with one click.
+- **Bulk Management**: Remove multiple subreddits at once or add them to projects in batch.
+- **Content Type Visualization**: Color-coded badges indicate primary content types for each subreddit.
+- **Post Statistics**: Quick view of recent posting activity and engagement metrics.
 
 ### Project Management
-- Create and organize marketing campaigns
-- Add subreddits to projects
-- Track performance across multiple subreddits
-- Set goals and track progress
-
-### Team Collaboration
-- Share projects with team members
-- Role-based access control (read, edit, owner)
-- Activity tracking
-- Collaborative workspace
-
-### Saved Subreddits
-- Quick access to frequently used subreddits
-- Custom notes and tags
-- Last post tracking
-- Sorting and filtering options
+- **Marketing Campaign Organization**: Create and manage multiple marketing campaigns as separate projects.
+- **Customizable Projects**: Name, describe, and add custom images to projects.
+- **Subreddit Collections**: Group target subreddits into logical campaign groups.
+- **Team Collaboration**: Share projects with team members with role-based permissions:
+  - **Owner**: Full control including deletion and sharing
+  - **Editor**: Can modify project contents and settings
+  - **Reader**: View-only access for stakeholders
+- **Progress Tracking**: Monitor campaign status and subreddit engagement.
+- **Visual Dashboard**: See an overview of all projects with quick-access cards.
+- **Project Settings**: Update project details, transfer ownership, or archive projects.
+- **Activity Timeline**: Track changes and contributions from team members.
+- **Subreddit Management**: Add or remove subreddits from projects as campaigns evolve.
+- **Performance Metrics**: View consolidated performance data across all subreddits in a project.
+- **Cross-project Analysis**: Compare performance across different campaigns.
 
 ### Analytics Dashboard
-- Performance metrics visualization
-- Engagement tracking
-- Content performance analysis
-- Trend identification
+- **Comprehensive Performance Metrics**: Visual representation of Reddit marketing performance.
+- **Custom Date Ranges**: Analyze data over specific time periods with flexible selection.
+- **Multi-dimensional Filtering**: Filter analytics by subreddits, Reddit accounts, and projects.
+- **Engagement Tracking**: Monitor upvotes, comments, and awards across all content.
+- **Post Performance Analysis**: Track individual post performance with detailed metrics.
+- **Content Type Effectiveness**: Analyze which content types generate the best results.
+- **Interactive Charts**: Visualize data through line charts, bar charts, and pie charts using Chart.js.
+- **User Growth Metrics**: Track karma and follower growth over time.
+- **Trending Analysis**: Identify emerging trends and patterns in engagement.
+- **Export Capabilities**: Download reports and raw data for external analysis.
+- **Real-time Updates**: Refresh data on demand to see the latest statistics.
+- **Performance Comparisons**: Compare performance across different time periods.
+- **Insight Summaries**: AI-generated interpretations of key performance indicators.
+- **User-friendly Interface**: Clean, intuitive dashboard with responsive design.
 
-### Content Strategy
-- Title template generation
-- Content type recommendations
-- Posting schedule optimization
-- A/B testing suggestions
+### Calendar
+- **Content Schedule Visualization**: View all Reddit posts in a calendar format.
+- **Multiple Views**: Toggle between month, week, and day views for different planning perspectives.
+- **Post Management**: Add, edit, and reschedule posts directly from the calendar.
+- **Filtering Options**: Filter posts by Reddit account, subreddit, or project.
+- **Optimal Posting Times**: Visual indicators for recommended posting times based on analysis.
+- **Post Details**: Quick view of post content, engagement metrics, and status.
+- **Drag and Drop**: Easily reschedule posts with intuitive drag-and-drop interface.
+- **Schedule Consistency**: Maintain consistent posting schedules across multiple subreddits.
+- **Content Gap Identification**: Easily spot gaps in your content calendar.
+- **Post Preview**: View post details without leaving the calendar interface.
+- **Content Distribution**: Ensure even distribution of content across different subreddits.
+- **Schedule Conflict Prevention**: Identify and prevent scheduling conflicts.
+- **Reminder System**: Set reminders for upcoming scheduled posts.
+- **Historical Performance**: View past post performance directly in the calendar interface.
+- **Team Coordination**: Coordinate posting schedules across team members and accounts.
+
+### Additional Tools
+
+#### Reddit Account Management
+- **Multiple Account Support**: Connect and manage multiple Reddit accounts.
+- **Authentication Management**: Secure OAuth integration with Reddit's API.
+- **Usage Tracking**: Monitor API usage to prevent rate limiting.
+- **Account Rotation**: Intelligent rotation between accounts to maximize API usage.
+- **Performance Metrics**: Track account performance and engagement.
+- **Credential Security**: Secure storage of authentication tokens with proper refresh logic.
+
+#### Subscription System
+- **Tiered Access**: Different feature sets based on subscription level.
+- **Usage Monitoring**: Track feature usage against subscription limits.
+- **Self-service Management**: Manage subscription through Stripe Customer Portal.
+- **Automatic Notifications**: Alerts for approaching usage limits or subscription renewal.
+- **Seamless Upgrades**: Easy pathway to upgrade subscription tier when needed.
+- **Trial Access**: Free trial period for all subscription tiers.
+
+## Technical Implementation Details
+
+### Reddit API Integration
+
+The application uses a sophisticated Reddit API client (`src/lib/redditApi.ts`) with the following technical features:
+
+#### Authentication System
+- **OAuth2 Flow**: Complete OAuth2 implementation for secure API access
+- **Token Management**: Automatic refresh token handling with expiry tracking
+- **Multiple Account Support**: Ability to manage and rotate between multiple Reddit accounts
+- **Credential Security**: Encrypted token storage in Supabase
+
+#### Rate Limiting Protection
+```typescript
+// Rate limit tracking
+private accountUsage: Map<string, { count: number, lastReset: number }> = new Map();
+private readonly RATE_LIMIT = 60; // Reddit's rate limit per minute
+private readonly USAGE_WINDOW = 60 * 1000; // 1 minute in milliseconds
+
+// Check rate limit before making requests
+private async checkRateLimit(endpoint: string): Promise<boolean> {
+  const now = Date.now();
+  const usage = this.accountUsage.get(this.accountId || 'default');
+  
+  // Reset counter if window has passed
+  if (usage && (now - usage.lastReset > this.USAGE_WINDOW)) {
+    this.accountUsage.set(this.accountId || 'default', { count: 0, lastReset: now });
+    return true;
+  }
+  
+  // Check if limit is reached
+  if (usage && usage.count >= this.RATE_LIMIT) {
+    return false;
+  }
+  
+  // Increment counter
+  this.accountUsage.set(
+    this.accountId || 'default', 
+    { count: (usage?.count || 0) + 1, lastReset: usage?.lastReset || now }
+  );
+  
+  // Track usage in database
+  await this.trackApiUsage(endpoint);
+  
+  return true;
+}
+```
+
+#### Database Tracking of API Usage
+```typescript
+// Database tracking of API usage
+private async trackApiUsage(endpoint: string): Promise<void> {
+  try {
+    if (!this.accountId) return;
+    
+    // Create a hash of the endpoint to avoid storing full paths
+    const endpointHash = crypto
+      .createHash('md5')
+      .update(endpoint)
+      .digest('hex');
+    
+    // Get the current record or create a new one
+    const { data, error } = await supabase
+      .from('reddit_api_usage')
+      .select('*')
+      .eq('reddit_account_id', this.accountId)
+      .eq('endpoint_hash', endpointHash)
+      .maybeSingle();
+    
+    const now = new Date();
+    const resetAt = new Date();
+    resetAt.setMinutes(resetAt.getMinutes() + 1); // 1 minute reset window
+    
+    if (error) {
+      console.error('Error tracking API usage:', error);
+      return;
+    }
+    
+    if (data) {
+      // Check if we need to reset the counter
+      const resetTime = new Date(data.reset_at);
+      if (now > resetTime) {
+        // Reset counter
+        await supabase
+          .from('reddit_api_usage')
+          .update({
+            requests_count: 1,
+            window_start: now.toISOString(),
+            reset_at: resetAt.toISOString(),
+            updated_at: now.toISOString()
+          })
+          .eq('id', data.id);
+      } else {
+        // Increment counter
+        await supabase.rpc('increment_requests_count', {
+          row_id: data.id,
+          amount: 1
+        });
+      }
+    } else {
+      // Create new record
+      await supabase
+        .from('reddit_api_usage')
+        .insert([{
+          reddit_account_id: this.accountId,
+          endpoint: endpoint,
+          endpoint_hash: endpointHash,
+          requests_count: 1,
+          window_start: now.toISOString(),
+          reset_at: resetAt.toISOString()
+        }]);
+    }
+  } catch (err) {
+    console.error('Error tracking API usage:', err);
+  }
+}
+```
+
+#### API Endpoint Implementations
+The client implements numerous Reddit API endpoints including:
+
+```typescript
+// Get subreddit information
+async getSubredditInfo(subredditName: string): Promise<SubredditInfo> {
+  await this.ensureAuth();
+  
+  const cacheKey = `subreddit:${subredditName}`;
+  const cached = this.getCachedData(cacheKey);
+  if (cached) return cached;
+  
+  if (!await this.checkRateLimit(`/r/${subredditName}/about`)) {
+    throw new RedditAPIError('Rate limit exceeded', 429);
+  }
+  
+  try {
+    // Get basic subreddit info
+    const response = await axios.get(
+      `https://oauth.reddit.com/r/${subredditName}/about.json`,
+      {
+        headers: this.getHeaders()
+      }
+    );
+    
+    const subredditInfo = this.transformSubredditInfo(response.data.data);
+    
+    // Get rules in a separate request
+    try {
+      if (!await this.checkRateLimit(`/r/${subredditName}/about/rules`)) {
+        throw new RedditAPIError('Rate limit exceeded', 429);
+      }
+      
+      const rulesResponse = await axios.get(
+        `https://oauth.reddit.com/r/${subredditName}/about/rules.json`,
+        {
+          headers: this.getHeaders()
+        }
+      );
+      
+      subredditInfo.rules = rulesResponse.data.rules.map((rule: any) => ({
+        title: rule.short_name || rule.title || '',
+        description: rule.description || ''
+      }));
+    } catch (rulesError) {
+      console.warn(`Failed to fetch rules for /r/${subredditName}:`, rulesError);
+      // Continue with empty rules rather than failing completely
+      subredditInfo.rules = [];
+    }
+    
+    this.setCachedData(cacheKey, subredditInfo);
+    return subredditInfo;
+  } catch (error) {
+    console.error(`Error fetching subreddit info for /r/${subredditName}:`, error);
+    throw new RedditAPIError(
+      `Failed to fetch subreddit info for /r/${subredditName}`,
+      axios.isAxiosError(error) ? error.response?.status : undefined,
+      `/r/${subredditName}/about`
+    );
+  }
+}
+```
+
+#### Caching System
+```typescript
+// Cache implementation for subreddit data
+private subredditCache: Map<string, { 
+  data: any;
+  timestamp: number;
+  expiresIn: number;
+}> = new Map();
+private readonly CACHE_TTL = 5 * 60 * 1000; // 5 minutes cache TTL
+
+// Cache get/set methods
+private getCachedData(cacheKey: string): any | null {
+  const cached = this.subredditCache.get(cacheKey);
+  if (!cached) return null;
+  
+  const now = Date.now();
+  if (now - cached.timestamp > cached.expiresIn) {
+    this.subredditCache.delete(cacheKey);
+    return null;
+  }
+  
+  return cached.data;
+}
+
+private setCachedData(cacheKey: string, data: any, ttl: number = this.CACHE_TTL): void {
+  this.subredditCache.set(cacheKey, {
+    data,
+    timestamp: Date.now(),
+    expiresIn: ttl
+  });
+}
+```
+
+### OpenRouter AI Integration
+AI analysis is performed using a specialized OpenRouter client (`src/lib/openRouter.ts`):
+
+#### Model Configuration
+- **Primary Model**: `nvidia/llama-3.1-nemotron-70b-instruct:free`
+- **Alternative Model Fallbacks**: Configured for handling rate limits or API failures
+- **Request Parameters**: Optimized temperature and token settings for consistent analysis
+
+#### System Prompts
+The application uses carefully crafted system prompts to guide AI analysis:
+
+```typescript
+const systemPrompt = `You are an expert Reddit marketing analyst. Your task is to analyze subreddit rules and content requirements to determine marketing potential. Focus ONLY on:
+
+1. Rule Analysis:
+   - How restrictive are the rules regarding marketing/promotion?
+   - What content types are allowed/prohibited?
+   - Are there specific formatting requirements?
+
+2. Title Requirements:
+   - Required formats (e.g. [Tags], specific prefixes)
+   - Prohibited patterns
+   - Length restrictions
+   - Example templates that comply with rules
+
+3. Content Restrictions:
+   - Allowed media types
+   - Required content elements
+   - Prohibited content types
+   - Quality requirements
+
+Your response must be valid JSON matching the AIAnalysisOutput interface.`;
+```
+
+#### Structured Output Processing
+```typescript
+export interface AIAnalysisOutput {
+  postingLimits: {
+    frequency: number;
+    bestTimeToPost: string[];
+    contentRestrictions: string[];
+  };
+  titleTemplates: {
+    patterns: string[];
+    examples: string[];
+    effectiveness: number;
+  };
+  contentStrategy: {
+    recommendedTypes: string[];
+    topics: string[];
+    style: string;
+    dos: string[];
+    donts: string[];
+  };
+  strategicAnalysis: {
+    strengths: string[];
+    weaknesses: string[];
+    opportunities: string[];
+    risks: string[];
+  };
+  marketingFriendliness: {
+    score: number;
+    reasons: string[];
+    recommendations: string[];
+  };
+  gamePlan: {
+    immediate: string[];
+    shortTerm: string[];
+    longTerm: string[];
+  };
+}
+```
+
+#### Error Handling and Retries
+```typescript
+// Error handling with backoff retry
+async function callAIWithRetry(prompt: string, maxRetries = 3, delay = 1000): Promise<string> {
+  let attempt = 0;
+  
+  while (attempt < maxRetries) {
+    try {
+      const response = await callAI(prompt);
+      return response;
+    } catch (error) {
+      attempt++;
+      if (attempt >= maxRetries) throw error;
+      
+      // Exponential backoff
+      const backoffTime = delay * Math.pow(2, attempt - 1);
+      await new Promise(resolve => setTimeout(resolve, backoffTime));
+    }
+  }
+  
+  throw new AIAnalysisError("Maximum retries exceeded");
+}
+```
+
+### Stripe Integration
+
+The payment system is implemented using the Stripe API with the following features:
+
+#### Checkout Process
+```typescript
+// Function to create Stripe checkout session
+export async function createCheckoutSession({ 
+  priceId, 
+  successUrl, 
+  cancelUrl, 
+  userId 
+}: CheckoutOptions) {
+  // Create session parameters
+  const sessionParams: any = {
+    mode: 'subscription',
+    payment_method_types: ['card'],
+    line_items: [
+      {
+        price: priceId,
+        quantity: 1,
+      },
+    ],
+    success_url: successUrl,
+    cancel_url: cancelUrl,
+    subscription_data: {
+      trial_period_days: 14,
+      metadata: { user_id: userId }
+    },
+    metadata: { user_id: userId }
+  };
+
+  // Add customer if user ID provided
+  if (userId) {
+    sessionParams.customer = await getOrCreateCustomerForUser(userId);
+  }
+
+  // Create and return the session
+  const session = await stripe.checkout.sessions.create(sessionParams);
+  return session;
+}
+```
+
+#### Customer Portal
+```typescript
+// Function to create customer portal session
+export async function createCustomerPortalSession({
+  customerId,
+  returnUrl
+}: PortalOptions) {
+  const session = await stripe.billingPortal.sessions.create({
+    customer: customerId,
+    return_url: returnUrl,
+  });
+  
+  return session;
+}
+```
+
+## Security Implementation
+
+### Row Level Security
+
+#### Database Security
+```sql
+-- Row level security for saved subreddits
+ALTER TABLE saved_subreddits ENABLE ROW LEVEL SECURITY;
+
+-- Users can only view their own saved subreddits
+CREATE POLICY "users_can_view_own_saved_subreddits"
+  ON saved_subreddits
+  FOR SELECT
+  TO authenticated
+  USING (user_id = auth.uid());
+
+-- Users can only insert their own saved subreddits
+CREATE POLICY "users_can_insert_own_saved_subreddits"
+  ON saved_subreddits
+  FOR INSERT
+  TO authenticated
+  WITH CHECK (user_id = auth.uid());
+
+-- Users can only delete their own saved subreddits
+CREATE POLICY "users_can_delete_own_saved_subreddits"
+  ON saved_subreddits
+  FOR DELETE
+  TO authenticated
+  USING (user_id = auth.uid());
+```
+
+#### API Security
+```typescript
+// Auth middleware for protected routes
+export const requireAuth = async (req: Request, res: Response, next: NextFunction) => {
+  const authHeader = req.headers.authorization;
+  
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return res.status(401).json({ error: 'Unauthorized: No token provided' });
+  }
+  
+  const token = authHeader.split(' ')[1];
+  
+  try {
+    // Verify JWT with Supabase
+    const { data, error } = await supabase.auth.getUser(token);
+    
+    if (error || !data.user) {
+      throw new Error('Invalid token');
+    }
+    
+    // Attach user to request
+    req.user = data.user;
+    next();
+  } catch (err) {
+    console.error('Auth middleware error:', err);
+    return res.status(401).json({ error: 'Unauthorized: Invalid token' });
+  }
+};
+```
 
 ## Technical Stack
 
@@ -180,1150 +682,744 @@ SubPirate offers a range of powerful features designed to enhance Reddit marketi
 - **CI/CD**: GitHub Actions
 - **Code Formatting**: PostCSS, Autoprefixer
 
-## Authentication
-
-Authentication is handled through Supabase Auth with the following features:
-
-- Email/Password authentication
-- Session management
-- Protected routes
-- Role-based access control
-
-### Auth Flow
-```mermaid
-sequenceDiagram
-    participant User
-    participant App
-    participant Supabase
-    
-    User->>App: Enter credentials
-    App->>Supabase: Sign in request
-    Supabase-->>App: JWT token
-    App->>User: Redirect to dashboard
-    
-    Note over App,Supabase: Session maintained via Supabase client
-```
-
-### Implementation Details
-
-- **JWT-based authentication**: Secure, stateless tokens for authentication
-- **Session management**: Handled via Supabase client
-- **Protected routes**: Routes requiring authentication are wrapped in a `PrivateRoute` component
-- **Role-based access**: Different permission levels (read, edit, owner) for project sharing
-- **Subscription-based feature access**: Feature availability controlled by subscription tier
-
-### Code Example: PrivateRoute Component
-
-```typescript
-function PrivateRoute({ children }: { children: React.ReactNode }) {
-  const { user, loading } = useAuth();
-
-  if (loading) {
-    return <div>Loading...</div>;
-  }
-
-  if (!user) {
-    return <Navigate to="/login" />;
-  }
-
-  return (
-    <div className="flex">
-      <Sidebar />
-      <main className="flex-1 p-8">
-        {children}
-      </main>
-    </div>
-  );
-}
-```
-
 ## Database Schema
+
+The application uses Supabase as its backend database service, with a comprehensive schema designed to support all the application features.
 
 ### Core Tables
 
-#### profiles
-- `id` (uuid, PK) - References auth.users
-- `display_name` (text)
-- `email` (text)
-- `image_url` (text)
-- `created_at` (timestamptz)
-- `updated_at` (timestamptz)
-- `stripe_customer_id` (text)
-- `full_name` (text)
+#### Subreddits
+```sql
+CREATE TABLE subreddits (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  name TEXT NOT NULL UNIQUE,
+  subscriber_count INTEGER,
+  active_users INTEGER,
+  marketing_friendly_score INTEGER,
+  posting_requirements JSONB,
+  posting_frequency JSONB,
+  allowed_content TEXT[],
+  best_practices TEXT[],
+  rules_summary TEXT,
+  title_template TEXT,
+  icon_img TEXT,
+  community_icon TEXT,
+  total_posts_24h INTEGER,
+  analysis_data JSONB,
+  last_analyzed_at TIMESTAMPTZ,
+  last_post_sync TIMESTAMPTZ,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+```
 
-#### projects
-- `id` (uuid, PK)
-- `user_id` (uuid, FK)
-- `name` (text)
-- `description` (text)
-- `image_url` (text)
-- `created_at` (timestamptz)
-- `updated_at` (timestamptz)
+#### Reddit Posts
+```sql
+CREATE TABLE reddit_posts (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  post_id TEXT NOT NULL UNIQUE,
+  title TEXT NOT NULL,
+  selftext TEXT,
+  url TEXT,
+  permalink TEXT,
+  author TEXT,
+  subreddit TEXT NOT NULL,
+  subreddit_id UUID REFERENCES subreddits(id),
+  reddit_account_id UUID REFERENCES reddit_accounts(id),
+  created_at TIMESTAMPTZ NOT NULL,
+  upvotes INTEGER DEFAULT 0,
+  downvotes INTEGER DEFAULT 0,
+  comments INTEGER DEFAULT 0,
+  content_type TEXT,
+  marketing_impact NUMERIC(3,1),
+  fetched_at TIMESTAMPTZ DEFAULT NOW()
+);
+```
 
-#### project_members
-- `id` (uuid, PK)
-- `project_id` (uuid, FK)
-- `user_id` (uuid, FK)
-- `role` (enum: 'read', 'edit', 'owner')
-- `created_at` (timestamptz)
-- `updated_at` (timestamptz)
+#### Reddit Accounts
+```sql
+CREATE TABLE reddit_accounts (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  username TEXT NOT NULL,
+  refresh_token TEXT,
+  access_token TEXT,
+  token_expires_at TIMESTAMPTZ,
+  avatar_url TEXT,
+  is_active BOOLEAN DEFAULT TRUE,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE(user_id, username)
+);
+```
 
-#### subreddits
-- `id` (uuid, PK)
-- `name` (text)
-- `subscriber_count` (integer)
-- `active_users` (integer)
-- `marketing_friendly_score` (integer)
-- `posting_requirements` (jsonb)
-- `posting_frequency` (jsonb)
-- `allowed_content` (text[])
-- `best_practices` (text[])
-- `rules_summary` (text)
-- `title_template` (text)
-- `icon_img` (text)
-- `community_icon` (text)
-- `total_posts_24h` (integer)
-- `analysis_data` (jsonb)
-- `last_analyzed_at` (timestamptz)
-- `last_post_sync` (timestamptz)
-- `created_at` (timestamptz)
-- `updated_at` (timestamptz)
-
-#### project_subreddits
-- `id` (uuid, PK)
-- `project_id` (uuid, FK)
-- `subreddit_id` (uuid, FK)
-- `created_at` (timestamptz)
-
-#### saved_subreddits
-- `id` (uuid, PK)
-- `user_id` (uuid, FK)
-- `subreddit_id` (uuid, FK)
-- `created_at` (timestamptz)
-- `last_post_at` (timestamptz)
-
-### Stripe Integration Tables
-
-#### stripe_products
-- `id` (uuid, PK)
-- `stripe_product_id` (text, unique)
-- `name` (text)
-- `description` (text)
-- `active` (boolean)
-- `metadata` (jsonb)
-- `created_at` (timestamptz)
-- `updated_at` (timestamptz)
-
-#### stripe_prices
-- `id` (text, PK)
-- `active` (boolean)
-- `currency` (text)
-- `unit_amount` (integer)
-- `type` (text)
-- `recurring_interval` (text)
-- `stripe_product_id` (text, FK)
-- `created_at` (timestamptz)
-- `updated_at` (timestamptz)
-
-#### customer_subscriptions
-- `id` (uuid, PK)
-- `user_id` (uuid, FK)
-- `stripe_customer_id` (text)
-- `stripe_subscription_id` (text)
-- `stripe_price_id` (text)
-- `status` (subscription_status enum)
-- `trial_start` (timestamptz)
-- `trial_end` (timestamptz)
-- `current_period_start` (timestamptz)
-- `current_period_end` (timestamptz)
-- `cancel_at_period_end` (boolean)
-- `created_at` (timestamptz)
-- `updated_at` (timestamptz)
-
-### Usage Tracking Tables
-
-#### user_usage_stats
-- `id` (uuid, PK)
-- `user_id` (uuid, FK)
-- `subreddit_analysis_count` (integer)
-- `month_start` (timestamptz)
-- `month_end` (timestamptz)
-- `created_at` (timestamptz)
-- `updated_at` (timestamptz)
-
-#### reddit_api_usage
-- `id` (uuid, PK)
-- `reddit_account_id` (uuid, FK)
-- `endpoint` (text)
-- `endpoint_hash` (varchar(32))
-- `requests_count` (integer)
-- `window_start` (timestamptz)
-- `reset_at` (timestamptz)
-- `updated_at` (timestamptz)
-- `created_at` (timestamptz)
-
-### Row Level Security (RLS)
-
-All tables have RLS enabled with appropriate policies for security:
+### Project Management
 
 #### Projects
 ```sql
--- View own projects
-CREATE POLICY "view_own_projects"
-  ON projects FOR SELECT
-  TO authenticated
-  USING (user_id = auth.uid());
-
--- Create projects
-CREATE POLICY "create_projects"
-  ON projects FOR INSERT
-  TO authenticated
-  WITH CHECK (user_id = auth.uid());
-
--- Update own projects
-CREATE POLICY "update_own_projects"
-  ON projects FOR UPDATE
-  TO authenticated
-  USING (user_id = auth.uid());
-
--- Delete own projects
-CREATE POLICY "delete_own_projects"
-  ON projects FOR DELETE
-  TO authenticated
-  USING (user_id = auth.uid());
+CREATE TABLE projects (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  name TEXT NOT NULL,
+  description TEXT,
+  icon TEXT,
+  color TEXT DEFAULT '#C69B7B',
+  owner_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
 ```
 
 #### Project Members
 ```sql
--- View project members
-CREATE POLICY "view_project_members"
-  ON project_members FOR SELECT
-  TO authenticated
-  USING (
-    EXISTS (
-      SELECT 1 FROM projects
-      WHERE id = project_members.project_id
-      AND user_id = auth.uid()
-    )
-  );
-
--- Manage project members
-CREATE POLICY "manage_project_members"
-  ON project_members FOR ALL
-  TO authenticated
-  USING (
-    EXISTS (
-      SELECT 1 FROM projects
-      WHERE id = project_members.project_id
-      AND user_id = auth.uid()
-    )
-  );
+CREATE TABLE project_members (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  project_id UUID NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  role TEXT NOT NULL CHECK (role IN ('owner', 'edit', 'read')),
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE(project_id, user_id)
+);
 ```
 
-## API Integration
+#### Project Subreddits
+```sql
+CREATE TABLE project_subreddits (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  project_id UUID NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+  subreddit_id UUID NOT NULL REFERENCES subreddits(id) ON DELETE CASCADE,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE(project_id, subreddit_id)
+);
+```
 
-### Reddit API
-The application uses a custom Reddit API client (`src/lib/redditApi.ts`) that handles:
-- Authentication with Reddit's API
-- Rate limiting and retries
-- Error handling
-- Data transformation
+### Saved Lists and Tracking
 
-Key Reddit API endpoints used:
+#### Saved Subreddits
+```sql
+CREATE TABLE saved_subreddits (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  subreddit_id UUID NOT NULL REFERENCES subreddits(id) ON DELETE CASCADE,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  last_post_at TIMESTAMPTZ,
+  UNIQUE(user_id, subreddit_id)
+);
+```
 
-- `/r/{subreddit}/about.json` - Subreddit information
-- `/r/{subreddit}/hot.json` - Hot posts for analysis
-- `/r/{subreddit}/about/rules.json` - Subreddit rules
-- `/subreddits/search.json` - Subreddit search functionality
+#### Frequent Searches
+```sql
+CREATE TABLE frequent_searches (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  username TEXT NOT NULL,
+  search_count INTEGER NOT NULL DEFAULT 1,
+  avatar_url TEXT,
+  user_id UUID REFERENCES auth.users(id),
+  last_searched_at TIMESTAMPTZ DEFAULT NOW(),
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
 
-### OpenRouter AI
-AI analysis is performed using the OpenRouter API (`src/lib/openRouter.ts`):
-- Model: deepseek/deepseek-chat
-- Custom system prompts for marketing analysis
-- Structured output format
-- Error handling and retries
-
-The AI analysis provides:
-- Content pattern detection
-- Rule interpretation
-- Marketing strategy recommendations
-- Optimal posting times
-- Title formats that perform well
-
-### Stripe Integration
-
-Payment processing is handled through Stripe's API:
-
-- **Checkout sessions**: Securely process payments
-- **Subscription management**: Handle recurring billing
-- **Webhook processing**: Track subscription lifecycle events
-- **Customer portal**: Self-service subscription management
-
-## Subscription System
-
-SubPirate offers a tiered subscription model with different feature sets and usage limits.
-
-### Subscription Tiers
-
-1. **Starter Tier** - $19.99/month
-   - Target: Individual users and small projects
-   - Limited subreddit analysis (10/month)
-   - Basic analytics
-
-2. **Creator Tier** - $39.99/month
-   - Target: Content creators and small businesses
-   - Expanded subreddit analysis (50/month)
-   - Advanced analytics
-
-3. **Pro Tier** - $47.99/month
-   - Target: Professional marketers
-   - Unlimited subreddit analysis
-   - Team collaboration features
-   - Advanced reporting
-
-4. **Agency Tier** - $97.99/month
-   - Target: Marketing agencies and large teams
-   - Full platform access
-   - Multiple team workspaces
-   - Premium support
+-- Unique constraint on username and user_id
+CREATE UNIQUE INDEX frequent_searches_username_user_id_idx ON frequent_searches (username, user_id);
+```
 
 ### Subscription Management
 
-- **Stripe Checkout**: Secure payment processing
-- **Customer Portal**: Self-service subscription management
-- **Trial Period**: 14-day free trial for all plans
-- **Usage Tracking**: Monitor feature usage based on subscription tier
-- **Automatic Renewal**: Seamless subscription continuity
-
-### Code Example: Creating a Checkout Session
-
-```typescript
-export async function createCheckoutSession({ 
-  priceId, 
-  successUrl, 
-  cancelUrl, 
-  userId 
-}: CheckoutOptions) {
-  // Create session parameters
-  const sessionParams: any = {
-    mode: 'subscription',
-    payment_method_types: ['card'],
-    line_items: [
-      {
-        price: priceId,
-        quantity: 1,
-      },
-    ],
-    success_url: successUrl,
-    cancel_url: cancelUrl,
-    subscription_data: {
-      trial_period_days: 14,
-      metadata: { user_id: userId }
-    },
-    metadata: { user_id: userId }
-  };
-
-  // Add customer parameter if a user ID is provided
-  if (userId) {
-    sessionParams.customer = await getOrCreateCustomerForUser(userId);
-  }
-
-  // Create and return the session
-  const session = await stripe.checkout.sessions.create(sessionParams);
-  return session;
-}
+#### Customer Subscriptions
+```sql
+CREATE TABLE customer_subscriptions (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  stripe_customer_id TEXT NOT NULL,
+  stripe_subscription_id TEXT NOT NULL,
+  stripe_price_id TEXT NOT NULL,
+  status TEXT NOT NULL,
+  current_period_start TIMESTAMPTZ NOT NULL,
+  current_period_end TIMESTAMPTZ NOT NULL,
+  cancel_at_period_end BOOLEAN DEFAULT FALSE,
+  trial_start TIMESTAMPTZ,
+  trial_end TIMESTAMPTZ,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE(user_id),
+  UNIQUE(stripe_subscription_id)
+);
 ```
 
-## Webhook Processing
-
-SubPirate uses a separate Express.js server to handle Stripe webhook events, ensuring reliable subscription state management.
-
-### Webhook Server Setup
-
-- **Express Server**: Standalone server on port 4242
-- **Raw Body Parsing**: Preserves request body for signature verification
-- **Signature Verification**: Security check using Stripe's webhook secret
-- **Event Logging**: Detailed logging for debugging
-
-### Event Handling
-
-The webhook server processes these key events:
-
-1. **checkout.session.completed**: Initial subscription setup
-2. **customer.subscription.created**: New subscription registration
-3. **customer.subscription.updated**: Subscription changes
-4. **customer.subscription.deleted**: Subscription cancellations
-5. **invoice.payment_succeeded**: Successful recurring payments
-6. **invoice.payment_failed**: Failed payment handling
-
-### Database Synchronization
-
-Each event triggers appropriate database updates through the `upsertSubscription` function:
-
-```javascript
-async function upsertSubscription(subscription, userId = null) {
-  // Extract subscription details
-  const subscriptionData = {
-    stripe_subscription_id: subscription.id,
-    stripe_customer_id: subscription.customer,
-    user_id: userId || subscription.metadata?.user_id,
-    status: subscription.status,
-    stripe_price_id: subscription.items.data[0]?.price.id,
-    current_period_start: new Date(subscription.current_period_start * 1000).toISOString(),
-    current_period_end: new Date(subscription.current_period_end * 1000).toISOString(),
-    cancel_at_period_end: subscription.cancel_at_period_end,
-    trial_start: subscription.trial_start ? new Date(subscription.trial_start * 1000).toISOString() : null,
-    trial_end: subscription.trial_end ? new Date(subscription.trial_end * 1000).toISOString() : null,
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString()
-  };
-
-  // Check for existing subscription
-  const { data: existingSubscription } = await supabase
-    .from('customer_subscriptions')
-    .select('*')
-    .eq('stripe_subscription_id', subscription.id)
-    .maybeSingle();
-
-  if (existingSubscription) {
-    // Update existing subscription
-    await supabase
-      .from('customer_subscriptions')
-      .update({
-        ...subscriptionData,
-        updated_at: new Date().toISOString()
-      })
-      .eq('stripe_subscription_id', subscription.id);
-  } else {
-    // Create new subscription
-    await supabase
-      .from('customer_subscriptions')
-      .insert([subscriptionData]);
-  }
-}
+#### Stripe Products
+```sql
+CREATE TABLE stripe_products (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  stripe_product_id TEXT NOT NULL UNIQUE,
+  name TEXT NOT NULL,
+  description TEXT,
+  active BOOLEAN DEFAULT TRUE,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
 ```
 
-## Components
-
-### Core Components
-- `Modal` - Base modal component
-- `ProgressBar` - Progress indicator
-- `Logo` - Application logo
-- `Sidebar` - Navigation sidebar
-- `Button` - Styled button component
-- `Card` - Card container for content
-- `Input` - Form input component
-- `Select` - Dropdown select component
-- `Tabs` - Tab navigation component
-
-### Feature Components
-- `ShareProjectModal` - Project sharing interface
-- `ProjectSettingsModal` - Project settings management
-- `AddToProjectModal` - Add subreddits to projects
-- `SubredditAnalysis` - Subreddit analysis display
-- `PricingCard` - Subscription plan display
-- `SubscriptionBadge` - Current plan indicator
-- `AnalysisCard` - Displays analysis results
-- `UsageMeter` - Shows feature usage limits
-
-### Analysis Components
-- `SubredditAnalysis`: Main analysis view component
-- `AnalysisCard`: Displays analysis results in a card format
-- `ProgressBar`: Visual indicator for analysis progress
-- `ContentTypeIndicators`: Visual indicators for content preferences
-- `RulesSummary`: Summarizes subreddit rules
-- `PostingFrequency`: Shows optimal posting times
-
-### Project Components
-- `ProjectList`: Overview of user projects
-- `ProjectSubreddits`: Displays subreddits in a project
-- `ProjectSettings`: Project configuration options
-- `ShareProject`: Team collaboration interface
-- `ProjectMetrics`: Project performance visualization
-
-### Subscription Components
-- `Pricing`: Subscription plan selection
-- `PricingCard`: Individual plan display
-- `TestModeIndicator`: Visual indicator for test mode
-- `SubscriptionStatus`: Displays current subscription status
-- `UpgradePrompt`: CTA for plan upgrades
-
-## State Management
-
-The application uses React Context for state management:
-
-### AuthContext
-```typescript
-interface AuthContextType {
-  user: User | null;
-  loading: boolean;
-  signIn: (email: string, password: string) => Promise<void>;
-  signUp: (email: string, password: string) => Promise<void>;
-  signOut: () => Promise<void>;
-  updateProfile: (data: { display_name?: string }) => Promise<void>;
-}
+#### Stripe Prices
+```sql
+CREATE TABLE stripe_prices (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  stripe_price_id TEXT NOT NULL UNIQUE,
+  stripe_product_id TEXT NOT NULL,
+  product_id UUID REFERENCES stripe_products(id) ON DELETE CASCADE,
+  active BOOLEAN DEFAULT TRUE,
+  currency TEXT NOT NULL,
+  unit_amount INTEGER NOT NULL,
+  recurring_interval TEXT,
+  recurring_interval_count INTEGER,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
 ```
 
-### SubscriptionContext
-```typescript
-interface SubscriptionContextType {
-  subscription: Subscription | null;
-  loading: boolean;
-  isActive: boolean;
-  currentPlan: 'starter' | 'creator' | 'pro' | 'agency' | 'free';
-  canUseFeature: (feature: Feature) => boolean;
-  remainingUsage: (feature: Feature) => number;
-  refreshSubscription: () => Promise<void>;
-}
+### Usage Tracking
+
+#### Reddit API Usage
+```sql
+CREATE TABLE reddit_api_usage (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  reddit_account_id UUID REFERENCES reddit_accounts(id) ON DELETE CASCADE,
+  endpoint TEXT NOT NULL,
+  endpoint_hash TEXT NOT NULL,
+  requests_count INTEGER DEFAULT 1,
+  window_start TIMESTAMPTZ NOT NULL,
+  reset_at TIMESTAMPTZ NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
 ```
 
-### React Query
-
-Used for data fetching, caching, and server state management:
-
-```typescript
-// Example of a React Query hook
-function useSubredditData(subredditName: string) {
-  return useQuery(
-    ['subreddit', subredditName], 
-    () => fetchSubredditData(subredditName),
-    {
-      staleTime: 5 * 60 * 1000, // 5 minutes
-      cacheTime: 60 * 60 * 1000, // 1 hour
-      retry: 2,
-      onError: (error) => console.error('Error fetching subreddit:', error)
-    }
-  );
-}
+#### User Usage Stats
+```sql
+CREATE TABLE user_usage_stats (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  subreddit_analysis_count INTEGER DEFAULT 0,
+  spyglass_searches_count INTEGER DEFAULT 0,
+  calendar_posts_count INTEGER DEFAULT 0,
+  created_subreddits_count INTEGER DEFAULT 0,
+  created_projects_count INTEGER DEFAULT 0,
+  saved_subreddits_count INTEGER DEFAULT 0,
+  last_active TIMESTAMPTZ DEFAULT NOW(),
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE(user_id)
+);
 ```
 
-### Local Component State
+### Feature Access Control
 
-Used for UI state and form inputs:
-
-```typescript
-function AnalysisForm() {
-  const [subredditName, setSubredditName] = useState('');
-  const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsAnalyzing(true);
-    setError(null);
-    
-    try {
-      await startAnalysis(subredditName);
-      // Success handling
-    } catch (err) {
-      setError('Failed to start analysis');
-      console.error(err);
-    } finally {
-      setIsAnalyzing(false);
-    }
-  };
-
-  // Component rendering
-}
+#### Subscription Features
+```sql
+CREATE TABLE subscription_features (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  name TEXT NOT NULL UNIQUE,
+  description TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
 ```
+
+#### Product Features
+```sql
+CREATE TABLE product_features (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  product_id UUID NOT NULL REFERENCES stripe_products(id) ON DELETE CASCADE,
+  feature_id UUID NOT NULL REFERENCES subscription_features(id) ON DELETE CASCADE,
+  limit_value INTEGER,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE(product_id, feature_id)
+);
+```
+
+## Feature Workflows
+
+### Subreddit Analysis Workflow
+
+The subreddit analysis feature follows a multi-step process:
+
+1. **User Input**
+   - User enters a subreddit name in the analysis form
+   - Application validates the subreddit name format
+
+2. **Data Collection**
+   - System fetches basic subreddit information (subscribers, active users, description)
+   - System retrieves subreddit rules and posting guidelines
+   - Recent posts are collected for content pattern analysis
+   - All Reddit API requests are rate-limited and tracked
+
+3. **Analysis Processing**
+   - Data is processed through a web worker to prevent UI freezing
+   - Basic metrics are calculated (post frequency, engagement rates)
+   - Content is categorized by type (text, image, video, link)
+   - Title patterns are extracted and analyzed
+
+4. **AI Analysis**
+   - Processed data is sent to the OpenRouter AI service
+   - AI generates marketing insights based on the gathered data
+   - System parses the structured JSON response
+
+5. **Results Presentation**
+   - Marketing friendliness score is displayed with justification
+   - Content recommendations are organized by category
+   - Posting schedule suggestions are formatted for readability
+   - SWOT analysis and action plans are presented
+
+6. **Results Management**
+   - User can save the analysis to their account
+   - Analysis can be added to projects for team collaboration
+   - User can export the analysis in various formats
+
+### SpyGlass Workflow
+
+The SpyGlass competitor analysis feature follows this workflow:
+
+1. **Username Input**
+   - User enters a Reddit username to analyze
+   - System validates the username format
+   - Username is added to frequent searches for quick access
+
+2. **Data Retrieval**
+   - System fetches the user's recent posting history (up to 100 posts)
+   - Posts are grouped by subreddit to determine frequency
+   - For each subreddit, basic information is collected
+
+3. **Frequency Analysis**
+   - System calculates posting patterns across subreddits
+   - Results are sorted by frequency (highest first)
+   - Engagement metrics are calculated for each subreddit
+
+4. **Results Presentation**
+   - Subreddits are displayed in a sortable/filterable list
+   - Each subreddit shows post count, subscribers, and active users
+   - Visual indicators show relative popularity and engagement
+   - Recent post examples are displayed for each subreddit
+
+5. **Action Options**
+   - User can save subreddits of interest
+   - One-click analysis of specific subreddits
+   - Direct addition to projects for further tracking
+
+### Project Management Workflow
+
+The project management system follows this workflow:
+
+1. **Project Creation**
+   - User creates a new project with name, description, and visual identifiers
+   - System assigns the user as project owner with full permissions
+
+2. **Team Collaboration**
+   - Project owner can invite team members via email
+   - Different permission levels can be assigned (owner, edit, read)
+   - Team members can view or modify the project based on their role
+
+3. **Content Collection**
+   - Subreddits can be added to the project from various sources
+   - Project members can analyze new subreddits directly from the project
+   - Saved subreddits can be imported in bulk
+
+4. **Progress Tracking**
+   - Dashboard shows overview of project metrics
+   - Subreddit list displays key performance indicators
+   - Activity timeline shows recent changes to the project
+
+5. **Content Planning**
+   - Team members can add notes and strategies
+   - Content calendar integrates with the project subreddits
+   - Performance metrics are updated in real-time
+
+### Calendar Feature Workflow
+
+The content calendar workflow includes:
+
+1. **View Selection**
+   - User selects desired calendar view (month, week, day)
+   - System loads appropriate date range and format
+
+2. **Content Loading**
+   - System fetches Reddit posts for the selected time period
+   - Posts are organized by date and time for display
+   - Additional metadata is loaded for each post (subreddit, engagement)
+
+3. **Display and Interaction**
+   - Posts are displayed in the calendar grid
+   - User can click on posts to see detailed information
+   - Empty time slots show recommended posting times
+
+4. **Filtering**
+   - User can filter by subreddit, account, or content type
+   - System updates the display in real-time based on filters
+   - User can toggle between different sorting options
+
+5. **Planning**
+   - User can create new post entries at specific times
+   - System suggests optimal posting times based on analysis
+   - Scheduling conflicts are highlighted automatically
+
+### Subscription Management Workflow
+
+The subscription system follows this workflow:
+
+1. **Plan Selection**
+   - User browses available subscription tiers
+   - Feature comparisons and pricing are displayed
+   - User selects desired plan
+
+2. **Checkout Process**
+   - Stripe Checkout is initiated with the selected price
+   - User completes payment through secure Stripe interface
+   - System receives webhook notification of successful payment
+
+3. **Account Provisioning**
+   - User's account is updated with subscription information
+   - Feature access is granted based on subscription tier
+   - Usage limits are configured accordingly
+
+4. **Subscription Management**
+   - User can view current subscription details
+   - Self-service portal allows upgrading or downgrading
+   - Billing history and invoices are accessible
+
+5. **Renewal and Updates**
+   - System handles automatic renewals through Stripe
+   - Email notifications for upcoming renewals
+   - Expiration handling with grace period
 
 ## API Routes
 
-### Supabase RPC Functions
+The application uses a combination of direct API access and serverless functions to handle various operations.
 
-#### User Management
-- `get_user_profile(user_id)`: Retrieve user profile
-- `update_user_profile(user_id, data)`: Update user profile
-- `get_user_subscription(user_id)`: Get subscription status
+### Authentication Routes
 
-#### Subreddit Analysis
-- `increment_usage_stat(user_id, stat_name, increment_by)`: Increment usage counter
-- `get_user_usage_stats(user_id)`: Get current usage statistics
-- `analyze_subreddit(subreddit_name, user_id)`: Start subreddit analysis
-- `get_analysis_results(subreddit_id)`: Get analysis results
+```
+POST /api/auth/login
+  - Authenticates a user with email and password
 
-#### Project Management
-- `create_project(name, description, user_id)`: Create new project
-- `add_subreddit_to_project(project_id, subreddit_id)`: Add subreddit to project
-- `share_project(project_id, email, role)`: Share project with team member
+POST /api/auth/register
+  - Registers a new user
 
-### REST API Endpoints
+GET /api/auth/session
+  - Retrieves current session information
 
-#### Authentication
-- `POST /auth/login`: User login
-- `POST /auth/register`: User registration
-- `POST /auth/logout`: User logout
-- `GET /auth/user`: Get current user
+POST /api/auth/logout
+  - Ends the current user session
+```
 
-#### Subreddit Management
-- `GET /api/subreddits/saved`: Get saved subreddits
-- `POST /api/subreddits/save`: Save subreddit
-- `DELETE /api/subreddits/save/:id`: Remove saved subreddit
-- `GET /api/subreddits/trending`: Get trending subreddits
+### Reddit Integration Routes
 
-#### Project Management
-- `GET /api/projects`: List user projects
-- `POST /api/projects`: Create new project
-- `GET /api/projects/:id`: Get project details
-- `PUT /api/projects/:id`: Update project
-- `DELETE /api/projects/:id`: Delete project
-- `POST /api/projects/:id/members`: Add project member
+```
+GET /api/reddit/auth/url
+  - Generates OAuth URL for Reddit authentication
 
-#### Analysis
-- `POST /api/analyze-subreddit`: Start subreddit analysis
-- `GET /api/analysis/:subredditName`: Get analysis results
+POST /api/reddit/auth/callback
+  - Handles OAuth callback from Reddit
 
-#### Subscription
-- `POST /api/stripe/create-checkout`: Create checkout session
-- `POST /api/stripe/create-portal`: Create customer portal session
-- `GET /api/subscription/status`: Get subscription status
+GET /api/reddit/accounts
+  - Lists authenticated Reddit accounts for current user
 
-#### Webhook
-- `POST /api/stripe/webhook`: Stripe webhook endpoint
+DELETE /api/reddit/accounts/:id
+  - Removes a Reddit account
 
-## Security Features
+GET /api/reddit/subreddit/:name
+  - Fetches information about a specific subreddit
 
-### Authentication Security
+GET /api/reddit/user/:username/posts
+  - Retrieves posting history for a Reddit user
 
-- **JWT-based authentication**: Stateless, secure tokens
-- **Password hashing**: Secure password storage
-- **Session management**: Proper timeout and refresh
-- **CSRF protection**: Cross-site request forgery prevention
+GET /api/reddit/posts/:subreddit
+  - Gets recent posts from a specific subreddit
+```
 
-### Database Security
+### Analysis Routes
 
-- **Row Level Security (RLS)**: Fine-grained access control
-- **Prepared statements**: SQL injection prevention
-- **Encryption**: Sensitive data encryption
-- **Sanitization**: Input validation and sanitization
+```
+POST /api/analysis/subreddit
+  - Performs comprehensive subreddit analysis
+  - Accepts subreddit name and analysis options
+  - Returns full analysis results
 
-### API Security
+GET /api/analysis/saved
+  - Returns saved analyses for the current user
 
-- **Rate limiting**: Prevent abuse and DDoS attacks
-- **CORS configuration**: Cross-origin resource sharing rules
-- **Input validation**: Prevent malicious data
-- **Error handling**: Non-revealing error messages
+POST /api/analysis/save
+  - Saves an analysis to the user's account
 
-### Stripe Security
+GET /api/analysis/subreddit/:name/basic
+  - Returns basic metrics for a subreddit without full analysis
+```
 
-- **Webhook signature verification**: Ensure events are genuine
-- **PCI compliance**: No card data stored on servers
-- **Test mode isolation**: Prevent accidental charges during development
-- **Metadata validation**: Verify customer and subscription relationships
+### SpyGlass Routes
 
-### General Security
+```
+GET /api/spyglass/user/:username
+  - Analyzes a Reddit user's posting frequency
+  - Returns subreddits and engagement metrics
 
-- **Environment variable protection**: Secure configuration
-- **Dependency security**: Regular updates and audits
-- **HTTPS enforcement**: Secure communication
-- **Content Security Policy**: Prevent XSS attacks
-
-## Usage Tracking
-
-SubPirate implements a comprehensive usage tracking system to enforce subscription tier limits.
-
-### Usage Tracking Implementation
-
-The system uses Supabase's PostgreSQL functions to maintain usage counters:
-
-```sql
--- Function to increment usage counter
-CREATE OR REPLACE FUNCTION increment_usage_stat(
-  user_id_param UUID,
-  stat_name TEXT,
-  increment_by INTEGER DEFAULT 1
-)
-RETURNS VOID AS $$
-DECLARE
-  current_month_start TIMESTAMP WITH TIME ZONE;
-  current_month_end TIMESTAMP WITH TIME ZONE;
-  stat_column TEXT;
-BEGIN
-  -- Calculate current month boundaries
-  current_month_start := date_trunc('month', now());
-  current_month_end := (date_trunc('month', now()) + interval '1 month' - interval '1 second');
+GET /api/spyglass/frequent
+  - Returns user's frequent searches
   
-  -- Validate stat_name to prevent SQL injection
-  IF stat_name = 'subreddit_analysis_count' THEN
-    stat_column := stat_name;
-  ELSE
-    RAISE EXCEPTION 'Invalid stat name: %', stat_name;
-  END IF;
-  
-  -- Insert or update the usage record for the current month
-  EXECUTE format('
-    INSERT INTO public.user_usage_stats (
-      user_id, 
-      %I, 
-      month_start, 
-      month_end
-    ) 
-    VALUES ($1, $2, $3, $4)
-    ON CONFLICT (user_id, month_start) 
-    DO UPDATE SET 
-      %I = user_usage_stats.%I + $2,
-      updated_at = now()
-  ', stat_column, stat_column, stat_column)
-  USING user_id_param, increment_by, current_month_start, current_month_end;
-END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+POST /api/spyglass/track
+  - Tracks a new search for frequency analysis
 ```
 
-### Usage Check Workflow
+### Saved List Routes
 
-Before performing limited actions, the application checks the user's current usage:
+```
+GET /api/saved/subreddits
+  - Lists user's saved subreddits
 
-```typescript
-async function canPerformAnalysis(userId: string) {
-  // Get user's subscription tier
-  const { data: subscription } = await supabase
-    .from('customer_subscriptions')
-    .select('*')
-    .eq('user_id', userId)
-    .eq('status', 'active')
-    .maybeSingle();
-    
-  // Get user's current usage
-  const { data: usage } = await supabase.rpc('get_user_usage_stats', {
-    user_id_param: userId
-  });
-  
-  // Check if user can perform action based on subscription tier
-  const tierLimits = {
-    'price_1QvyvlCtsTY6FiiZizercIly': 10,  // Starter
-    'price_1QvyvTCtsTY6FiiZ4xK1M82X': 50,  // Creator
-    'price_1QvyvaCtsTY6FiiZfyf3jfH2': 9999, // Pro (unlimited)
-    'price_1QvyvhCtsTY6FiiZpHBontp5': 9999  // Agency (unlimited)
-  };
-  
-  const userLimit = subscription ? tierLimits[subscription.stripe_price_id] || 5 : 5;
-  const currentUsage = usage?.subreddit_analysis_count || 0;
-  
-  return currentUsage < userLimit;
-}
+POST /api/saved/subreddits
+  - Saves a subreddit to user's list
+
+DELETE /api/saved/subreddits/:id
+  - Removes a subreddit from saved list
+
+GET /api/saved/subreddits/postcounts
+  - Fetches recent post counts for saved subreddits
 ```
 
-### Usage Tracking for Reddit API
+### Project Management Routes
 
-The application also tracks Reddit API usage to prevent rate limiting:
+```
+GET /api/projects
+  - Lists projects for current user
 
-```sql
--- Automatic endpoint hashing trigger
-CREATE FUNCTION set_endpoint_hash()
-RETURNS trigger AS $$
-BEGIN
-  new.endpoint_hash := encode(digest(new.endpoint, 'md5'), 'hex');
-  RETURN new;
-END;
-$$ LANGUAGE plpgsql;
+POST /api/projects
+  - Creates a new project
 
-CREATE TRIGGER auto_set_endpoint_hash
-  BEFORE INSERT OR UPDATE OF endpoint ON reddit_api_usage
-  FOR EACH ROW
-  EXECUTE FUNCTION set_endpoint_hash();
+GET /api/projects/:id
+  - Retrieves project details
 
--- Atomic increment function
-CREATE FUNCTION increment_requests_count(row_id uuid, amount int)
-RETURNS void AS $$
-BEGIN
-  UPDATE reddit_api_usage
-  SET requests_count = requests_count + amount
-  WHERE id = row_id;
-END;
-$$ LANGUAGE plpgsql;
+PUT /api/projects/:id
+  - Updates project information
+
+DELETE /api/projects/:id
+  - Deletes a project
+
+GET /api/projects/:id/subreddits
+  - Lists subreddits in a project
+
+POST /api/projects/:id/subreddits
+  - Adds a subreddit to a project
+
+DELETE /api/projects/:id/subreddits/:subredditId
+  - Removes a subreddit from a project
+
+GET /api/projects/:id/members
+  - Lists project members
+
+POST /api/projects/:id/members
+  - Adds a user to a project
+
+PUT /api/projects/:id/members/:userId
+  - Updates a member's role
+
+DELETE /api/projects/:id/members/:userId
+  - Removes a member from a project
 ```
 
-## Deployment
+### Calendar Routes
 
-The application can be deployed to any static hosting service:
+```
+GET /api/calendar/posts
+  - Retrieves posts for calendar view
+  - Accepts date range parameters
 
-1. Build the application:
-```bash
-npm run build
+POST /api/calendar/posts
+  - Creates a new post entry in the calendar
+
+PUT /api/calendar/posts/:id
+  - Updates a calendar post entry
+
+DELETE /api/calendar/posts/:id
+  - Removes a post from the calendar
 ```
 
-2. Deploy the `dist` directory
+### Analytics Routes
 
-3. Configure environment variables
+```
+GET /api/analytics/overview
+  - Retrieves overview metrics for the dashboard
 
-4. Set up proper CORS and security headers
+GET /api/analytics/engagement
+  - Fetches engagement statistics for posts
 
-### CI/CD Pipeline
-```mermaid
-graph LR
-    A[Push to main] --> B[Run tests]
-    B --> C[Build]
-    C --> D[Deploy to staging]
-    D --> E[Run E2E tests]
-    E --> F[Deploy to production]
+GET /api/analytics/content-types
+  - Returns performance metrics by content type
+
+GET /api/analytics/posting-times
+  - Analyzes optimal posting times
 ```
 
-### Production Preparation
+### Subscription Routes
 
-1. Set up production environment variables
-2. Update Stripe to production mode
-3. Configure production webhook endpoints
-4. Run database migrations
-5. Set up proper SSL certificates
+```
+GET /api/subscriptions/plans
+  - Lists available subscription plans
 
-### Supabase Configuration
+POST /api/subscriptions/create-checkout
+  - Creates a Stripe checkout session
 
-1. Apply all migrations to production database
-2. Configure RLS policies
-3. Set up authentication providers
-4. Create service roles with restricted permissions
+POST /api/subscriptions/create-portal
+  - Creates a Stripe customer portal session
 
-### Stripe Configuration
+GET /api/subscriptions/status
+  - Retrieves current user's subscription status
 
-1. Switch from test to production mode
-2. Update webhook endpoints to production URLs
-3. Verify product and price IDs
-4. Set up production webhooks with proper signature verification
-
-### Deployment Checklist
-
-- [ ] All environment variables set correctly
-- [ ] Database migrations applied
-- [ ] Stripe products and prices configured
-- [ ] Webhook endpoints secured
-- [ ] SSL certificates installed
-- [ ] Performance testing completed
-- [ ] Security audit performed
-
-## Development Guide
-
-### Environment Setup
-
-Required environment variables:
-```bash
-# Supabase Configuration
-VITE_SUPABASE_URL=your_supabase_url
-VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
-VITE_SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
-
-# Reddit API Configuration
-VITE_REDDIT_CLIENT_ID=your_reddit_client_id
-VITE_REDDIT_CLIENT_SECRET=your_reddit_client_secret
-
-# OpenRouter AI Configuration
-VITE_OPENROUTER_API_KEY=your_openrouter_api_key
-
-# Stripe Configuration
-VITE_STRIPE_TEST_SECRET_KEY=your_test_secret_key
-VITE_STRIPE_TEST_PUBLISHABLE_KEY=your_test_publishable_key
-VITE_STRIPE_WEBHOOK_SECRET=your_webhook_secret
+POST /api/webhooks/stripe
+  - Handles Stripe webhook events for subscriptions
 ```
 
-### Prerequisites
+## Architecture Overview
 
-- Node.js 18+
-- npm
-- Git
-- Supabase account
-- Stripe account (for payment testing)
-- Reddit application credentials
-- OpenRouter API account
+The SubPirate application is built with a modern, scalable architecture designed for reliability and performance.
 
-### Local Development
+### High-Level Architecture
 
-1. Clone the repository
-   ```bash
-   git clone https://github.com/your-org/subpirate.git
-   cd subpirate
+```
+┌─────────────────┐         ┌─────────────────┐         ┌─────────────────┐
+│                 │         │                 │         │                 │
+│  React Frontend │ ◄─────► │  API Layer      │ ◄─────► │  Supabase       │
+│                 │         │                 │         │                 │
+└─────────────────┘         └─────────────────┘         └─────────────────┘
+        ▲                            ▲                           ▲
+        │                            │                           │
+        ▼                            ▼                           ▼
+┌─────────────────┐         ┌─────────────────┐         ┌─────────────────┐
+│                 │         │                 │         │                 │
+│  Web Workers    │         │  External APIs  │         │  Stripe         │
+│                 │         │  (Reddit, AI)   │         │                 │
+└─────────────────┘         └─────────────────┘         └─────────────────┘
+```
+
+### Frontend Architecture
+
+The frontend is built with React and TypeScript, following a component-based architecture:
+
+1. **Core Components**
+   - `App.tsx`: Main application entry point with routing
+   - Feature pages (SubredditAnalysis, SpyGlass, etc.)
+   - Shared UI components (Button, Card, Input)
+
+2. **State Management**
+   - React Query for server state management
+   - Context API for global application state
+   - Local component state for UI interactions
+
+3. **Web Workers**
+   - Dedicated workers for CPU-intensive operations
+   - Analysis processing to avoid UI blocking
+   - Background data processing
+
+### Backend Architecture
+
+The backend uses Supabase for database and serverless functions:
+
+1. **Database Layer**
+   - PostgreSQL database with comprehensive schema
+   - Real-time subscriptions for live updates
+   - Row-level security for data protection
+
+2. **API Layer**
+   - RESTful API endpoints for data access
+   - Authentication and authorization middleware
+   - Rate limiting and request validation
+
+3. **Serverless Functions**
+   - API route handlers for complex logic
+   - Webhook processing for external events
+   - Background jobs for data processing
+
+### Integration Architecture
+
+Multiple external services are integrated:
+
+1. **Reddit API Integration**
+   - OAuth2 authentication flow
+   - Dedicated client with rate limiting
+   - Caching layer for performance
+
+2. **AI Services**
+   - OpenRouter API for AI analysis
+   - Structured prompt engineering
+   - Error handling and retry logic
+
+3. **Payment Processing**
+   - Stripe integration for subscriptions
+   - Webhook handlers for payment events
+   - Customer portal for self-service management
+
+### Data Flow Architecture
+
+The application's data flows through these pathways:
+
+1. **User Authentication Flow**
+   ```
+   User Login → Auth Request → Supabase Auth → JWT Token → Client Storage
    ```
 
-2. Install dependencies
-   ```bash
-   npm install
+2. **Subreddit Analysis Flow**
+   ```
+   Input → Reddit API → Data Processing → AI Analysis → Results Rendering → Database Storage
    ```
 
-3. Start the development server
-   ```bash
-   npm run dev
+3. **SpyGlass Analysis Flow**
+   ```
+   Username Input → Reddit API → Post Collection → Frequency Analysis → Results Rendering
    ```
 
-4. Start the webhook server (in a separate terminal)
-   ```bash
-   npm run webhook
+4. **Project Collaboration Flow**
+   ```
+   User Action → Permission Check → Database Update → Real-time Updates → Collaborator Notification
    ```
 
-### Development Scripts
+### Security Architecture
 
-```json
-{
-  "scripts": {
-    "dev": "vite",
-    "build": "tsc && vite build",
-    "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
-    "preview": "vite preview",
-    "webhook": "node webhook-server.js",
-    "dev:all": "concurrently \"npm run dev\" \"npm run webhook\" \"stripe listen --forward-to http://localhost:4242/api/stripe/webhook\""
-  }
-}
-```
+Security is implemented at multiple levels:
 
-### Code Style
-- Follow TypeScript best practices
-- Use functional components with hooks
-- Implement proper error handling
-- Write meaningful comments
-- Use consistent naming conventions
+1. **Authentication Security**
+   - JWT-based authentication
+   - Short-lived access tokens
+   - Secure refresh token rotation
 
-## Testing Strategy
+2. **Authorization Controls**
+   - Row-level security policies
+   - Role-based access control
+   - Object ownership validation
 
-SubPirate implements a comprehensive testing approach to ensure quality and reliability.
+3. **Data Protection**
+   - Encrypted storage of sensitive data
+   - Input validation and sanitization
+   - API rate limiting and abuse prevention
 
-### Unit Testing
+4. **External API Security**
+   - Secure credential storage
+   - Token management system
+   - Request signing where required
 
-- **Component tests**: Verify UI components function correctly
-- **Hook tests**: Ensure custom hooks behave as expected
-- **Utility function tests**: Validate helper functions
+5. **Payment Security**
+   - PCI-compliant payment processing
+   - Webhook signature verification
+   - Secure customer data handling
 
-### Integration Testing
+### Scalability Considerations
 
-- **API integration tests**: Verify API calls and responses
-- **Database interaction tests**: Ensure data operations work correctly
-- **Authentication flow tests**: Validate user authentication
+The architecture is designed for scalability:
 
-### End-to-End Testing
+1. **Performance Optimization**
+   - Efficient database queries with indexing
+   - Caching strategies for frequently accessed data
+   - Web workers for CPU-intensive tasks
 
-- **User flows**: Test complete user journeys
-- **Subscription workflows**: Validate payment and subscription flows
-- **Analysis workflows**: Test the complete analysis process
+2. **Resource Management**
+   - Rate limiting for external API calls
+   - Connection pooling for database access
+   - Lazy loading of heavy components
 
-### Performance Testing
-
-- **Load testing**: Ensure the application can handle expected traffic
-- **API response time**: Measure and optimize API performance
-- **Rendering performance**: Monitor and improve UI rendering
-
-### Security Testing
-
-- **Penetration testing**: Identify security vulnerabilities
-- **Authentication testing**: Ensure secure login processes
-- **Authorization testing**: Verify proper access controls
-
-## Troubleshooting
-
-### Common Issues
-
-#### Stripe Integration Issues
-
-- **Webhook Signature Errors**: Verify webhook secret matches
-- **Missing Customer ID**: Check customer creation workflow
-- **Checkout Session Errors**: Verify price IDs exist and are active
-
-```javascript
-// Proper webhook signature verification
-try {
-  stripeEvent = stripe.webhooks.constructEvent(
-    rawBody,
-    signature,
-    webhookSecret
-  );
-} catch (err) {
-  console.error('⚠️ Webhook signature verification failed:', err.message);
-  throw new Error(`Webhook signature verification failed: ${err.message}`);
-}
-```
-
-#### Supabase Errors
-
-- **406 Not Acceptable Errors**: Use wildcard `*` for select queries
-- **RPC Function 404 Errors**: Check function exists and permissions are correct
-- **Foreign Key Constraint Errors**: Ensure references exist before insertion
-
-```typescript
-// Proper Supabase query with wildcard select
-const { data, error } = await supabase
-  .from('table_name')
-  .select('*')
-  .eq('column', value)
-  .maybeSingle(); // Use maybeSingle instead of single for queries that might return no rows
-```
-
-#### Reddit API Issues
-
-- **Rate Limiting**: Implement proper delay and retry logic
-- **Authentication Errors**: Refresh tokens when expired
-- **Endpoint Changes**: Monitor for Reddit API updates
-
-### Debugging Tools
-
-- **Error Logging**: Detailed error messages in console
-- **Request/Response Logging**: Log API interactions
-- **Webhook Event Logging**: Track Stripe events
-- **Database Query Monitoring**: Log slow or failing queries
-
-### Recovery Procedures
-
-- **Database Cleanup**: SQL scripts for fixing database issues
-- **Stripe Synchronization**: Scripts to sync Stripe products/prices
-- **User Data Recovery**: Tools for recovering user data
-- **Subscription Reconciliation**: Tools for fixing subscription issues
-
-## Performance Optimizations
-
-### Client-Side Optimizations
-
-- **Code Splitting**: Load components only when needed
-- **Lazy Loading**: Defer non-critical component loading
-- **Memoization**: Cache expensive calculations
-- **Virtualization**: Efficiently render large lists
-
-### Server-Side Optimizations
-
-- **Query Optimization**: Efficient database queries
-- **Indexing**: Strategic database indexes
-- **Caching**: Cache frequently accessed data
-- **Connection Pooling**: Optimize database connections
-
-### API Optimizations
-
-- **Request Batching**: Combine multiple requests
-- **Response Compression**: Reduce data transfer size
-- **Pagination**: Split large data sets into pages
-- **Partial Responses**: Return only needed data
-
-### Database Optimizations
-
-- **Schema Optimization**: Efficient data structure
-- **Index Design**: Strategic index placement
-- **Query Optimization**: Efficient SQL queries
-- **Connection Management**: Proper connection handling
-
-### Code Example: Memoization
-
-```typescript
-import { useMemo } from 'react';
-
-function SubredditList({ subreddits, filter, sort }) {
-  // Memoize the filtered and sorted list
-  const processedList = useMemo(() => {
-    console.log('Recomputing subreddit list');
-    
-    // Filter subreddits
-    let result = subreddits.filter(s => 
-      s.name.toLowerCase().includes(filter.toLowerCase())
-    );
-    
-    // Sort subreddits
-    result.sort((a, b) => {
-      if (sort === 'subscriber_count') {
-        return b.subscriber_count - a.subscriber_count;
-      } else if (sort === 'name') {
-        return a.name.localeCompare(b.name);
-      } else if (sort === 'score') {
-        return b.marketing_friendly_score - a.marketing_friendly_score;
-      }
-      return 0;
-    });
-    
-    return result;
-  }, [subreddits, filter, sort]); // Only recompute when these values change
-  
-  return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-      {processedList.map(subreddit => (
-        <SubredditCard key={subreddit.id} subreddit={subreddit} />
-      ))}
-    </div>
-  );
-}
-```
-
-## Future Development
-
-### Planned Features
-
-1. **Advanced Analytics Dashboard**
-   - Enhanced visualization tools
-   - Custom reporting
-   - Data export features
-
-2. **AI Content Generation**
-   - Title suggestions
-   - Post content creation
-   - Content optimization
-
-3. **Multi-Platform Expansion**
-   - Additional social media platforms
-   - Cross-platform campaign management
-   - Unified analytics
-
-4. **Collaboration Enhancements**
-   - Task assignment
-   - Activity timeline
-   - Team performance metrics
-
-### Technical Roadmap
-
-1. **Performance Improvements**
-   - Server-side rendering for critical paths
-   - Edge caching for API responses
-   - Database query optimization
-
-2. **Architecture Enhancements**
-   - Microservices for scalability
-   - Message queue for asynchronous processing
-   - GraphQL API for flexible data fetching
-
-3. **Security Enhancements**
-   - Enhanced audit logging
-   - Advanced threat detection
-   - Compliance certifications
-
-4. **Developer Experience**
-   - Improved testing infrastructure
-   - Enhanced documentation
-   - Streamlined deployment pipeline
-
-### Integration Opportunities
-
-1. **Analytics Platforms**
-   - Google Analytics
-   - Mixpanel
-   - Amplitude
-
-2. **Marketing Tools**
-   - HubSpot
-   - Mailchimp
-   - Zapier
-
-3. **Content Platforms**
-   - WordPress
-   - Medium
-   - Contentful
-
-4. **Team Collaboration**
-   - Slack
-   - Microsoft Teams
-   - Asana
-
-## Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Write/update tests
-5. Submit a pull request
-
-### Pull Request Guidelines
-- Follow the PR template
-- Include tests
-- Update documentation
-- Follow code style guidelines
-- Ensure CI passes
-
-## Support
-
-For technical support:
-1. Check the documentation
-2. Search existing issues
-3. Create a new issue if needed
-4. Contact support team
-
-## License
-
-This project is proprietary and confidential.
-All rights reserved.
+3. **Growth Capabilities**
+   - Horizontal scaling through serverless functions
+   - Modular code organization for feature expansion
+   - Configurable feature flags for gradual rollouts

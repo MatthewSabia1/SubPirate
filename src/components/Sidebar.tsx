@@ -159,8 +159,8 @@ function Sidebar({ isMobileOpen, onMobileClose }: SidebarProps) {
       
       <nav className="mt-4">
         <button 
-          onClick={() => handleNavigation('/')}
-          className={`sidebar-link w-full text-left ${location.pathname === '/' ? 'active' : ''}`}
+          onClick={() => handleNavigation('/dashboard')}
+          className={`sidebar-link w-full text-left ${location.pathname === '/dashboard' ? 'active' : ''}`}
         >
           <Search size={20} />
           Analyze

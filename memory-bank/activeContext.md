@@ -28,6 +28,9 @@
 - Fixing foreign key constraint issues in the database
 - Resolving Stripe synchronization script errors
 - Fixing Supabase RPC function 404 errors and permission issues
+- Adding CORS protection for Reddit images
+- Creating reusable components for handling external image loading
+- Fixing potential image loading errors across the application
 
 ## Recent Changes
 - Renamed `postingGuidelines` to `postingLimits` across the application for consistency
@@ -68,6 +71,22 @@
 - Implemented proper user ID storage in Stripe customer metadata
 - Modified API endpoints to work with Vite instead of Next.js
 - Changed environment variable access from `process.env` to `import.meta.env` for Vite compatibility
+- Created a new `RedditImage` component to handle CORS issues with Reddit images:
+  - Handles image loading errors gracefully
+  - Provides fallback mechanisms for failed image loads
+  - Uses generated placeholders as a last resort
+  - Applies best practices for image loading
+- Updated components that display Reddit images to use the new `RedditImage` component:
+  - Updated `RedditAccounts.tsx` to use `RedditImage` for account avatars
+  - Updated `Calendar.tsx` to use `RedditImage` for post thumbnails and avatars
+  - Fixed type issues in the `Calendar.tsx` component related to Reddit post data structure
+- Added proper mapping for the API response in the Calendar component to match the RedditPost interface
+- Enhanced error handling for image loading across the application
+- Fixed NSFW content handling in Calendar component to ensure all content displays properly
+- Updated RedditImage component to handle NSFW thumbnails more effectively
+- Improved post details fetching to properly handle NSFW content and thumbnails
+- Removed content filtering from Reddit API integration
+- Set showNSFW to true by default in Dashboard component
 
 ### Stripe Integration Fixes
 - Fixed several critical issues with Stripe integration:
@@ -180,6 +199,11 @@ interface AnalysisData {
 - Using specific test price IDs for consistent checkout flow
 - Maintaining separate environment variables for test and production
 - Enhancing webhook handlers to properly process test events
+- Using a component-based approach for CORS handling rather than a proxy server
+- Implementing graceful fallbacks for failed image loads
+- Using generated avatars when no image is available
+- Using consistent error handling patterns across the application
+- Focusing on user experience by making image loading resilient
 
 ## Next Steps
 1. Monitor error rates after deployment
@@ -202,6 +226,14 @@ interface AnalysisData {
 18. Ensure subscription flow works with cleaned database
 19. Consider regular database maintenance procedures
 20. Schedule periodic reviews of the Stripe products and prices database
+21. Continue monitoring for additional CORS issues
+22. Consider additional components that might benefit from the `RedditImage` component
+23. Enhance the `RedditImage` component with additional features as needed:
+   - Consider adding a loading state
+   - Add image optimization features
+   - Add cache control headers
+24. Update documentation to reflect the new image handling approach
+25. Consider adding server-side proxy for production if CORS issues persist
 
 ## Current Considerations
 - Backward compatibility with existing saved analyses
@@ -220,6 +252,10 @@ interface AnalysisData {
 - Process for switching to production Stripe mode when ready to launch
 - Maintaining test/production separation in development
 - Handling webhook verification in different environments
+- Image loading performance across the application
+- User experience during image loading failures
+- Fallback strategies for external resources
+- Alternative approaches for handling Reddit content if CORS issues continue
 
 ## Dependencies
 - Supabase database schema
@@ -228,6 +264,10 @@ interface AnalysisData {
 - TypeScript type system
 - Stripe API for subscriptions and payments
 - Webhook server for handling Stripe events
+- React components 
+- Reddit API responses
+- Tailwind CSS for styling
+- External SVG generators for fallback images
 
 ## Recent Insights
 - Consistent property naming improves maintainability
@@ -244,6 +284,11 @@ interface AnalysisData {
 - SQL transactions are essential for database maintenance operations
 - Filtering test products/prices during synchronization prevents database clutter
 - Maintaining a list of official product/price IDs ensures proper tracking
+- Reddit's APIs do not properly set CORS headers for image responses
+- Direct loading of Reddit images in the browser causes CORS errors
+- The application has multiple places where Reddit images are displayed
+- A component-based approach with proper fallbacks can address CORS issues without needing a proxy server
+- Reddit's data structure can be inconsistent in the response format, requiring careful mapping to typed interfaces
 
 ## Current Focus
 Working on enhancing the subreddit analysis system, specifically:
@@ -722,3 +767,75 @@ We have successfully updated the subscription pricing structure in both Stripe a
   8. Added explicit row-level security policies for the user_usage_stats table
   9. Verified successful implementation by executing the script
   10. Fixed console errors that were appearing during application usage
+
+## Recent Changes
+- Fixed NSFW content handling in Calendar component to ensure all content displays properly
+- Updated RedditImage component to handle NSFW thumbnails more effectively
+- Improved post details fetching to properly handle NSFW content and thumbnails
+- Removed content filtering from Reddit API integration
+- Set showNSFW to true by default in Dashboard component
+
+## Current Focus
+- Ensuring all Reddit content displays properly regardless of NSFW status
+- Improving image handling and fallbacks for all content types
+- Maintaining proper error handling while ensuring no content is filtered
+
+## Active Decisions
+1. NSFW Content Handling:
+   - No filtering of NSFW content at any level
+   - Special handling for Reddit's 'nsfw' thumbnail placeholder
+   - Use of alternative image sources when primary thumbnail is unavailable
+   - Proper fallback system for all image types
+
+2. Image Display Strategy:
+   - Try preview image first (highest quality)
+   - Fall back to thumbnail if preview unavailable
+   - Use media.oembed.thumbnail_url as additional source
+   - Generate placeholder only when no images available
+
+3. Error Handling:
+   - Maintain error logging for debugging
+   - Use fallback images when needed
+   - Don't filter content based on type or rating
+
+## Recent Component Updates
+1. RedditImage Component:
+   - Removed NSFW filtering from URL validation
+   - Improved handling of Reddit's special thumbnail values
+   - Enhanced fallback system for all content types
+
+2. Calendar Component:
+   - Updated fetchPostDetails to better handle NSFW content
+   - Improved image source selection logic
+   - Added additional logging for content handling
+
+3. Dashboard Component:
+   - Set showNSFW to true by default
+   - Removed any NSFW-related filtering
+
+## Next Steps
+1. Test NSFW content display across all components
+2. Verify image loading and fallbacks work consistently
+3. Monitor error logs for any image loading issues
+4. Consider adding more image source fallbacks if needed
+5. Update documentation to reflect new content handling approach
+
+## Known Issues
+- None currently identified with NSFW content handling
+- Continue monitoring for any image loading edge cases
+
+## Recent Improvements
+1. Image Handling:
+   - Better handling of Reddit's special thumbnail values
+   - More robust fallback system
+   - Improved error logging
+
+2. Content Display:
+   - No content filtering
+   - Better handling of NSFW posts
+   - More reliable image loading
+
+3. Error Handling:
+   - Clearer error messages
+   - Better fallback behavior
+   - Improved debugging information

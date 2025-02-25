@@ -33,7 +33,7 @@ function Login() {
     try {
       if (isLogin) {
         await signIn(email, password);
-        navigate('/', { replace: true });
+        navigate('/dashboard', { replace: true });
       } else {
         await signUp(email, password);
         setError('Account created successfully! You can now sign in.');

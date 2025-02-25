@@ -17,6 +17,7 @@ import SpyGlass from './pages/SpyGlass';
 import RedditAccounts from './pages/RedditAccounts';
 import RedditOAuthCallback from './pages/RedditOAuthCallback';
 import Pricing from './pages/Pricing';
+import LandingPage from './pages/LandingPage';
 import { Menu } from 'lucide-react';
 
 // Create a client
@@ -77,6 +78,7 @@ function App() {
         <QueryClientProvider client={queryClient}>
           <Router>
             <Routes>
+              <Route path="/" element={<LandingPage />} />
               <Route path="/login" element={<Login />} />
               <Route path="/pricing" element={<Pricing />} />
               <Route path="/auth/reddit/callback" element={
@@ -84,7 +86,7 @@ function App() {
                   <RedditOAuthCallback />
                 </PrivateRoute>
               } />
-              <Route path="/" element={
+              <Route path="/dashboard" element={
                 <PrivateRoute>
                   <Dashboard />
                 </PrivateRoute>

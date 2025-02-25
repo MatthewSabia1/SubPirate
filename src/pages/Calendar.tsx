@@ -18,20 +18,33 @@ import {
   Calendar as CalendarIcon,
   ChevronLeft,
   ChevronRight,
-  MessageCircle
+  MessageCircle,
+  RefreshCcw
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { useClickOutside } from '../hooks/useClickOutside';
+import Modal from '../components/Modal';
+import RedditImage from '../components/RedditImage';
+import { syncRedditAccountPosts, ensureRedditPostsSchema } from '../lib/redditSync';
 
 // Define interfaces
+interface RedditAccount {
+  username: string;
+  avatar_url: string | null;
+}
+
+interface Subreddit {
+  name: string;
+}
+
 interface RedditPost {
   id: string;
   post_id: string;
   reddit_account_id: string;
   created_at: string;
-  reddit_accounts: { username: string; avatar_url: string | null };
-  subreddits: { name: string };
+  reddit_accounts: RedditAccount;
+  subreddits: Subreddit;
 }
 
 interface RedditPostDetails {
@@ -94,7 +107,11 @@ const ExpandablePostItem = ({ post, isExpanded, onToggle, details }: {
   return (
     <div className="bg-[#1A1A1A] p-3 rounded-lg shadow-sm hover:shadow-md hover:bg-[#252525] transition-all duration-200">
       <div className="flex items-center gap-2 cursor-pointer" onClick={onToggle}>
-        <img src={avatarSrc} alt={post.reddit_accounts.username} className="w-8 h-8 rounded-full" />
+        <RedditImage 
+          src={avatarSrc} 
+          alt={post.reddit_accounts.username} 
+          className="w-8 h-8 rounded-full" 
+        />
         <div className="flex-1">
           <span className="text-sm font-semibold text-gray-200 truncate block">u/{post.reddit_accounts.username}</span>
           <span className="text-sm text-[#C69B7B] truncate block">r/{post.subreddits.name}</span>
@@ -148,6 +165,7 @@ function Calendar() {
   const [postDetails, setPostDetails] = useState<Record<string, RedditPostDetails>>({});
   const [activeTab, setActiveTab] = useState<SortType>('recent');
   const [selectedAccount, setSelectedAccount] = useState<string | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
   const dropdownRef = useClickOutside(() => setOpenDropdown(null));
   const [filters, setFilters] = useState<Filter>(() => {
     const savedFilters = localStorage.getItem('calendarFilters');
@@ -181,6 +199,57 @@ function Calendar() {
       fetchPosts();
     }
   }, [user, currentDate, view, filters]);
+
+  // Check for any posts immediately when the component loads
+  useEffect(() => {
+    const checkInitialPosts = async () => {
+      if (user) {
+        try {
+          // Check if we have any posts in the database at all
+          const { count, error } = await supabase
+            .from('reddit_posts')
+            .select('*', { count: 'exact', head: true });
+            
+          if (error) throw error;
+          
+          console.log(`Found ${count} total posts in database on initial load`);
+          
+          // If no posts, prompt a refresh
+          if (count === 0) {
+            console.log('No posts found in database, consider refreshing data');
+            setError('No Reddit posts found. Click "Refresh Data" to sync your posts.');
+          }
+        } catch (err) {
+          console.error('Error checking initial posts:', err);
+        }
+      }
+    };
+    
+    checkInitialPosts();
+  }, [user]);
+
+  // Check database schema and initialize the component
+  useEffect(() => {
+    const initializeComponent = async () => {
+      if (user) {
+        try {
+          // Check if database schema has all needed columns
+          await ensureRedditPostsSchema();
+          
+          // Initial data fetch after schema check
+          await fetchRedditAccounts();
+          await fetchSubreddits();
+          await fetchProjects();
+          await fetchPosts();
+        } catch (err) {
+          console.error('Error initializing Calendar component:', err);
+          setError('Failed to initialize calendar. Please try refreshing the page.');
+        }
+      }
+    };
+    
+    initializeComponent();
+  }, [user]);
 
   // Persist filters to localStorage
   useEffect(() => {
@@ -260,6 +329,7 @@ function Calendar() {
 
   const fetchPosts = async () => {
     setLoading(true);
+    setError(null);
     try {
       // Validate account IDs before querying
       const validAccountIds = filters.accounts.filter(isValidUUID);
@@ -281,15 +351,25 @@ function Calendar() {
           break;
       }
 
+      // Ensure the dates are at the START and END of the day
+      startDate.setHours(0, 0, 0, 0);
+      endDate.setHours(23, 59, 59, 999);
+
+      // Log date range for debugging
+      console.log(`Fetching posts from ${startDate.toISOString()} to ${endDate.toISOString()}`);
+      console.log(`Current view is: ${view}, Current date is: ${currentDate.toDateString()}`);
+
+      // Build the query based on account filters
       let query = supabase
         .from('reddit_posts')
         .select(`
           id,
           post_id,
           reddit_account_id,
+          subreddit_id,
           created_at,
-          reddit_accounts (username, avatar_url),
-          subreddits (name)
+          reddit_accounts!reddit_account_id(username, avatar_url),
+          subreddits!subreddit_id(name)
         `)
         .gte('created_at', startDate.toISOString())
         .lt('created_at', endDate.toISOString())
@@ -316,22 +396,95 @@ function Calendar() {
       }
 
       const { data, error } = await query;
-      if (error) throw error;
-
+      
+      if (error) {
+        console.error('Database error fetching posts:', error);
+        if (error.code === '42703') {
+          // Column does not exist error
+          throw new Error('Database schema error: Please contact support');
+        } else if (error.code === 'PGRST204') {
+          // Schema cache error
+          throw new Error('Database configuration error: Please try again later');
+        } else {
+          throw error;
+        }
+      }
+      
+      // Log the number of posts returned
+      console.log(`Retrieved ${data?.length || 0} posts from database`);
+      
+      // Log detailed date information to help debug
+      if (data && data.length > 0) {
+        console.log('First post date:', new Date(data[0].created_at).toISOString());
+        console.log('Last post date:', new Date(data[data.length - 1].created_at).toISOString());
+        
+        // Count posts by date
+        const dateCount = data.reduce((acc, post) => {
+          const date = new Date(post.created_at).toDateString();
+          acc[date] = (acc[date] || 0) + 1;
+          return acc;
+        }, {} as Record<string, number>);
+        
+        console.log('Posts by date:', dateCount);
+        
+        // Check if today's posts are included
+        const today = new Date().toDateString();
+        console.log(`Posts for today (${today}):`, dateCount[today] || 0);
+        
+        // Check post date range
+        const postDates = data.map(post => new Date(post.created_at).getTime());
+        const minDate = new Date(Math.min(...postDates));
+        const maxDate = new Date(Math.max(...postDates));
+        console.log(`Post date range: ${minDate.toDateString()} to ${maxDate.toDateString()}`);
+      } else {
+        console.log('No posts found in the date range');
+      }
+      
       // Group posts by date
-      const postsByDate = (data || []).reduce<DayPost[]>((acc, post) => {
+      const postsByDate = (data || []).reduce<DayPost[]>((acc, post: any) => {
         const date = new Date(post.created_at);
         date.setHours(0, 0, 0, 0);
+        
+        // Properly map the API response to match our RedditPost interface
+        const formattedPost: RedditPost = {
+          id: post.id,
+          post_id: post.post_id,
+          reddit_account_id: post.reddit_account_id,
+          created_at: post.created_at,
+          reddit_accounts: {
+            username: extractUsername(post.reddit_accounts),
+            avatar_url: extractAvatarUrl(post.reddit_accounts)
+          },
+          subreddits: {
+            name: extractSubredditName(post.subreddits)
+          }
+        };
+        
+        // Log warning if subreddit data is missing
+        if (extractSubredditName(post.subreddits) === 'unknown') {
+          console.warn(`Missing subreddit data for post ID: ${post.id}, Post ID: ${post.post_id}`);
+          console.log('Post data:', JSON.stringify(post, null, 2));
+        }
+        
         const existingDay = acc.find(day => day.date.getTime() === date.getTime());
-        if (existingDay) existingDay.posts.push(post as RedditPost);
-        else acc.push({ date, posts: [post as RedditPost] });
+        if (existingDay) existingDay.posts.push(formattedPost);
+        else acc.push({ date, posts: [formattedPost] });
         return acc;
       }, []);
 
       setPosts(postsByDate);
+      
+      // Log the number of days with posts
+      console.log(`Grouped into ${postsByDate.length} days with posts`);
     } catch (err) {
       console.error('Error fetching posts:', err);
-      setError('Failed to load posts');
+      
+      // Provide a user-friendly error message
+      if (err instanceof Error) {
+        setError(`Failed to load posts: ${err.message}`);
+      } else {
+        setError('Failed to load posts. Please try again later.');
+      }
     } finally {
       setLoading(false);
     }
@@ -340,9 +493,49 @@ function Calendar() {
   const fetchPostDetails = async (post: RedditPost) => {
     setLoadingDetails(prev => ({ ...prev, [post.id]: true }));
     try {
+      // Handle 'unknown' subreddit case
+      if (post.subreddits.name === 'unknown') {
+        console.warn(`Cannot fetch details for post ${post.post_id}: Subreddit name is unknown`);
+        const errorDetails: RedditPostDetails = {
+          title: 'Missing subreddit information',
+          url: '',
+          selftext: 'Post details cannot be fetched because the subreddit information is missing.',
+          score: 0,
+          num_comments: 0,
+          thumbnail: null,
+          preview: null
+        };
+        setPostDetails(prev => ({ ...prev, [post.id]: errorDetails }));
+        setLoadingDetails(prev => ({ ...prev, [post.id]: false }));
+        return;
+      }
+    
       // Fetch post data with error handling
       const response = await fetch(`https://www.reddit.com/r/${post.subreddits.name}/comments/${post.post_id}.json`);
-      if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+      
+      // Log the URL being fetched for debugging
+      console.log(`Fetching post details from: https://www.reddit.com/r/${post.subreddits.name}/comments/${post.post_id}.json`);
+      
+      if (!response.ok) {
+        if (response.status === 404) {
+          console.error(`Post not found: Subreddit "${post.subreddits.name}" or post ID "${post.post_id}" may be incorrect or deleted`);
+          
+          // Create error details object with informative message
+          const errorDetails: RedditPostDetails = {
+            title: `Post not found (404)`,
+            url: '',
+            selftext: `The post could not be found on Reddit. It may have been deleted or the subreddit "${post.subreddits.name}" is incorrect.`,
+            score: 0,
+            num_comments: 0,
+            thumbnail: null,
+            preview: null
+          };
+          
+          setPostDetails(prev => ({ ...prev, [post.id]: errorDetails }));
+          return;
+        }
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
       
       const data = await response.json();
       if (!data?.[0]?.data?.children?.[0]?.data) {
@@ -351,6 +544,57 @@ function Calendar() {
 
       const postData = data[0].data.children[0].data;
       
+      // Helper function to validate image URLs - only filters out non-URL placeholder values
+      const isValidImageUrl = (url?: string): boolean => {
+        if (!url) return false;
+        // Only filter out Reddit's special non-URL placeholder values
+        if (['self', 'default'].includes(url)) return false;
+        return true;
+      };
+      
+      // Process thumbnail URL - explicitly handle NSFW thumbnails
+      let thumbnailUrl = null;
+      if (postData.thumbnail === 'nsfw') {
+        // For NSFW posts, if we have a preview image available, use that
+        if (postData.preview?.images?.[0]?.source?.url) {
+          thumbnailUrl = decodeHtmlEntities(postData.preview.images[0].source.url);
+        } else {
+          // Otherwise, we'll let the fallback system take over
+          thumbnailUrl = null;
+        }
+      } else if (isValidImageUrl(postData.thumbnail)) {
+        thumbnailUrl = decodeHtmlEntities(postData.thumbnail);
+      }
+      
+      // Process preview URL
+      let previewUrl = null;
+      if (postData.preview?.images?.[0]?.source?.url) {
+        previewUrl = decodeHtmlEntities(postData.preview.images[0].source.url);
+      } else if (postData.preview?.images?.[0]?.resolutions?.length > 0) {
+        // Get a medium-sized resolution if available
+        const resolutions = postData.preview.images[0].resolutions;
+        const mediumRes = resolutions.find((r: any) => r.width >= 320 && r.width <= 640);
+        if (mediumRes?.url) {
+          previewUrl = decodeHtmlEntities(mediumRes.url);
+        } else {
+          // Otherwise use the largest resolution
+          previewUrl = decodeHtmlEntities(resolutions[resolutions.length - 1].url);
+        }
+      }
+
+      // Handle over_18 content specifically - ensure we're not filtering NSFW posts
+      if (postData.over_18) {
+        console.log('Processing NSFW post:', postData.id);
+        // Make sure we're getting images even for NSFW content
+        if (!thumbnailUrl && !previewUrl) {
+          console.log('NSFW post has no images, checking additional sources');
+          // Try to get image from media, if available
+          if (postData.media?.oembed?.thumbnail_url) {
+            thumbnailUrl = decodeHtmlEntities(postData.media.oembed.thumbnail_url);
+          }
+        }
+      }
+      
       // Create a safe details object with only primitive values and simple objects
       const safeDetails: RedditPostDetails = {
         title: String(postData.title || 'Untitled'),
@@ -358,13 +602,14 @@ function Calendar() {
         selftext: String(postData.selftext || ''),
         score: Number(postData.score || 0),
         num_comments: Number(postData.num_comments || 0),
-        thumbnail: typeof postData.thumbnail === 'string' && postData.thumbnail !== 'self' && postData.thumbnail !== 'default' 
-          ? postData.thumbnail 
-          : null,
-        preview: postData.preview?.images?.[0]?.source?.url 
-          ? { images: [{ source: { url: String(postData.preview.images[0].source.url) } }] }
-          : null
+        thumbnail: thumbnailUrl,
+        preview: previewUrl ? { images: [{ source: { url: previewUrl } }] } : null
       };
+
+      // Log the extracted image URLs for debugging
+      console.log('Post thumbnail URL:', safeDetails.thumbnail);
+      console.log('Post preview URL:', safeDetails.preview?.images[0]?.source?.url);
+      console.log('Is NSFW:', postData.over_18);
 
       // Update state with the safe object
       setPostDetails(prev => ({ ...prev, [post.id]: safeDetails }));
@@ -384,6 +629,13 @@ function Calendar() {
     } finally {
       setLoadingDetails(prev => ({ ...prev, [post.id]: false }));
     }
+  };
+
+  // Helper function to decode HTML entities in URLs
+  const decodeHtmlEntities = (encodedString: string): string => {
+    const textarea = document.createElement('textarea');
+    textarea.innerHTML = encodedString;
+    return textarea.value;
   };
 
   // Navigation functions
@@ -699,6 +951,151 @@ function Calendar() {
     return date.toLocaleString();
   };
 
+  // Add a function to check if sync is needed
+  const isSyncNeeded = async (accountId: string): Promise<boolean> => {
+    try {
+      // Check when this account was last synced
+      const { data, error } = await supabase
+        .from('reddit_accounts')
+        .select('username, last_post_sync')
+        .eq('id', accountId)
+        .single();
+      
+      if (error) throw error;
+      
+      // Only sync if it's been more than 15 minutes since last sync
+      const lastSync = data?.last_post_sync ? new Date(data.last_post_sync) : null;
+      const now = new Date();
+      const minutesSinceLastSync = lastSync 
+        ? (now.getTime() - lastSync.getTime()) / (60 * 1000) 
+        : null;
+      
+      return !lastSync || minutesSinceLastSync === null || minutesSinceLastSync > 15;
+    } catch (err) {
+      console.error(`Error checking sync status for account ${accountId}:`, err);
+      return true; // On error, assume sync is needed
+    }
+  };
+
+  const handleRefresh = async () => {
+    if (refreshing) return;
+    
+    setRefreshing(true);
+    setError(null);
+    
+    try {
+      // Refresh posts for all connected accounts
+      if (accounts.length > 0) {
+        console.log(`Starting refresh for ${accounts.length} accounts`);
+        // Get all account IDs
+        const accountIds = accounts.map(account => account.id);
+        
+        // Track successful and failed syncs
+        let successCount = 0;
+        let failCount = 0;
+        
+        // For each account, trigger a sync - don't skip any accounts to ensure fresh data
+        for (let i = 0; i < accountIds.length; i++) {
+          const accountId = accountIds[i];
+          try {
+            const accountName = accounts.find(a => a.id === accountId)?.name || accountId;
+            console.log(`Syncing posts for account ${accountName} (${i+1}/${accountIds.length})`);
+            
+            // Force a sync of this account
+            await syncRedditAccountPosts(accountId);
+            successCount++;
+            
+            // Add a small delay between syncs to avoid overwhelming the API
+            if (i < accountIds.length - 1) {
+              console.log('Waiting briefly before syncing next account...');
+              await new Promise(resolve => setTimeout(resolve, 1000)); // 1-second delay
+            }
+          } catch (err) {
+            console.error(`Error syncing account ${accountId}:`, err);
+            failCount++;
+          }
+        }
+        
+        console.log(`Sync complete. Success: ${successCount}, Failed: ${failCount}`);
+      } else {
+        console.log('No accounts found to sync');
+        setError('No Reddit accounts connected. Please connect an account first.');
+        setRefreshing(false);
+        return;
+      }
+      
+      // First update our local state
+      await fetchRedditAccounts();
+      await fetchSubreddits();
+      await fetchProjects();
+      
+      // Then refresh the posts data
+      console.log('Refreshing posts data in calendar view...');
+      await fetchPosts();
+      
+      // Verify we have posts in the database
+      try {
+        const today = new Date();
+        const oneMonthAgo = new Date();
+        oneMonthAgo.setMonth(today.getMonth() - 1); // Show posts from last month to now
+        
+        // Get a count of all posts across all accounts for the past month
+        const { count, error } = await supabase
+          .from('reddit_posts')
+          .select('*', { count: 'exact', head: true })
+          .gte('created_at', oneMonthAgo.toISOString());
+          
+        if (error) throw error;
+        
+        console.log(`After refresh: found ${count} total posts in database from the last month`);
+        
+        if (count === 0) {
+          // Still no posts after refresh - something is wrong
+          setError('No posts found after refresh. Please check your Reddit accounts.');
+        } else if (posts.length === 0 && currentDate.getMonth() === today.getMonth()) {
+          // Posts in database but not showing even though we're viewing the current month
+          console.log('Posts found in database but not showing in UI - refreshing view');
+          await fetchPosts();
+        }
+      } catch (verifyErr) {
+        console.error('Error verifying posts after refresh:', verifyErr);
+      }
+      
+      // Show success message
+      console.log('Successfully refreshed Reddit data');
+    } catch (err) {
+      console.error('Error during manual refresh:', err);
+      setError(`Failed to refresh data: ${err instanceof Error ? err.message : 'Unknown error'}`);
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
+  // Helper functions to extract data correctly regardless of structure
+  function extractUsername(accounts: any): string {
+    if (!accounts) return 'unknown';
+    if (Array.isArray(accounts)) {
+      return accounts[0]?.username || 'unknown';
+    }
+    return accounts.username || 'unknown';
+  }
+
+  function extractAvatarUrl(accounts: any): string | null {
+    if (!accounts) return null;
+    if (Array.isArray(accounts)) {
+      return accounts[0]?.avatar_url || null;
+    }
+    return accounts.avatar_url || null;
+  }
+
+  function extractSubredditName(subreddits: any): string {
+    if (!subreddits) return 'unknown';
+    if (Array.isArray(subreddits)) {
+      return subreddits[0]?.name || 'unknown';
+    }
+    return subreddits.name || 'unknown';
+  }
+
   return (
     <div className="max-w-[1400px] mx-auto p-4 md:p-8 space-y-6 relative">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -706,115 +1103,128 @@ function Calendar() {
           <h1 className="text-2xl md:text-3xl font-bold text-white">Calendar</h1>
           <p className="text-gray-300 text-sm mt-1 mb-2">View and manage your Reddit posting schedule</p>
         </div>
-        <div className="flex-1 bg-[#0A0A0A] p-4 rounded-lg shadow-sm" ref={dropdownRef}>
-          <div className="flex flex-wrap items-center gap-3">
-            <div className="relative">
-              <button
-                onClick={() => setOpenDropdown(openDropdown === 'accounts' ? null : 'accounts')}
-                className="flex items-center gap-2 px-4 py-2 bg-[#111111] rounded-md hover:bg-[#1A1A1A] transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-[#C69B7B]"
-                aria-label="Filter by Reddit Accounts"
-                aria-expanded={openDropdown === 'accounts'}
-              >
-                <Users size={16} className="text-gray-400" />
-                <span className="text-sm">Reddit Accounts</span>
-                {filters.accounts.length > 0 && (
-                  <span className="bg-[#2B543A] text-white text-xs px-2 py-0.5 rounded-full">{filters.accounts.length}</span>
-                )}
-                <ChevronDown size={16} className="text-gray-400" />
-              </button>
-              {openDropdown === 'accounts' && (
-                <div className="absolute top-full left-0 mt-2 w-72 bg-[#111111] rounded-lg shadow-md border border-[#333333] p-3 max-h-60 overflow-y-auto z-50">
-                  {accounts.length > 0 ? (
-                    accounts.map(account => (
-                      <button
-                        key={account.id}
-                        onClick={() => toggleFilter('accounts', account.id)}
-                        className={`flex items-center gap-2 w-full p-2 rounded hover:bg-[#1A1A1A] transition-all duration-200 ${
-                          filters.accounts.includes(account.id) ? 'bg-[#1A1A1A]' : ''
-                        }`}
-                      >
-                        <img src={account.image} alt={account.name} className="w-6 h-6 rounded-full" />
-                        <span className="text-sm truncate">{account.name}</span>
-                        {filters.accounts.includes(account.id) && <Check size={16} className="ml-auto text-[#C69B7B]" />}
-                      </button>
-                    ))
-                  ) : (
-                    <div className="p-2 text-gray-400 text-sm">No accounts found</div>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleRefresh}
+            disabled={refreshing}
+            className={`bg-[#1A1A1A] hover:bg-[#252525] text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-all ${
+              refreshing ? 'opacity-50 cursor-not-allowed' : ''
+            }`}
+            title="Manually refresh Reddit data"
+          >
+            <RefreshCcw size={16} className={refreshing ? 'animate-spin' : ''} />
+            <span>{refreshing ? 'Refreshing...' : 'Refresh Data'}</span>
+          </button>
+          <div className="flex-1 bg-[#0A0A0A] p-4 rounded-lg shadow-sm" ref={dropdownRef}>
+            <div className="flex flex-wrap items-center gap-3">
+              <div className="relative">
+                <button
+                  onClick={() => setOpenDropdown(openDropdown === 'accounts' ? null : 'accounts')}
+                  className="flex items-center gap-2 px-4 py-2 bg-[#111111] rounded-md hover:bg-[#1A1A1A] transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-[#C69B7B]"
+                  aria-label="Filter by Reddit Accounts"
+                  aria-expanded={openDropdown === 'accounts'}
+                >
+                  <Users size={16} className="text-gray-400" />
+                  <span className="text-sm">Reddit Accounts</span>
+                  {filters.accounts.length > 0 && (
+                    <span className="bg-[#2B543A] text-white text-xs px-2 py-0.5 rounded-full">{filters.accounts.length}</span>
                   )}
-                </div>
-              )}
-            </div>
-            <div className="relative">
-              <button
-                onClick={() => setOpenDropdown(openDropdown === 'subreddits' ? null : 'subreddits')}
-                className="flex items-center gap-2 px-4 py-2 bg-[#111111] rounded-md hover:bg-[#1A1A1A] transition-all duration- 200 focus:outline-none focus:ring-2 focus:ring-[#C69B7B]"
-                aria-label="Filter by Subreddits"
-                aria-expanded={openDropdown === 'subreddits'}
-              >
-                <Globe size={16} className="text-gray-400" />
-                <span className="text-sm">Subreddits</span>
-                {filters.subreddits.length > 0 && (
-                  <span className="bg-[#2B543A] text-white text-xs px-2 py-0.5 rounded-full">{filters.subreddits.length}</span>
+                  <ChevronDown size={16} className="text-gray-400" />
+                </button>
+                {openDropdown === 'accounts' && (
+                  <div className="absolute top-full left-0 mt-2 w-72 bg-[#111111] rounded-lg shadow-md border border-[#333333] p-3 max-h-60 overflow-y-auto z-50">
+                    {accounts.length > 0 ? (
+                      accounts.map(account => (
+                        <button
+                          key={account.id}
+                          onClick={() => toggleFilter('accounts', account.id)}
+                          className={`flex items-center gap-2 w-full p-2 rounded hover:bg-[#1A1A1A] transition-all duration-200 ${
+                            filters.accounts.includes(account.id) ? 'bg-[#1A1A1A]' : ''
+                          }`}
+                        >
+                          <img src={account.image} alt={account.name} className="w-6 h-6 rounded-full" />
+                          <span className="text-sm truncate">{account.name}</span>
+                          {filters.accounts.includes(account.id) && <Check size={16} className="ml-auto text-[#C69B7B]" />}
+                        </button>
+                      ))
+                    ) : (
+                      <div className="p-2 text-gray-400 text-sm">No accounts found</div>
+                    )}
+                  </div>
                 )}
-                <ChevronDown size={16} className="text-gray-400" />
-              </button>
-              {openDropdown === 'subreddits' && (
-                <div className="absolute top-full left-0 mt-2 w-72 bg-[#111111] rounded-lg shadow-md border border-[#333333] p-3 max-h-60 overflow-y-auto z-50">
-                  {subreddits.length > 0 ? (
-                    subreddits.map(subreddit => (
-                      <button
-                        key={subreddit.id}
-                        onClick={() => toggleFilter('subreddits', subreddit.id)}
-                        className={`flex items-center gap-2 w-full p-2 rounded hover:bg-[#1A1A1A] transition-all duration-200 ${
-                          filters.subreddits.includes(subreddit.id) ? 'bg-[#1A1A1A]' : ''
-                        }`}
-                      >
-                        <img src={subreddit.image} alt={subreddit.name} className="w-6 h-6 rounded-md" />
-                        <span className="text-sm truncate">r/{subreddit.name}</span>
-                        {filters.subreddits.includes(subreddit.id) && <Check size={16} className="ml-auto text-[#C69B7B]" />}
-                      </button>
-                    ))
-                  ) : (
-                    <div className="p-2 text-gray-400 text-sm">No subreddits found</div>
+              </div>
+              <div className="relative">
+                <button
+                  onClick={() => setOpenDropdown(openDropdown === 'subreddits' ? null : 'subreddits')}
+                  className="flex items-center gap-2 px-4 py-2 bg-[#111111] rounded-md hover:bg-[#1A1A1A] transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-[#C69B7B]"
+                  aria-label="Filter by Subreddits"
+                  aria-expanded={openDropdown === 'subreddits'}
+                >
+                  <Globe size={16} className="text-gray-400" />
+                  <span className="text-sm">Subreddits</span>
+                  {filters.subreddits.length > 0 && (
+                    <span className="bg-[#2B543A] text-white text-xs px-2 py-0.5 rounded-full">{filters.subreddits.length}</span>
                   )}
-                </div>
-              )}
-            </div>
-            <div className="relative">
-              <button
-                onClick={() => setOpenDropdown(openDropdown === 'projects' ? null : 'projects')}
-                className="flex items-center gap-2 px-4 py-2 bg-[#111111] rounded-md hover:bg-[#1A1A1A] transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-[#C69B7B]"
-                aria-label="Filter by Projects"
-                aria-expanded={openDropdown === 'projects'}
-              >
-                <FolderKanban size={16} className="text-gray-400" />
-                <span className="text-sm">Projects</span>
-                {filters.projects.length > 0 && (
-                  <span className="bg-[#2B543A] text-white text-xs px-2 py-0.5 rounded-full">{filters.projects.length}</span>
+                  <ChevronDown size={16} className="text-gray-400" />
+                </button>
+                {openDropdown === 'subreddits' && (
+                  <div className="absolute top-full left-0 mt-2 w-72 bg-[#111111] rounded-lg shadow-md border border-[#333333] p-3 max-h-60 overflow-y-auto z-50">
+                    {subreddits.length > 0 ? (
+                      subreddits.map(subreddit => (
+                        <button
+                          key={subreddit.id}
+                          onClick={() => toggleFilter('subreddits', subreddit.id)}
+                          className={`flex items-center gap-2 w-full p-2 rounded hover:bg-[#1A1A1A] transition-all duration-200 ${
+                            filters.subreddits.includes(subreddit.id) ? 'bg-[#1A1A1A]' : ''
+                          }`}
+                        >
+                          <img src={subreddit.image} alt={subreddit.name} className="w-6 h-6 rounded-md" />
+                          <span className="text-sm truncate">r/{subreddit.name}</span>
+                          {filters.subreddits.includes(subreddit.id) && <Check size={16} className="ml-auto text-[#C69B7B]" />}
+                        </button>
+                      ))
+                    ) : (
+                      <div className="p-2 text-gray-400 text-sm">No subreddits found</div>
+                    )}
+                  </div>
                 )}
-                <ChevronDown size={16} className="text-gray-400" />
-              </button>
-              {openDropdown === 'projects' && (
-                <div className="absolute top-full left-0 mt-2 w-72 bg-[#111111] rounded-lg shadow-md border border-[#333333] p-3 max-h-60 overflow-y-auto z-50">
-                  {projects.length > 0 ? (
-                    projects.map(project => (
-                      <button
-                        key={project.id}
-                        onClick={() => toggleFilter('projects', project.id)}
-                        className={`flex items-center gap-2 w-full p-2 rounded hover:bg-[#1A1A1A] transition-all duration-200 ${
-                          filters.projects.includes(project.id) ? 'bg-[#1A1A1A]' : ''
-                        }`}
-                      >
-                        <img src={project.image} alt={project.name} className="w-6 h-6 rounded-lg" />
-                        <span className="text-sm truncate">{project.name}</span>
-                        {filters.projects.includes(project.id) && <Check size={16} className="ml-auto text-[#C69B7B]" />}
-                      </button>
-                    ))
-                  ) : (
-                    <div className="p-2 text-gray-400 text-sm">No projects found</div>
+              </div>
+              <div className="relative">
+                <button
+                  onClick={() => setOpenDropdown(openDropdown === 'projects' ? null : 'projects')}
+                  className="flex items-center gap-2 px-4 py-2 bg-[#111111] rounded-md hover:bg-[#1A1A1A] transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-[#C69B7B]"
+                  aria-label="Filter by Projects"
+                  aria-expanded={openDropdown === 'projects'}
+                >
+                  <FolderKanban size={16} className="text-gray-400" />
+                  <span className="text-sm">Projects</span>
+                  {filters.projects.length > 0 && (
+                    <span className="bg-[#2B543A] text-white text-xs px-2 py-0.5 rounded-full">{filters.projects.length}</span>
                   )}
-                </div>
-              )}
+                  <ChevronDown size={16} className="text-gray-400" />
+                </button>
+                {openDropdown === 'projects' && (
+                  <div className="absolute top-full left-0 mt-2 w-72 bg-[#111111] rounded-lg shadow-md border border-[#333333] p-3 max-h-60 overflow-y-auto z-50">
+                    {projects.length > 0 ? (
+                      projects.map(project => (
+                        <button
+                          key={project.id}
+                          onClick={() => toggleFilter('projects', project.id)}
+                          className={`flex items-center gap-2 w-full p-2 rounded hover:bg-[#1A1A1A] transition-all duration-200 ${
+                            filters.projects.includes(project.id) ? 'bg-[#1A1A1A]' : ''
+                          }`}
+                        >
+                          <img src={project.image} alt={project.name} className="w-6 h-6 rounded-lg" />
+                          <span className="text-sm truncate">{project.name}</span>
+                          {filters.projects.includes(project.id) && <Check size={16} className="ml-auto text-[#C69B7B]" />}
+                        </button>
+                      ))
+                    ) : (
+                      <div className="p-2 text-gray-400 text-sm">No projects found</div>
+                    )}
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         </div>
@@ -996,27 +1406,15 @@ function Calendar() {
                     <div key={post.id} className="p-4 hover:bg-[#111111] transition-colors">
                       {postDetails[post.id] ? (
                         <div className="flex items-start gap-4">
-                          {(postDetails[post.id].preview?.images[0]?.source?.url || postDetails[post.id].thumbnail) ? (
-                            <img 
-                              src={postDetails[post.id].preview?.images[0]?.source?.url || postDetails[post.id].thumbnail}
-                              alt=""
-                              className="w-20 h-20 rounded-md object-cover bg-[#111111]"
-                              onError={(e) => {
-                                const target = e.target as HTMLImageElement;
-                                target.src = post.reddit_accounts.avatar_url || 
-                                  `https://api.dicebear.com/7.x/initials/svg?seed=${post.reddit_accounts.username}&backgroundColor=111111`;
-                              }}
+                          {/* Post Image - Try preview image first, then thumbnail, then fallback to generated image */}
+                          <div className="w-20 h-20 rounded-md overflow-hidden flex-shrink-0 bg-[#111111]">
+                            <RedditImage 
+                              src={postDetails[post.id].preview?.images[0]?.source?.url || postDetails[post.id].thumbnail || ''}
+                              alt={postDetails[post.id].title || ""}
+                              className="w-full h-full object-cover"
+                              fallbackSrc={`https://api.dicebear.com/7.x/shapes/svg?seed=${encodeURIComponent(postDetails[post.id].title || post.post_id)}&backgroundColor=111111&radius=12`}
                             />
-                          ) : (
-                            <div className="w-20 h-20 rounded-md bg-[#111111] flex items-center justify-center">
-                              <img 
-                                src={post.reddit_accounts.avatar_url || 
-                                  `https://api.dicebear.com/7.x/initials/svg?seed=${post.reddit_accounts.username}&backgroundColor=111111`}
-                                alt=""
-                                className="w-12 h-12"
-                              />
-                            </div>
-                          )}
+                          </div>
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2 mb-1">
                               <span className="text-sm text-gray-400">

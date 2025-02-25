@@ -144,6 +144,27 @@ This pattern ensures usage tracking is:
 4. **Maintainable**: Clear separation of concerns
 5. **Resilient**: Error handling at multiple levels
 
+### 8. Image Loading Pattern
+```mermaid
+flowchart TD
+    Component[UI Component] --> RedditImage[RedditImage Component]
+    RedditImage --> AttemptLoad[Attempt Image Load]
+    AttemptLoad --> LoadCheck{Success?}
+    LoadCheck -->|Yes| DisplayImage[Display Image]
+    LoadCheck -->|No| TryFallback{Fallback Available?}
+    TryFallback -->|Yes| LoadFallback[Load Fallback Image]
+    TryFallback -->|No| GeneratePlaceholder[Generate Placeholder]
+    LoadFallback --> DisplayImage
+    GeneratePlaceholder --> DisplayImage
+```
+
+This pattern ensures image loading is:
+1. **Resilient**: Handles CORS errors and network failures gracefully
+2. **User-friendly**: Always displays something meaningful
+3. **Reusable**: Consistent approach across the application
+4. **Efficient**: Uses lazy loading for performance
+5. **Maintainable**: Centralizes image loading logic
+
 ## Technical Decisions
 
 ### 1. Framework Choices
@@ -1026,3 +1047,186 @@ CREATE TABLE public.customer_subscriptions (
    - Row Level Security (RLS) policies
    - User-specific subscription access
    - Protected price management 
+
+## Image Handling Patterns
+
+### Reddit Image Processing
+1. **Image Source Priority**
+   ```typescript
+   // Try sources in order:
+   1. preview?.images[0]?.source?.url  // Highest quality
+   2. thumbnail                        // Fallback
+   3. media?.oembed?.thumbnail_url     // Additional source
+   4. generatePlaceholder()            // Last resort
+   ```
+
+2. **NSFW Content Handling**
+   ```typescript
+   // No content filtering - handle special values
+   if (postData.thumbnail === 'nsfw') {
+     // Try to get alternative image source
+     if (postData.preview?.images?.[0]?.source?.url) {
+       thumbnailUrl = decodeHtmlEntities(postData.preview.images[0].source.url);
+     } else if (postData.media?.oembed?.thumbnail_url) {
+       thumbnailUrl = decodeHtmlEntities(postData.media.oembed.thumbnail_url);
+     }
+   }
+   ```
+
+3. **URL Validation**
+   ```typescript
+   const isValidUrl = (url: string): boolean => {
+     if (!url) return false;
+     // Only filter non-URL placeholders
+     if (url === 'self' || url === 'default' || url === 'image') return false;
+     try {
+       new URL(url);
+       return true;
+     } catch (e) {
+       return false;
+     }
+   };
+   ```
+
+### Image Component Pattern
+```typescript
+// RedditImage component usage
+<RedditImage 
+  src={primaryImageUrl}
+  alt={title}
+  className="..."
+  fallbackSrc={fallbackImageUrl}
+/>
+```
+
+## Error Handling Patterns
+
+### Image Loading Errors
+```typescript
+// Progressive fallback system
+1. Try primary image
+2. On error, try fallback image
+3. On fallback error, use generated placeholder
+4. Log all failures for debugging
+```
+
+### API Error Handling
+```typescript
+try {
+  const response = await fetch(url);
+  if (!response.ok) {
+    if (response.status === 404) {
+      // Handle not found
+    } else if (response.status === 403) {
+      // Handle forbidden
+    }
+    throw new Error(`HTTP error! status: ${response.status}`);
+  }
+} catch (err) {
+  console.error('Error fetching data:', err);
+  // Set safe error state
+}
+```
+
+## Content Display Patterns
+
+### Post Details Display
+```typescript
+// Post display hierarchy
+1. Title and metadata
+2. Image/thumbnail if available
+3. Content preview
+4. Engagement metrics
+5. Action buttons
+```
+
+### Calendar Display Pattern
+```typescript
+// Calendar post display
+1. Compact view in grid
+2. Expandable details in modal
+3. Full content access on click
+4. No content filtering
+```
+
+## Data Fetching Patterns
+
+### Reddit API Integration
+```typescript
+// API request pattern
+1. Validate input
+2. Check rate limits
+3. Make request
+4. Handle special cases
+5. Process response
+6. Update state
+```
+
+### Post Syncing Pattern
+```typescript
+// Sync process
+1. Fetch latest posts
+2. Process all content types
+3. Store in database
+4. Update UI
+```
+
+## State Management Patterns
+
+### Loading States
+```typescript
+// Loading state pattern
+1. Initial loading
+2. Content fetching
+3. Error states
+4. Success states
+```
+
+### Data Caching
+```typescript
+// Cache implementation
+1. Store fetched data
+2. Check cache before API calls
+3. Invalidate on updates
+4. Refresh periodically
+```
+
+## UI Patterns
+
+### Modal Pattern
+```typescript
+// Modal implementation
+1. Trigger opens modal
+2. Load content
+3. Handle interactions
+4. Close and cleanup
+```
+
+### Responsive Design
+```typescript
+// Breakpoint pattern
+sm: '640px'   // Mobile
+md: '768px'   // Tablet
+lg: '1024px'  // Desktop
+xl: '1280px'  // Large Desktop
+```
+
+## Security Patterns
+
+### Authentication
+```typescript
+// Auth flow
+1. Check auth state
+2. Validate tokens
+3. Refresh if needed
+4. Handle errors
+```
+
+### Data Access
+```typescript
+// Access control
+1. Check user permissions
+2. Validate request
+3. Filter response
+4. Log access
+```

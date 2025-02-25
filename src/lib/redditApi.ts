@@ -786,29 +786,37 @@ export class RedditAPI {
   private cleanImageUrl(url: string | null): string | null {
     if (!url) return null;
 
-    // Handle special URL cases that aren't actual URLs
-    if (['self', 'default'].includes(url)) return null;
-
-    try {
-      // Decode HTML entities in the URL
-      const decodedUrl = this.decodeHtmlEntities(url);
-      
-      // Parse the URL
-      const urlObj = new URL(decodedUrl);
-      
-      // Keep preview parameters for Reddit media URLs
-      if (urlObj.hostname.includes('redd.it') || 
-          urlObj.hostname.includes('reddit.com') || 
-          urlObj.hostname.includes('redditstatic.com')) {
-        return decodedUrl;
-      }
-      
-      // Strip query params for non-Reddit URLs
-      return `${urlObj.origin}${urlObj.pathname}`;
-    } catch (err) {
-      // If URL parsing fails, return original
-      return url;
+    // Handle special URL cases and invalid URLs 
+    if (url === 'self' || url === 'default' || url === 'none' || url === 'null') {
+      return null;
     }
+    
+    // For nsfw thumbnails, we need to return null to avoid showing broken images,
+    // but we'll handle this better elsewhere by using alternative sources
+    if (url === 'nsfw' || url === 'spoiler') {
+      return null;
+    }
+
+    // Handle URLs with query parameters
+    if (url.includes('?')) {
+      try {
+        const urlObj = new URL(url);
+        // For Reddit CDN URLs, keep all original parameters
+        if (urlObj.hostname.includes('redd.it') || 
+            urlObj.hostname.includes('reddit.com') || 
+            urlObj.hostname.includes('redditstatic.com')) {
+          return url; // Return the original URL to preserve all Reddit's parameters
+        }
+        
+        // For non-Reddit URLs, strip query params
+        return `${urlObj.origin}${urlObj.pathname}`;
+      } catch (err) {
+        console.error('Failed to parse image URL:', err);
+        return url; // Return original URL if parsing fails
+      }
+    }
+    
+    return url;
   }
 
   async getSubredditInfo(subreddit: string): Promise<SubredditInfo> {
