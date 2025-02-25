@@ -97,14 +97,21 @@
             try {
               sessionStorage.setItem('supabase-auth-hash', hash);
               
-              // Try to directly redirect to the callback handler
-              if (window.location.hostname === 'subpirate.com') {
-                // In production, use absolute URL with https
-                window.location.href = 'https://subpirate.com/auth/callback';
-              } else {
-                // In development, use relative path
-                window.location.href = '/auth/callback';
-              }
+              // Build the callback URL
+              const callbackUrl = window.location.hostname === 'subpirate.com'
+                ? 'https://subpirate.com/auth/callback'
+                : '/auth/callback';
+                
+              // Ensure we have a clean URL without any trailing spaces
+              const cleanCallbackUrl = callbackUrl.trim();
+              
+              // Ensure we properly append the hash
+              const redirectUrl = `${cleanCallbackUrl}${hash}`;
+              
+              console.log('Redirecting to:', redirectUrl.replace(/access_token=([^&]+)/, 'access_token=REDACTED'));
+              
+              // Use replace for a clean redirect
+              window.location.replace(redirectUrl);
             } catch (error) {
               console.error('Error handling auth redirect:', error);
             }
