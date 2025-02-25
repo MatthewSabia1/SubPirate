@@ -16,6 +16,7 @@ import SavedList from './pages/SavedList';
 import SpyGlass from './pages/SpyGlass';
 import RedditAccounts from './pages/RedditAccounts';
 import RedditOAuthCallback from './pages/RedditOAuthCallback';
+import AuthCallback from './pages/AuthCallback';
 import Pricing from './pages/Pricing';
 import LandingPage from './pages/LandingPage';
 import { Menu } from 'lucide-react';
@@ -81,6 +82,7 @@ function App() {
               <Route path="/" element={<LandingPage />} />
               <Route path="/login" element={<Login />} />
               <Route path="/pricing" element={<Pricing />} />
+              <Route path="/auth/callback" element={<AuthCallback />} />
               <Route path="/auth/reddit/callback" element={
                 <PrivateRoute>
                   <RedditOAuthCallback />

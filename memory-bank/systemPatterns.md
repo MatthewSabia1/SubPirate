@@ -28,6 +28,26 @@ flowchart LR
     Webhook --> Supabase
 ```
 
+### Authentication Flow
+```mermaid
+flowchart TD
+    User[User] --> LoginOptions[Login Options]
+    LoginOptions --> EmailPassword[Email/Password]
+    LoginOptions --> GoogleOAuth[Google OAuth]
+    
+    EmailPassword --> SupabaseAuth[Supabase Auth]
+    GoogleOAuth --> GoogleConsent[Google Consent Screen]
+    GoogleConsent --> AuthCallback[/auth/callback]
+    
+    SupabaseAuth --> SessionCreated{Session Created?}
+    AuthCallback --> SessionCreated
+    
+    SessionCreated -->|Yes| Dashboard[Dashboard]
+    SessionCreated -->|No| LoginError[Login Error]
+    
+    LoginError --> LoginOptions
+```
+
 ### Subscription Flow
 ```mermaid
 flowchart TD
@@ -63,8 +83,16 @@ flowchart TD
    - AddToProject
    - FilterSort
    - Icons
+   - AuthCallback
 
-4. **Subscription Components**
+4. **Authentication Components**
+   - Login
+   - Signup
+   - AuthCallback
+   - AuthContext
+   - PrivateRoute
+
+5. **Subscription Components**
    - Pricing
    - PricingCard
    - TestModeIndicator
@@ -165,6 +193,42 @@ This pattern ensures image loading is:
 4. **Efficient**: Uses lazy loading for performance
 5. **Maintainable**: Centralizes image loading logic
 
+### 9. Authentication Pattern
+```mermaid
+flowchart TD
+    Component[UI Component] --> AuthContext[AuthContext]
+    
+    AuthContext --> AuthMethods{Auth Methods}
+    AuthMethods -->|Email/Password| SignInWithEmail[signInWithEmail]
+    AuthMethods -->|Google| SignInWithGoogle[signInWithGoogle]
+    AuthMethods -->|Signup| SignUp[signUp]
+    AuthMethods -->|Logout| SignOut[signOut]
+    
+    SignInWithEmail --> SupabaseAuth[Supabase Auth]
+    SignInWithGoogle --> SupabaseOAuth[Supabase OAuth]
+    SignUp --> SupabaseAuth
+    SignOut --> SupabaseAuth
+    
+    SupabaseOAuth --> Redirect[Redirect to Provider]
+    Redirect --> Callback[AuthCallback Component]
+    Callback --> SessionCheck{Session Valid?}
+    
+    SupabaseAuth --> SessionCheck
+    
+    SessionCheck -->|Yes| SetSession[Set Session in Context]
+    SessionCheck -->|No| HandleError[Handle Error]
+    
+    SetSession --> ProtectedRoute[Access Protected Routes]
+    HandleError --> ShowError[Show Error Message]
+```
+
+This pattern ensures authentication is:
+1. **Consistent**: Unified approach across different providers
+2. **Secure**: Proper session handling and validation
+3. **User-friendly**: Clear feedback during authentication process
+4. **Flexible**: Easy to add new authentication providers
+5. **Maintainable**: Centralized authentication logic in AuthContext
+
 ## Technical Decisions
 
 ### 1. Framework Choices
@@ -194,9 +258,14 @@ This pattern ensures image loading is:
 
 ### 4. Authentication
 - Supabase Auth
+- Multiple authentication providers:
+  - Email/Password for traditional login
+  - Google OAuth for social login
 - JWT tokens
 - Role-based access
 - Subscription-based feature access
+- Dedicated callback route for OAuth providers
+- Consistent error handling across authentication methods
 
 ### 5. Environment Separation
 - Development with forced test mode
@@ -221,6 +290,7 @@ This pattern ensures image loading is:
 - Webhook verification tests
 - Success/failure flow tests
 - Using Stripe CLI for local webhook testing
+
 ### Directory Structure
 ```
 src/

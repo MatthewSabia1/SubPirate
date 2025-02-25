@@ -59,6 +59,44 @@
 - Validate all parsed data from external sources
 - Provide meaningful defaults for missing data
 
+## Authentication Best Practices
+
+### OAuth Integration
+- Use the Supabase OAuth methods for implementing social login
+- Always provide a `redirectTo` URL that matches the application's callback route
+- Implement a dedicated callback component to handle OAuth redirects
+- Use loading indicators during authentication to provide user feedback
+- Implement comprehensive error handling for failed authentication attempts
+- Store authentication sessions securely
+- Use the onAuthStateChange listener to handle authentication events
+- Provide clear error messages for authentication failures
+- Test OAuth flows thoroughly across different environments
+- Configure OAuth providers correctly in the Supabase dashboard
+
+### Authentication Flow
+- Maintain consistent UI across authentication methods
+- Provide clear feedback during authentication processes
+- Implement proper loading states for asynchronous operations
+- Use comprehensive error handling for auth operations
+- Store user data securely and respect privacy
+- Refresh tokens appropriately to maintain sessions
+- Implement secure logout functionality
+- Use protected routes to prevent unauthorized access
+- Validate user sessions on navigation when appropriate
+- Create dedicated components for handling authentication callbacks
+
+### Supabase Configuration
+- Enable required OAuth providers in the Supabase dashboard
+- Configure proper redirect URLs for both development and production
+- Store Client IDs and Secrets securely
+- Configure proper scopes for OAuth providers
+- Test authentication flows in both development and production
+- Monitor authentication errors and address issues promptly
+- Document authentication configuration for future reference
+- Maintain a list of authorized redirect URIs
+- Test the complete authentication flow regularly
+- Follow security best practices for authentication
+
 ## Analysis System
 
 ### Type Safety

@@ -147,7 +147,7 @@ function Sidebar({ isMobileOpen, onMobileClose }: SidebarProps) {
     <div className={`sidebar ${isMobileOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}`}>
       <div className="p-4">
         <div className="flex items-center justify-between">
-          <Logo />
+          <Logo size="md" className="ml-1" />
           <button
             onClick={onMobileClose}
             className="md:hidden text-gray-400 hover:text-white p-2 -mr-2 rounded-full hover:bg-white/10"

@@ -16,7 +16,10 @@
 ### Backend
 - **Platform**: Supabase
 - **Database**: PostgreSQL
-- **Authentication**: Supabase Auth
+- **Authentication**: 
+  - Supabase Auth
+  - Email/Password authentication
+  - Google OAuth authentication
 - **Storage**: Supabase Storage
 - **Real-time**: Supabase Realtime
 - **AI**: OpenRouter
@@ -27,6 +30,7 @@
 - **Reddit API**: Direct REST integration with batching
 - **OpenRouter API**: AI analysis
 - **DiceBear**: Avatar generation
+- **Google OAuth**: User authentication
 - **Stripe API**: Subscription and payment processing
   - Test Mode configuration for development
   - Separate webhook server for event handling
@@ -51,7 +55,9 @@ routes: [
     ]
   },
   { path: '/login', element: <Login /> },
-  { path: '/signup', element: <Signup /> }
+  { path: '/signup', element: <Signup /> },
+  { path: '/auth/callback', element: <AuthCallback /> },
+  { path: '/reddit/callback', element: <RedditOAuthCallback /> }
 ]
 ```
 
@@ -114,6 +120,10 @@ VITE_SUPABASE_ACCESS_TOKEN=
 VITE_REDDIT_APP_ID=
 VITE_REDDIT_APP_SECRET=
 
+# Google OAuth Configuration
+# Configure in Supabase Dashboard under Authentication > Providers > Google
+# No additional environment variables needed for client-side implementation
+
 # Stripe Configuration
 # Test API keys (use these during development)
 VITE_STRIPE_TEST_SECRET_KEY=
@@ -169,6 +179,82 @@ VITE_STRIPE_BASE_URL=
 3. Redirect to Stripe Checkout
 4. On success, redirect back to app
 5. Webhook events update user subscription status
+
+## Authentication
+
+### Authentication Methods
+- **Email/Password**: Standard email and password login
+- **Google OAuth**: "Continue with Google" social login
+- **Reddit OAuth**: OAuth for Reddit API access (not for authentication)
+
+### Authentication Flow
+1. **Email/Password**:
+   - User enters email and password in Login form
+   - Credentials are validated by Supabase
+   - Session is created and stored in local storage
+   - User is redirected to the Dashboard
+
+2. **Google OAuth**:
+   - User clicks "Continue with Google" button
+   - Redirected to Google consent screen
+   - After approval, redirected to `/auth/callback`
+   - AuthCallback component processes the session
+   - User redirected to Dashboard on success
+
+3. **Session Management**:
+   - Sessions stored in local storage
+   - Sessions automatically refreshed
+   - Logged out when session expires
+
+### Authentication Configuration
+```typescript
+// src/contexts/AuthContext.tsx
+const signInWithGoogle = async () => {
+  setLoading(true);
+  try {
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: `${window.location.origin}/auth/callback`,
+      },
+    });
+    if (error) throw error;
+  } catch (error) {
+    console.error('Error signing in with Google:', error);
+    setError('An error occurred during Google sign-in. Please try again.');
+  } finally {
+    setLoading(false);
+  }
+};
+```
+
+```typescript
+// src/pages/AuthCallback.tsx
+useEffect(() => {
+  const { data: authListener } = supabase.auth.onAuthStateChange(
+    async (event, session) => {
+      if (event === 'SIGNED_IN' && session) {
+        setLoading(false);
+        navigate('/');
+      } else if (event === 'SIGNED_OUT') {
+        navigate('/login');
+      }
+    }
+  );
+
+  return () => {
+    authListener?.subscription.unsubscribe();
+  };
+}, [navigate]);
+```
+
+### Required Supabase Configuration
+- Google OAuth provider must be enabled in Supabase dashboard
+- Google Cloud Platform OAuth credentials required:
+  - Client ID and Client Secret
+  - Authorized redirect URI: `https://[PROJECT_REF].supabase.co/auth/v1/callback`
+  - Additional redirect URI for local development: `http://localhost:5173/auth/callback`
+  - Additional production redirect URI: `https://yourdomain.com/auth/callback`
 
 ## Dependencies
 
