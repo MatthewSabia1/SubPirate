@@ -19,7 +19,12 @@
     "stripe:test-env": "node scripts/test-stripe-environment.js",
     "stripe:migrate": "node scripts/migrate-stripe-to-production.js",
     "stripe:register-webhooks": "chmod +x scripts/register-product-price-webhooks.sh && ./scripts/register-product-price-webhooks.sh",
-    "stripe:migrate-products": "ts-node scripts/migrate-products-to-stripe.ts"
+    "stripe:migrate-products": "ts-node scripts/migrate-products-to-stripe.ts",
+    "admin:set": "node scripts/set-admin.js",
+    "admin:remove": "node scripts/set-admin.js --remove",
+    "gift:set": "node scripts/set-admin.js --gift",
+    "gift:remove": "node scripts/set-admin.js --gift --remove",
+    "admin:create-user-function": "node scripts/run_create_special_user_migration.js"
   },
   "dependencies": {
     "@clerk/backend": "^1.24.2",

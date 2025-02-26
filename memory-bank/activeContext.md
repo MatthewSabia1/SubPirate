@@ -1,6 +1,26 @@
 # Active Context
 
 ## Current Focus
+- Implementing comprehensive admin panel for application management
+- Admin panel metrics display for user growth, revenue, and usage statistics
+- User management interface for role assignment and user administration
+- User detail views for comprehensive user information and activity tracking
+- Admin tools for creating special users (gift and admin accounts)
+- Securing admin routes with proper authentication and authorization
+- Implementing tabbed interface for admin panel navigation
+- Enhancing Sidebar with conditional admin panel link for admin users
+- Ensuring consistent subscription verification across all routes
+- Improving error handling for subscription checks
+- Enhancing the subscription features system to support multiple user roles
+- Implementing the admin and gift user interfaces in the Settings page
+- Creating administrative scripts to manage user roles
+- Adding triggers for automatic subscription management based on user roles
+- Extending the feature access system to support different user roles
+- Improving error handling and validation in the role management system
+- Maintaining consistent data structure between frontend and database
+- Improving handling of Stripe test vs. live mode customer IDs
+- Fixing redirect loops for users with active subscriptions
+- Enhancing error logging for subscription verification
 - Preparing Stripe integration for production environment
 - Improving environment detection for Stripe configuration (test vs. production)
 - Implementing robust verification tools for Stripe production readiness
@@ -39,7 +59,129 @@
 - Fixing potential image loading errors across the application
 - Implementing Google Authentication for enhanced login options
 
+## Recently Implemented Features
+
+### Admin Panel
+The application now includes a comprehensive admin panel accessible only to users with the admin role. This panel serves as a central management hub for application administrators and includes the following key components:
+
+#### Admin Dashboard Metrics
+- Total users count with new user growth statistics
+- Monthly revenue calculation based on active subscriptions
+- Subscription metrics by tier with visual distribution
+- Usage statistics including total analyses and posts
+- Activity summary with key performance indicators
+
+#### User Management Interface
+- Complete user table with search functionality
+- User role management (admin, gift, regular)
+- Password reset functionality
+- User deletion with confirmation
+- Visual indicators for different user types
+- Profile image preview in user list
+
+#### User Details View
+- Comprehensive user profile information
+- Subscription details and status
+- Usage statistics and activity history
+- Connected Reddit accounts
+- Frequent searches history
+- Projects overview
+- Saved subreddits listing
+
+#### Admin Tools
+- Special user creation interface (admin or gift users)
+- Existing user role modification
+- Automatic password reset email generation
+- Role descriptions and documentation
+- Validation and error handling
+
+#### Technical Implementation
+- React Router integration with protected route
+- Tab-based navigation system
+- Role-based access control
+- Database RPC functions for user role management
+- Consistent styling with existing application
+- Mobile-responsive design
+- Clear error states and loading indicators
+
 ## Recent Changes
+- Implemented comprehensive user role system with admin and gift roles:
+  - Added a "gift" role to complement the existing "admin" role
+  - Created a robust role management system with database functions and triggers
+  - Implemented role-based subscription features and limits
+  - Added specialized UI elements for different user roles in the Settings page
+  - Enhanced the FeatureAccessContext to detect and handle different user roles
+  - Created command-line scripts for managing user roles
+  - Added database triggers to automatically maintain subscription records for special roles
+  
+- Enhanced the subscription system to support role-based access:
+  - Extended the subscription tier enumeration to include "admin" and "gift" tiers
+  - Added specialized handling for admin and gift users in the feature access system
+  - Created custom subscription records for admin and gift users
+  - Implemented unique constraints to prevent conflicts in subscription records
+  - Developed triggers to automatically update subscription records when roles change
+  - Fixed issues with ON CONFLICT clauses by adding proper constraints
+  - Updated the FeatureAccessContext to check for admin and gift roles
+  
+- Improved the UI for different user roles:
+  - Added special sections in Settings page for admin and gift users
+  - Implemented role-specific visual indicators and messaging
+  - Created custom subscription plan displays for different roles
+  - Added appropriate icons and styling for each role type
+  - Enhanced subscription management with role-specific actions and alerts
+  - Implemented different subscription detail displays based on user role
+  
+- Developed administrative scripts and tools:
+  - Updated the set-admin.js script to handle both admin and gift roles
+  - Added comprehensive command-line options for role management
+  - Improved error handling and user feedback in the scripts
+  - Created separate npm commands for setting and removing different roles
+  - Enhanced validation and error reporting for role management operations
+  - Added documentation in both code and usage examples
+
+- Fixed several critical issues with user role management:
+  - Added a unique constraint on (user_id, stripe_subscription_id) in customer_subscriptions
+  - Fixed SQL migration errors with the ON CONFLICT clause
+  - Improved error handling for role-setting operations
+  - Enhanced subscription feature availability checks
+  - Updated the subscription tier type system across the application
+  - Standardized role validation across multiple components
+  - Fixed edge cases in the role-based subscription management
+
+- Implemented mandatory subscription requirement for all new users:
+  - Modified authentication flow to check subscription status
+  - Updated routing to direct new users to subscription page
+  - Enhanced subscription status verification across multiple tables
+  - Added clear state management for authentication redirects
+  - Improved error handling and logging during subscription checks
+  - Fixed redirect issues for users with active subscriptions
+  - Added robust error handling for subscription verification
+  - Fixed issue with customer ID mismatches between test/live environments
+
+- Improved subscription verification across multiple tables:
+  - Enhanced `checkUserSubscription` function to check both subscription tables
+  - Added explicit OR condition handling for active/trialing status
+  - Implemented individual queries as fallback for OR condition failures
+  - Added detailed logging throughout the subscription check process
+  - Created safety mechanisms for handling errors during subscription verification
+  - Added graceful degradation for failed subscription checks
+
+- Fixed routing for users with active subscriptions:
+  - Removed `PrivateRoute` wrapper from subscription page to prevent redirect loops
+  - Updated subscription page to correctly handle authenticated users
+  - Enhanced logic in `App.tsx` to prevent unnecessary redirections
+  - Added clear logging of redirect conditions
+  - Improved state passing during navigation
+  - Fixed authentication callback routing logic
+
+- Enhanced error handling for Stripe customer IDs:
+  - Added detection of customer ID environment mismatches
+  - Implemented recovery mechanism for mismatched customer IDs
+  - Added fallback checkout process when customer ID is invalid
+  - Enhanced error messaging for Stripe API errors
+  - Added robust error handling in `createCheckoutSession` function
+  - Improved validation of environment-specific configurations
+
 - Prepared Stripe integration for production environment:
   - Created verification script (`scripts/verify-stripe-production.js`) to check:
     - Environment variables for production keys
@@ -855,85 +997,4 @@ We have successfully updated the subscription pricing structure in both Stripe a
 
 ### User Usage Stats Fix
 - Fixed 404 errors with the Supabase RPC function `get_user_usage_stats`:
-  1. Created new migration file `20240225_create_usage_tracking_fix.sql` with idempotent operations
-  2. Fixed missing RPC function implementation in Supabase
-  3. Added explicit permission grants for authenticated and anonymous users
-  4. Implemented proper error handling in the function
-  5. Created DROP statements for existing functions to avoid conflicts
-  6. Made the migration script safe to run multiple times
-  7. Added appropriate security definer settings for the functions
-  8. Added explicit row-level security policies for the user_usage_stats table
-  9. Verified successful implementation by executing the script
-  10. Fixed console errors that were appearing during application usage
-
-## Recent Changes
-- Fixed NSFW content handling in Calendar component to ensure all content displays properly
-- Updated RedditImage component to handle NSFW thumbnails more effectively
-- Improved post details fetching to properly handle NSFW content and thumbnails
-- Removed content filtering from Reddit API integration
-- Set showNSFW to true by default in Dashboard component
-
-## Current Focus
-- Ensuring all Reddit content displays properly regardless of NSFW status
-- Improving image handling and fallbacks for all content types
-- Maintaining proper error handling while ensuring no content is filtered
-
-## Active Decisions
-1. NSFW Content Handling:
-   - No filtering of NSFW content at any level
-   - Special handling for Reddit's 'nsfw' thumbnail placeholder
-   - Use of alternative image sources when primary thumbnail is unavailable
-   - Proper fallback system for all image types
-
-2. Image Display Strategy:
-   - Try preview image first (highest quality)
-   - Fall back to thumbnail if preview unavailable
-   - Use media.oembed.thumbnail_url as additional source
-   - Generate placeholder only when no images available
-
-3. Error Handling:
-   - Maintain error logging for debugging
-   - Use fallback images when needed
-   - Don't filter content based on type or rating
-
-## Recent Component Updates
-1. RedditImage Component:
-   - Removed NSFW filtering from URL validation
-   - Improved handling of Reddit's special thumbnail values
-   - Enhanced fallback system for all content types
-
-2. Calendar Component:
-   - Updated fetchPostDetails to better handle NSFW content
-   - Improved image source selection logic
-   - Added additional logging for content handling
-
-3. Dashboard Component:
-   - Set showNSFW to true by default
-   - Removed any NSFW-related filtering
-
-## Next Steps
-1. Test NSFW content display across all components
-2. Verify image loading and fallbacks work consistently
-3. Monitor error logs for any image loading issues
-4. Consider adding more image source fallbacks if needed
-5. Update documentation to reflect new content handling approach
-
-## Known Issues
-- None currently identified with NSFW content handling
-- Continue monitoring for any image loading edge cases
-
-## Recent Improvements
-1. Image Handling:
-   - Better handling of Reddit's special thumbnail values
-   - More robust fallback system
-   - Improved error logging
-
-2. Content Display:
-   - No content filtering
-   - Better handling of NSFW posts
-   - More reliable image loading
-
-3. Error Handling:
-   - Clearer error messages
-   - Better fallback behavior
-   - Improved debugging information
+  1. Created new migration file `

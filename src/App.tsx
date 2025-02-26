@@ -25,6 +25,7 @@ import { Menu } from 'lucide-react';
 import { useRedirectHandler } from './lib/useRedirectHandler';
 import { ErrorBoundary } from 'react-error-boundary';
 import { supabase } from './lib/supabase';
+import Admin from './pages/Admin';
 
 // Create a client
 const queryClient = new QueryClient({
@@ -308,6 +309,11 @@ function App() {
                   <Route path="/accounts" element={
                     <PrivateRoute>
                       <RedditAccounts />
+                    </PrivateRoute>
+                  } />
+                  <Route path="/admin" element={
+                    <PrivateRoute>
+                      <Admin />
                     </PrivateRoute>
                   } />
                   <Route path="/subscription" element={<SubscriptionPage />} />

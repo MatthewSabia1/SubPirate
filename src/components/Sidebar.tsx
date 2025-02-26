@@ -13,9 +13,11 @@ import {
   Upload,
   X,
   Menu,
-  ChevronLeft
+  ChevronLeft,
+  ShieldCheck
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
+import { useFeatureAccess } from '../contexts/FeatureAccessContext';
 import { supabase } from '../lib/supabase';
 import Logo from './Logo';
 
@@ -33,6 +35,7 @@ function Sidebar({ isMobileOpen, onMobileClose }: SidebarProps) {
   const location = useLocation();
   const navigate = useNavigate();
   const { user, profile, signOut } = useAuth();
+  const { isAdmin } = useFeatureAccess();
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -207,6 +210,17 @@ function Sidebar({ isMobileOpen, onMobileClose }: SidebarProps) {
           <Users size={20} />
           Reddit Accounts
         </button>
+        
+        {/* Admin Panel Link - Only visible to admins */}
+        {isAdmin && (
+          <button
+            onClick={() => handleNavigation('/admin')}
+            className={`sidebar-link w-full text-left ${location.pathname === '/admin' ? 'active' : ''}`}
+          >
+            <ShieldCheck size={20} />
+            Admin Panel
+          </button>
+        )}
       </nav>
 
       <div className="absolute bottom-0 left-0 w-full border-t border-[#333333]">

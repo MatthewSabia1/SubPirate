@@ -17,6 +17,7 @@ CREATE TABLE public.customer_subscriptions (
   CONSTRAINT customer_subscriptions_stripe_subscription_id_key UNIQUE (stripe_subscription_id),
   CONSTRAINT customer_subscriptions_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id)
 );
+
 CREATE TABLE public.frequent_searches (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
   username text NOT NULL,
@@ -28,8 +29,7 @@ CREATE TABLE public.frequent_searches (
   CONSTRAINT frequent_searches_pkey PRIMARY KEY (id),
   CONSTRAINT unique_username UNIQUE (username)
 );
-CREATE INDEX IF NOT EXISTS idx_frequent_searches_count ON public.frequent_searches USING btree (search_count DESC);
-CREATE INDEX IF NOT EXISTS idx_frequent_searches_username ON public.frequent_searches USING btree (username);
+
 CREATE TABLE public.product_features (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
   stripe_product_id text NOT NULL,
@@ -41,6 +41,7 @@ CREATE TABLE public.product_features (
   CONSTRAINT fk_feature FOREIGN KEY (feature_key) REFERENCES subscription_features(feature_key) ON DELETE CASCADE,
   CONSTRAINT fk_stripe_product FOREIGN KEY (stripe_product_id) REFERENCES stripe_products(stripe_product_id) ON DELETE CASCADE
 );
+
 CREATE TABLE public.profiles (
   id uuid NOT NULL,
   display_name text NULL,
@@ -50,10 +51,11 @@ CREATE TABLE public.profiles (
   image_url text NULL,
   stripe_customer_id text NULL,
   full_name text NULL,
+  role text NOT NULL DEFAULT 'user'::text,
   CONSTRAINT profiles_pkey PRIMARY KEY (id),
   CONSTRAINT profiles_id_fkey FOREIGN KEY (id) REFERENCES auth.users(id) ON DELETE CASCADE
 );
-CREATE INDEX IF NOT EXISTS idx_profiles_stripe_customer_id ON public.profiles USING btree (stripe_customer_id);
+
 CREATE TABLE public.project_members (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
   project_id uuid NOT NULL,
@@ -66,6 +68,7 @@ CREATE TABLE public.project_members (
   CONSTRAINT project_members_project_id_fkey FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
   CONSTRAINT project_members_user_id_fkey FOREIGN KEY (user_id) REFERENCES profiles(id) ON DELETE CASCADE
 );
+
 CREATE TABLE public.project_subreddits (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
   project_id uuid NOT NULL,
@@ -77,6 +80,7 @@ CREATE TABLE public.project_subreddits (
   CONSTRAINT project_subreddits_project_id_fkey FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
   CONSTRAINT project_subreddits_subreddit_id_fkey FOREIGN KEY (subreddit_id) REFERENCES subreddits(id) ON DELETE CASCADE
 );
+
 CREATE TABLE public.projects (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
   user_id uuid NOT NULL,
@@ -88,6 +92,7 @@ CREATE TABLE public.projects (
   CONSTRAINT projects_pkey PRIMARY KEY (id),
   CONSTRAINT projects_user_id_fkey FOREIGN KEY (user_id) REFERENCES profiles(id) ON DELETE CASCADE
 );
+
 CREATE TABLE public.reddit_accounts (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
   user_id uuid NOT NULL,
@@ -126,9 +131,7 @@ CREATE TABLE public.reddit_accounts (
   CONSTRAINT reddit_accounts_user_id_username_key UNIQUE (user_id, username),
   CONSTRAINT reddit_accounts_user_id_fkey FOREIGN KEY (user_id) REFERENCES profiles(id) ON DELETE CASCADE
 );
-CREATE INDEX IF NOT EXISTS idx_reddit_accounts_token_expiry ON public.reddit_accounts USING btree (token_expiry);
-CREATE INDEX IF NOT EXISTS idx_reddit_accounts_is_active ON public.reddit_accounts USING btree (is_active);
-CREATE INDEX IF NOT EXISTS idx_reddit_accounts_rate_limit ON public.reddit_accounts USING btree (rate_limit_remaining, rate_limit_reset) WHERE (is_active = true);
+
 CREATE TABLE public.reddit_api_usage (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
   reddit_account_id uuid NOT NULL,
@@ -143,9 +146,7 @@ CREATE TABLE public.reddit_api_usage (
   CONSTRAINT reddit_api_usage_account_endpoint_hash_key UNIQUE (reddit_account_id, endpoint_hash),
   CONSTRAINT reddit_api_usage_reddit_account_id_fkey FOREIGN KEY (reddit_account_id) REFERENCES reddit_accounts(id) ON DELETE CASCADE
 );
-CREATE INDEX IF NOT EXISTS idx_reddit_api_usage_account_endpoint ON public.reddit_api_usage USING btree (reddit_account_id, endpoint);
-CREATE INDEX IF NOT EXISTS idx_reddit_api_usage_window ON public.reddit_api_usage USING btree (window_start, reset_at);
-CREATE INDEX IF NOT EXISTS idx_reddit_api_usage_lookup ON public.reddit_api_usage USING btree (reddit_account_id, endpoint_hash, window_start);
+
 CREATE TABLE public.reddit_posts (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
   reddit_account_id uuid NOT NULL,
@@ -164,6 +165,7 @@ CREATE TABLE public.reddit_posts (
   CONSTRAINT reddit_posts_reddit_account_id_fkey FOREIGN KEY (reddit_account_id) REFERENCES reddit_accounts(id) ON DELETE CASCADE,
   CONSTRAINT reddit_posts_subreddit_id_fkey FOREIGN KEY (subreddit_id) REFERENCES subreddits(id) ON DELETE CASCADE
 );
+
 CREATE TABLE public.saved_subreddits (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
   user_id uuid NOT NULL,
@@ -175,8 +177,7 @@ CREATE TABLE public.saved_subreddits (
   CONSTRAINT saved_subreddits_subreddit_id_fkey FOREIGN KEY (subreddit_id) REFERENCES subreddits(id) ON DELETE CASCADE,
   CONSTRAINT saved_subreddits_user_id_fkey FOREIGN KEY (user_id) REFERENCES profiles(id) ON DELETE CASCADE
 );
-CREATE INDEX IF NOT EXISTS idx_saved_subreddits_subreddit_id ON public.saved_subreddits USING btree (subreddit_id);
-CREATE INDEX IF NOT EXISTS idx_saved_subreddits_user_id ON public.saved_subreddits USING btree (user_id);
+
 CREATE TABLE public.stripe_prices (
   id text NOT NULL,
   active boolean NULL DEFAULT true,
@@ -190,7 +191,7 @@ CREATE TABLE public.stripe_prices (
   CONSTRAINT stripe_prices_pkey PRIMARY KEY (id),
   CONSTRAINT fk_stripe_product FOREIGN KEY (stripe_product_id) REFERENCES stripe_products(stripe_product_id) ON DELETE CASCADE
 );
-CREATE INDEX IF NOT EXISTS idx_stripe_prices_product_id ON public.stripe_prices USING btree (stripe_product_id);
+
 CREATE TABLE public.stripe_products (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
   stripe_product_id text NOT NULL,
@@ -203,6 +204,7 @@ CREATE TABLE public.stripe_products (
   CONSTRAINT stripe_products_pkey PRIMARY KEY (id),
   CONSTRAINT stripe_products_stripe_product_id_key UNIQUE (stripe_product_id)
 );
+
 CREATE TABLE public.subreddit_posts (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
   reddit_account_id uuid NOT NULL,
@@ -213,9 +215,93 @@ CREATE TABLE public.subreddit_posts (
   CONSTRAINT subreddit_posts_reddit_account_id_fkey FOREIGN KEY (reddit_account_id) REFERENCES reddit_accounts(id) ON DELETE CASCADE,
   CONSTRAINT subreddit_posts_subreddit_id_fkey FOREIGN KEY (subreddit_id) REFERENCES subreddits(id) ON DELETE CASCADE
 );
+
 CREATE TABLE public.subreddits (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
   name text NOT NULL,
   subscriber_count integer NULL DEFAULT 0,
   active_users integer NULL DEFAULT 0,
   marketing_friendly_score integer NULL DEFAULT 0,
+  posting_requirements jsonb NULL DEFAULT '{}'::jsonb,
+  posting_frequency jsonb NULL DEFAULT '{}'::jsonb,
+  allowed_content text[] NULL DEFAULT '{}'::text[],
+  best_practices text[] NULL DEFAULT '{}'::text[],
+  rules_summary text NULL,
+  title_template text NULL,
+  last_analyzed_at timestamp with time zone NULL DEFAULT now(),
+  created_at timestamp with time zone NULL DEFAULT now(),
+  updated_at timestamp with time zone NULL DEFAULT now(),
+  icon_img text NULL,
+  community_icon text NULL,
+  total_posts_24h integer NULL DEFAULT 0,
+  last_post_sync timestamp with time zone NULL DEFAULT now(),
+  analysis_data jsonb NULL,
+  CONSTRAINT subreddits_pkey PRIMARY KEY (id),
+  CONSTRAINT subreddits_name_key UNIQUE (name)
+);
+
+CREATE TABLE public.subscription_features (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  feature_key text NOT NULL,
+  name text NOT NULL,
+  description text NOT NULL,
+  created_at timestamp with time zone NULL DEFAULT now(),
+  updated_at timestamp with time zone NULL DEFAULT now(),
+  CONSTRAINT subscription_features_pkey PRIMARY KEY (id),
+  CONSTRAINT subscription_features_feature_key_key UNIQUE (feature_key)
+);
+
+CREATE TABLE public.subscriptions (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  user_id uuid NOT NULL,
+  stripe_customer_id text NULL,
+  stripe_subscription_id text NULL,
+  status public.subscription_status NOT NULL,
+  price_id text NULL,
+  quantity integer NULL DEFAULT 1,
+  cancel_at_period_end boolean NULL DEFAULT false,
+  cancel_at timestamp with time zone NULL,
+  canceled_at timestamp with time zone NULL,
+  current_period_start timestamp with time zone NULL,
+  current_period_end timestamp with time zone NULL,
+  created_at timestamp with time zone NULL DEFAULT now(),
+  ended_at timestamp with time zone NULL,
+  trial_start timestamp with time zone NULL,
+  trial_end timestamp with time zone NULL,
+  CONSTRAINT subscriptions_pkey PRIMARY KEY (id),
+  CONSTRAINT subscriptions_price_id_fkey FOREIGN KEY (price_id) REFERENCES stripe_prices(id),
+  CONSTRAINT subscriptions_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id)
+);
+
+CREATE TABLE public.user_usage_stats (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  user_id uuid NOT NULL,
+  subreddit_analysis_count integer NULL DEFAULT 0,
+  month_start timestamp with time zone NOT NULL,
+  month_end timestamp with time zone NOT NULL,
+  created_at timestamp with time zone NULL DEFAULT now(),
+  updated_at timestamp with time zone NULL DEFAULT now(),
+  CONSTRAINT user_usage_stats_pkey PRIMARY KEY (id),
+  CONSTRAINT user_usage_stats_user_id_month_start_key UNIQUE (user_id, month_start),
+  CONSTRAINT user_usage_stats_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE
+);
+
+-- Row Level Security Policies
+CREATE POLICY "Authenticated users can view their own profiles" ON public.profiles
+FOR SELECT TO authenticated
+USING (auth.uid() = id);
+
+CREATE POLICY "Authenticated users can insert their own profiles" ON public.profiles
+FOR INSERT TO authenticated
+WITH CHECK (auth.uid() = id);
+
+CREATE POLICY "Authenticated users can update their own profiles" ON public.profiles
+FOR UPDATE TO authenticated
+USING (auth.uid() = id)
+WITH CHECK (auth.uid() = id);
+
+CREATE POLICY "Authenticated users can delete their own profiles" ON public.profiles
+FOR DELETE TO authenticated
+USING (auth.uid() = id);
+
+-- Repeat similar policies for other tables as needed

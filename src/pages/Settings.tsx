@@ -1,11 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
+import { useFeatureAccess } from '../contexts/FeatureAccessContext';
 import { createBillingPortalSession } from '../lib/stripe/client';
 import { getSubscriptionStatus } from '../lib/stripe/subscription';
 import { supabase } from '../lib/supabase';
+import { Infinity, Gift } from 'lucide-react';
 
 function Settings() {
   const { user, profile, updateProfile } = useAuth();
+  const { isAdmin, isGiftUser, tier } = useFeatureAccess();
   const [email, setEmail] = useState(user?.email || '');
   const [displayName, setDisplayName] = useState(profile?.display_name || '');
   const [currentPassword, setCurrentPassword] = useState('');
@@ -34,14 +37,17 @@ function Settings() {
   useEffect(() => {
     async function loadSubscription() {
       try {
-        const sub = await getSubscriptionStatus();
-        setSubscription(sub);
+        // Only load subscription status for regular users
+        if (!isAdmin && !isGiftUser) {
+          const sub = await getSubscriptionStatus();
+          setSubscription(sub);
+        }
       } catch (error) {
         console.error('Error loading subscription:', error);
       }
     }
     loadSubscription();
-  }, []);
+  }, [isAdmin, isGiftUser]);
 
   const handleProfileUpdate = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -144,6 +150,17 @@ function Settings() {
   };
 
   const handleManageSubscription = async () => {
+    // Special users don't need to manage subscriptions
+    if (isAdmin) {
+      alert('Admin users have full access to all features and do not require subscription management.');
+      return;
+    }
+    
+    if (isGiftUser) {
+      alert('You have a gift account with complimentary access to premium features.');
+      return;
+    }
+    
     try {
       setPortalLoading(true);
       if (!user) {
@@ -180,7 +197,7 @@ function Settings() {
       <h1 className="text-4xl font-bold mb-8">Account Settings</h1>
 
       {/* Subscription Warning Modal */}
-      {showSubscriptionWarning && (
+      {showSubscriptionWarning && !isAdmin && !isGiftUser && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
           <div className="bg-[#1c1c1c] p-6 rounded-lg max-w-md w-full">
             <h3 className="text-xl font-bold mb-4">Subscription Required</h3>
@@ -220,7 +237,15 @@ function Settings() {
               <h2 className="text-xl font-semibold mb-1">Subscription</h2>
               <p className="text-gray-500 text-sm">Manage your subscription</p>
             </div>
-            {subscription && (
+            {isAdmin ? (
+              <span className="px-2 py-1 text-xs rounded-md bg-purple-900/30 text-purple-400">
+                Admin
+              </span>
+            ) : isGiftUser ? (
+              <span className="px-2 py-1 text-xs rounded-md bg-pink-900/30 text-pink-400">
+                Gift
+              </span>
+            ) : subscription && (
               <span className={`px-2 py-1 text-xs rounded-md ${
                 subscription.status === 'active' || subscription.status === 'trialing'
                   ? 'bg-green-900/30 text-green-400'
@@ -232,7 +257,63 @@ function Settings() {
           </div>
 
           <div className="mt-6 space-y-6">
-            {subscription ? (
+            {isAdmin ? (
+              <>
+                <div className="flex justify-between items-start">
+                  <div>
+                    <div className="text-gray-500 mb-1">Plan</div>
+                    <div className="text-lg flex items-center">
+                      Admin Plan <Infinity className="ml-2 text-purple-400" size={18} />
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-gray-500 mb-1">Price</div>
+                    <div className="text-lg text-purple-400">Unlimited Access</div>
+                  </div>
+                </div>
+
+                <div>
+                  <div className="text-gray-500 mb-1">Status</div>
+                  <div className="text-lg">
+                    <span className="text-purple-400">Full administrative access</span>
+                  </div>
+                </div>
+
+                <div className="bg-purple-900/20 border border-purple-800 text-purple-200 p-4 rounded-lg">
+                  <p className="text-sm">
+                    As an administrator, you have unlimited access to all features with no subscription restrictions.
+                  </p>
+                </div>
+              </>
+            ) : isGiftUser ? (
+              <>
+                <div className="flex justify-between items-start">
+                  <div>
+                    <div className="text-gray-500 mb-1">Plan</div>
+                    <div className="text-lg flex items-center">
+                      Gift Plan <Gift className="ml-2 text-pink-400" size={18} />
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-gray-500 mb-1">Price</div>
+                    <div className="text-lg text-pink-400">Complimentary</div>
+                  </div>
+                </div>
+
+                <div>
+                  <div className="text-gray-500 mb-1">Status</div>
+                  <div className="text-lg">
+                    <span className="text-pink-400">Premium access granted</span>
+                  </div>
+                </div>
+
+                <div className="bg-pink-900/20 border border-pink-800 text-pink-200 p-4 rounded-lg">
+                  <p className="text-sm">
+                    You have been granted complimentary access to premium features at no cost.
+                  </p>
+                </div>
+              </>
+            ) : subscription ? (
               <>
                 <div className="flex justify-between items-start">
                   <div>

@@ -14,6 +14,8 @@ interface FeatureAccessContextType {
   tier: string;
   refreshAccess: () => Promise<void>;
   checkUsageLimit: (metric: string, currentUsage: number) => boolean;
+  isAdmin: boolean;
+  isGiftUser: boolean;
 }
 
 // Define the shape of the data we expect from Supabase
@@ -26,6 +28,10 @@ interface PriceWithProduct {
   stripe_products: StripeProduct;
 }
 
+// Special tier identifiers
+const ADMIN_TIER = 'admin';
+const GIFT_TIER = 'gift';
+
 const FeatureAccessContext = createContext<FeatureAccessContextType | undefined>(undefined);
 
 export function FeatureAccessProvider({ children }: { children: React.ReactNode }) {
@@ -34,17 +40,84 @@ export function FeatureAccessProvider({ children }: { children: React.ReactNode 
   const [tier, setTier] = useState<string>('free');
   const [features, setFeatures] = useState<string[]>([]);
   const [usageLimits, setUsageLimits] = useState<Record<string, number>>({});
+  const [isAdmin, setIsAdmin] = useState<boolean>(false);
+  const [isGiftUser, setIsGiftUser] = useState<boolean>(false);
+
+  const checkAdminStatus = useCallback(async (userId: string) => {
+    try {
+      const { data, error } = await supabase
+        .rpc('is_admin', { user_id: userId });
+      
+      if (error) {
+        console.error('Error checking admin status:', error);
+        return false;
+      }
+      
+      return data || false;
+    } catch (error) {
+      console.error('Exception checking admin status:', error);
+      return false;
+    }
+  }, []);
+
+  const checkGiftStatus = useCallback(async (userId: string) => {
+    try {
+      const { data, error } = await supabase
+        .rpc('is_gift_user', { user_id: userId });
+      
+      if (error) {
+        console.error('Error checking gift user status:', error);
+        return false;
+      }
+      
+      return data || false;
+    } catch (error) {
+      console.error('Exception checking gift user status:', error);
+      return false;
+    }
+  }, []);
 
   const loadSubscriptionData = useCallback(async () => {
     if (!user) {
       setTier('free');
       setFeatures(TIER_FEATURES.free);
+      setIsAdmin(false);
+      setIsGiftUser(false);
       setIsLoading(false);
       return;
     }
 
     setIsLoading(true);
     try {
+      // First check if user is admin
+      const adminStatus = await checkAdminStatus(user.id);
+      setIsAdmin(adminStatus);
+      
+      // Then check if user has a gift account
+      const giftStatus = await checkGiftStatus(user.id);
+      setIsGiftUser(giftStatus);
+      
+      // If user is admin, they get all features
+      if (adminStatus) {
+        // Set to admin tier and give access to all features
+        setTier(ADMIN_TIER);
+        // Combine all features from all tiers
+        const allFeatures = Object.values(TIER_FEATURES).flat();
+        // Remove duplicates
+        setFeatures([...new Set(allFeatures)]);
+        setIsLoading(false);
+        return;
+      }
+
+      // If user has a gift account, they get gift tier features
+      if (giftStatus) {
+        setTier(GIFT_TIER);
+        setFeatures(TIER_FEATURES.gift);
+        setIsLoading(false);
+        return;
+      }
+
+      // For regular users, proceed with normal subscription check
       // Simplified query to avoid 406 error
       const { data: subscription, error: subscriptionError } = await supabase
         .from('customer_subscriptions')
@@ -124,7 +197,7 @@ export function FeatureAccessProvider({ children }: { children: React.ReactNode 
     } finally {
       setIsLoading(false);
     }
-  }, [user]);
+  }, [user, checkAdminStatus, checkGiftStatus]);
 
   // Load subscription data on component mount or when user changes
   useEffect(() => {
@@ -133,11 +206,16 @@ export function FeatureAccessProvider({ children }: { children: React.ReactNode 
 
   // Function to check if user has access to a feature
   const hasAccess = useCallback((featureKey: FeatureKey): boolean => {
+    // Admins always have access to all features
+    if (isAdmin) {
+      return true;
+    }
     return features.includes(featureKey);
-  }, [features]);
+  }, [features, isAdmin]);
 
   // Function to check if user is within usage limits
   const checkUsageLimit = useCallback((metric: string, currentUsage: number): boolean => {
+    // Usage limits are defined per tier
     return isWithinUsageLimit(tier as any, metric, currentUsage);
   }, [tier]);
 
@@ -148,6 +226,8 @@ export function FeatureAccessProvider({ children }: { children: React.ReactNode 
       tier,
       refreshAccess: loadSubscriptionData,
       checkUsageLimit,
+      isAdmin,
+      isGiftUser,
     }}>
       {children}
     </FeatureAccessContext.Provider>

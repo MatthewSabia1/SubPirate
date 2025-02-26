@@ -28,6 +28,30 @@ flowchart LR
     Webhook --> Supabase
 ```
 
+### User Role Management Flow
+```mermaid
+flowchart TD
+    Admin[Admin User] --> SetRole[Set User Role]
+    SetRole --> RoleType{Role Type}
+    RoleType -->|Admin| SetAdminRole[Set Admin Role]
+    RoleType -->|Gift| SetGiftRole[Set Gift Role]
+    RoleType -->|Regular| RemoveSpecialRole[Remove Special Role]
+    
+    SetAdminRole --> DatabaseUpdate[Update Profile Role]
+    SetGiftRole --> DatabaseUpdate
+    RemoveSpecialRole --> DatabaseUpdate
+    
+    DatabaseUpdate --> RefreshUI[Refresh UI]
+    
+    Admin -->|Create New| NewUser[Create Special User]
+    NewUser --> CheckExists{User Exists?}
+    CheckExists -->|Yes| UpdateExisting[Update Existing User]
+    CheckExists -->|No| CreateNew[Create New User]
+    CreateNew --> SetPassword[Generate Temporary Password]
+    SetPassword --> SendReset[Send Reset Email]
+    UpdateExisting --> SetRole
+```
+
 ### Authentication Flow
 ```mermaid
 flowchart TD
@@ -268,6 +292,66 @@ This pattern ensures authentication is:
 3. **User-friendly**: Clear feedback during authentication process
 4. **Flexible**: Easy to add new authentication providers
 5. **Maintainable**: Centralized authentication logic in AuthContext
+
+### User Role Management Pattern
+```mermaid
+flowchart TD
+    Start[Role Assignment] --> CheckRole{Which Role?}
+    CheckRole -->|Admin| SetAdmin[Set Admin Role]
+    CheckRole -->|Gift| SetGift[Set Gift Role]
+    CheckRole -->|User| RemoveSpecial[Remove Special Role]
+    
+    SetAdmin --> DatabaseUpdate[Update User Profile]
+    SetGift --> DatabaseUpdate
+    RemoveSpecial --> DatabaseUpdate
+    
+    DatabaseUpdate --> Trigger[Database Trigger]
+    Trigger --> CreateSubscription[Create/Update Role-specific Subscription]
+    CreateSubscription --> Frontend[Update Frontend Access]
+    
+    Frontend --> CheckAccess{Check Access}
+    CheckAccess -->|Admin| AdminFeatures[Full Access + Admin Panel]
+    CheckAccess -->|Gift| GiftFeatures[Pro-level Access]
+    CheckAccess -->|Regular| StandardFeatures[Tier-based Access]
+```
+
+The User Role Management Pattern implements:
+1. **Role-based Access Control**: Three distinct user roles (user, admin, gift)
+2. **Database Functions**:
+   - `is_admin(user_id)`: Checks if a user has admin role
+   - `is_gift_user(user_id)`: Checks if a user has gift role
+   - `set_user_role(user_id, role)`: Securely sets a user's role with validation
+3. **Database Triggers**:
+   - `special_role_subscription_trigger`: Automatically maintains subscription records for admin and gift users
+4. **Command-line Interface**: Admin tool for role management
+5. **UI Components**: Role-specific displays in Settings page
+6. **Feature Access System**: Tier access based on role
+
+### Subscription Tier System Pattern
+```mermaid
+flowchart TD
+    User[User] --> CheckRole{Check Role}
+    CheckRole -->|Admin| AdminTier[Admin Tier]
+    CheckRole -->|Gift| GiftTier[Gift Tier]
+    CheckRole -->|Regular| CheckSubscription[Check Subscription]
+    
+    CheckSubscription --> TierAssignment[Assign Tier]
+    AdminTier --> Features{Feature Access}
+    GiftTier --> Features
+    TierAssignment --> Features
+    
+    Features --> FeatureCheck{Has Access?}
+    FeatureCheck -->|Yes| AllowAccess[Allow Feature]
+    FeatureCheck -->|No| UpgradePrompt[Show Upgrade]
+```
+
+The Subscription Tier System includes:
+1. **Hierarchical Tiers**: free, starter, creator, pro, agency, admin, gift
+2. **Role-based Override**: admin and gift roles override regular subscription
+3. **Feature Mapping**: Feature keys mapped to tiers
+4. **Usage Limits**: Tier-specific limits on various metrics
+5. **UI Rendering**: Different UI/UX based on tier
+6. **Clear Upgrade Paths**: For regular users to enhance their subscription
 
 ## Technical Decisions
 
@@ -1339,4 +1423,34 @@ xl: '1280px'  // Large Desktop
 2. Validate request
 3. Filter response
 4. Log access
+```
+
+### Admin Panel Architecture
+```mermaid
+flowchart TD
+    AdminPage[Admin Page] --> AdminTabs{Tab Selection}
+    AdminTabs -->|Metrics| AdminMetrics[Admin Metrics]
+    AdminTabs -->|Users| UserManagement[User Management]
+    AdminTabs -->|Tools| AdminTools[Admin Tools]
+    UserManagement -->|Select User| UserDetails[User Details]
+    AdminMetrics -->|Fetch| MetricsData[Database Metrics]
+    UserManagement -->|Fetch| UsersData[User Database]
+    UserDetails -->|Fetch| UserDetailData[User Details Data]
+    AdminTools -->|Create| SpecialUser[Special User]
+```
+
+### Admin Panel Access Flow
+```mermaid
+flowchart TD
+    User -->|Navigate| AdminRoute[/admin Route]
+    AdminRoute --> CheckAuth{Is Authenticated?}
+    CheckAuth -->|No| RedirectLogin[Redirect to Login]
+    CheckAuth -->|Yes| CheckAdmin{Is Admin?}
+    CheckAdmin -->|No| RedirectDashboard[Redirect to Dashboard]
+    CheckAdmin -->|Yes| AdminPanel[Admin Panel]
+    AdminPanel --> AdminTabs{Tab Selection}
+    AdminTabs -->|Metrics| ShowMetrics[Show Metrics]
+    AdminTabs -->|Users| ShowUsers[Show User Management]
+    AdminTabs -->|Tools| ShowTools[Show Admin Tools]
+    ShowUsers -->|Select User| ShowUserDetails[Show User Details]
 ```

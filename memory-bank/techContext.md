@@ -118,16 +118,16 @@ GET /api/test
 ### Environment Variables
 ```
 # Supabase Configuration
-VITE_SUPABASE_URL=
-VITE_SUPABASE_ANON_KEY=
-VITE_SUPABASE_SERVICE_ROLE_KEY=
+VITE_SUPABASE_URL=your_supabase_url
+VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
+VITE_SUPABASE_SERVICE_ROLE_KEY=your_supabase_service_role_key
 VITE_SUPABASE_JWT_SECRET=
 VITE_SUPABASE_CONNECTION_STRING=
 VITE_SUPABASE_ACCESS_TOKEN=
 
 # Reddit API Configuration
-VITE_REDDIT_APP_ID=
-VITE_REDDIT_APP_SECRET=
+VITE_REDDIT_APP_ID=your_reddit_app_id
+VITE_REDDIT_APP_SECRET=your_reddit_app_secret
 
 # Google OAuth Configuration
 # Configure in Supabase Dashboard under Authentication > Providers > Google
@@ -135,16 +135,19 @@ VITE_REDDIT_APP_SECRET=
 
 # Stripe Configuration
 # Test API keys (used in development and preview environments)
-VITE_STRIPE_TEST_SECRET_KEY=
-VITE_STRIPE_TEST_PUBLISHABLE_KEY=
-VITE_STRIPE_TEST_WEBHOOK_SECRET=
+VITE_STRIPE_TEST_SECRET_KEY=sk_test_...
+VITE_STRIPE_TEST_PUBLISHABLE_KEY=pk_test_...
+VITE_STRIPE_TEST_WEBHOOK_SECRET=whsec_...
 
 # Production API keys (used in production environment)
-VITE_STRIPE_SECRET_KEY=
-VITE_STRIPE_PUBLISHABLE_KEY=
-VITE_STRIPE_WEBHOOK_SECRET=
+VITE_STRIPE_SECRET_KEY=sk_test_...
+VITE_STRIPE_PUBLISHABLE_KEY=pk_test_...
+VITE_STRIPE_WEBHOOK_SECRET=whsec_...
 VITE_STRIPE_PROD_WEBHOOK_SECRET=
 VITE_STRIPE_BASE_URL=
+
+# OpenRouter API
+VITE_OPENROUTER_API_KEY=your_openrouter_api_key
 ```
 
 ### Development Scripts
@@ -306,7 +309,8 @@ create table profiles (
   email text,
   image_url text,
   created_at timestamptz default now(),
-  updated_at timestamptz default now()
+  updated_at timestamptz default now(),
+  role TEXT DEFAULT 'user' NOT NULL
 );
 ```
 
@@ -974,7 +978,8 @@ profiles (
   email TEXT,
   avatar_url TEXT,
   created_at TIMESTAMPTZ,
-  updated_at TIMESTAMPTZ
+  updated_at TIMESTAMPTZ,
+  role TEXT DEFAULT 'user' NOT NULL
 )
 
 -- Projects
@@ -1028,4 +1033,60 @@ get_user_usage_stats(
 ) RETURNS JSON
 ```
 
-// ... rest of existing content ... 
+### User Role Management System
+The application implements a comprehensive role management system with three primary user roles:
+
+1. **Regular User** (default)
+   - Access determined by subscription tier
+   - Feature access varies by subscription level
+   - Usage limits based on tier
+
+2. **Admin**
+   - Complete access to all features
+   - No usage limits
+   - Access to admin-only features
+   - Managed via CLI tools
+   - Special subscription handling
+
+3. **Gift**
+   - Pro-level feature access
+   - No direct payment required
+   - Granted by administrators
+   - Managed via CLI tools
+   - Special subscription handling
+
+**Database Implementation:**
+```sql
+-- In profiles table
+role TEXT DEFAULT 'user' NOT NULL
+
+-- Role checking functions
+is_admin(user_id UUID) RETURNS BOOLEAN
+is_gift_user(user_id UUID) RETURNS BOOLEAN
+set_user_role(user_id UUID, new_role TEXT) RETURNS VOID
+```
+
+**Subscription Tier Extension:**
+```sql
+-- Add values to subscription_tier enum
+ALTER TYPE subscription_tier ADD VALUE 'admin' AFTER 'agency';
+ALTER TYPE subscription_tier ADD VALUE 'gift' AFTER 'admin';
+
+-- Trigger function for subscription management
+handle_special_subscription_status()
+```
+
+**CLI Management Tools:**
+```bash
+# Set a user as admin
+npm run admin:set user@example.com
+
+# Remove admin role
+npm run admin:remove user@example.com
+
+# Set a user as gift
+npm run gift:set user@example.com
+
+# Remove gift role
+npm run gift:remove user@example.com
+```
