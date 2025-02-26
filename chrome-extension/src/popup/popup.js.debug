@@ -1,0 +1,54 @@
+// Constants - Direct assignment for debugging
+let SUPABASE_URL = 'https://pdgnyhkngewmneujsheq.supabase.co';
+let SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBkZ255aGtuZ2V3bW5ldWpzaGVxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Mzk4ODU3NjYsImV4cCI6MjA1NTQ2MTc2Nn0.C0AtQq3841gVmK4k6mDOUdZE0jpJ5fWGEHTM8DNnt-g';
+let APP_URL = 'http://localhost:5173';
+
+// DOM Elements
+const loginSection = document.getElementById('login-section');
+const actionsSection = document.getElementById('actions-section');
+const userSection = document.getElementById('user-section');
+const statusMessage = document.getElementById('status-message');
+const subredditNameElement = document.getElementById('subreddit-name');
+const userName = document.getElementById('user-name');
+const projectSelector = document.getElementById('project-selector');
+const projectList = document.getElementById('project-list');
+
+// Buttons
+const loginButton = document.getElementById('login-button');
+const logoutButton = document.getElementById('logout-button');
+const saveSubredditButton = document.getElementById('save-subreddit');
+const analyzeSubredditButton = document.getElementById('analyze-subreddit');
+const addToProjectButton = document.getElementById('add-to-project');
+const confirmAddToProjectButton = document.getElementById('confirm-add-to-project');
+
+// State
+let currentSubreddit = '';
+let isAuthenticated = false;
+let userProfile = null;
+let projects = [];
+
+// Initialize
+document.addEventListener('DOMContentLoaded', async () => {
+  console.log('DOMContentLoaded - Direct mode');
+  
+  // Skip the variable loading from storage and use hard-coded values
+  // for debugging purposes
+  init();
+  
+  /* Original code - commented out for debugging
+  // Load environment variables from extension storage
+  chrome.storage.local.get(['supabaseUrl', 'supabaseKey', 'appUrl'], (result) => {
+    if (result.supabaseUrl && result.supabaseKey && result.appUrl) {
+      SUPABASE_URL = result.supabaseUrl;
+      SUPABASE_KEY = result.supabaseKey;
+      APP_URL = result.appUrl;
+      
+      // Initialize the extension
+      init();
+    } else {
+      showStatus("Configuration error. Please contact support.", "error");
+      console.error("Missing configuration values:", result);
+    }
+  });
+  */
+});

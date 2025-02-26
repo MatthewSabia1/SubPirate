@@ -191,52 +191,52 @@ function SpyGlass() {
         throw new Error('Please sign in to save subreddits');
       }
 
-      // First check if this subreddit is already saved by the user
-      const { data: existingSaved } = await supabase
-        .from('saved_subreddits_with_icons')
+      console.log(`Starting saveSubreddit for r/${subredditName}`);
+
+      // First check if this subreddit already exists in the database
+      const { data: existingSubreddit, error: lookupError } = await supabase
+        .from('subreddits')
         .select('*')
         .eq('name', subredditName)
-        .eq('user_id', user.id)
         .maybeSingle();
-
-      if (existingSaved) {
-        setSaveStatus(prev => ({
-          subreddits: {
-            ...prev.subreddits,
-            [subredditName]: {
-              type: 'success',
-              message: 'Already saved',
-              saving: false,
-              saved: true
-            }
-          }
-        }));
-        return existingSaved;
+        
+      if (lookupError) {
+        console.error(`Error looking up r/${subredditName}:`, lookupError);
+        throw lookupError;
+      }
+      
+      if (existingSubreddit) {
+        console.log(`Found existing subreddit in database: r/${subredditName}`, existingSubreddit);
+        
+        // Add to user's saved list if not already saved - use onConflict: 'ignore' to avoid duplicate key errors
+        const { error: saveError } = await supabase
+          .from('saved_subreddits')
+          .upsert({
+            subreddit_id: existingSubreddit.id,
+            user_id: user.id,
+            last_post_at: null
+          }, { onConflict: 'user_id,subreddit_id', ignoreDuplicates: true });
+        
+        if (saveError) {
+          // Just log this error but don't throw - we want to continue even if saving fails
+          console.warn(`Warning: Error adding r/${subredditName} to saved_subreddits:`, saveError);
+        }
+        
+        return existingSubreddit;
       }
 
       // Find the frequency data for this subreddit
       const frequencyData = frequencies.find(f => f.name === subredditName);
       if (!frequencyData) {
-        throw new Error('Subreddit data not found in analysis results');
+        throw new Error(`Subreddit data not found in analysis results for r/${subredditName}`);
       }
 
-      // Set initial saving state
-      setSaveStatus(prev => ({
-        subreddits: {
-          ...prev.subreddits,
-          [subredditName]: {
-            type: 'success',
-            message: 'Saving to database...',
-            saving: true,
-            saved: false
-          }
-        }
-      }));
+      console.log(`Creating new subreddit record for r/${subredditName}`);
 
-      // Save to database using the existing frequency data
-      const { data: savedSubreddit, error: upsertError } = await supabase
+      // Create new subreddit
+      const { data: newSubreddit, error: insertError } = await supabase
         .from('subreddits')
-        .upsert({
+        .insert({
           name: frequencyData.name,
           subscriber_count: frequencyData.subscribers,
           active_users: frequencyData.active_users,
@@ -251,36 +251,44 @@ function SpyGlass() {
             timing: [],
             topics: []
           },
-          allowed_content: [],
+          // Set default content types - most subreddits support at least text and links
+          allowed_content: ['text', 'link'],
           best_practices: [],
           rules_summary: '',
           last_analyzed_at: new Date().toISOString(),
           icon_img: frequencyData.icon_img,
           community_icon: frequencyData.community_icon
-        }, {
-          onConflict: 'name',
-          ignoreDuplicates: false
         })
         .select()
         .single();
 
-      if (upsertError) throw upsertError;
-      if (!savedSubreddit) throw new Error('Failed to save subreddit data');
+      if (insertError) {
+        console.error(`Error creating subreddit r/${subredditName}:`, insertError);
+        throw insertError;
+      }
+      
+      if (!newSubreddit) {
+        throw new Error(`Failed to create subreddit record for r/${subredditName}`);
+      }
 
-      // Save to user's list if not already saved
-      const { error: savedError } = await supabase
+      console.log(`Created new subreddit record:`, newSubreddit);
+
+      // Add to user's saved list - use onConflict: 'ignore' to avoid duplicate key errors
+      const { error: saveError } = await supabase
         .from('saved_subreddits')
         .upsert({
-          subreddit_id: savedSubreddit.id,
+          subreddit_id: newSubreddit.id,
           user_id: user.id,
           last_post_at: null
-        })
-        .select();
-
-      if (savedError) throw savedError;
-      return savedSubreddit;
+        }, { onConflict: 'user_id,subreddit_id', ignoreDuplicates: true });
+        
+      if (saveError) {
+        console.warn(`Warning: Error adding r/${subredditName} to saved_subreddits, but continuing:`, saveError);
+      }
+      
+      return newSubreddit;
     } catch (err) {
-      console.error('Error saving subreddit:', err);
+      console.error(`Error in saveSubreddit for r/${subredditName}:`, err);
       throw err;
     }
   };
@@ -431,7 +439,21 @@ function SpyGlass() {
     setSaveStatus({ subreddits: {} });
     setShowCreateProject(false);
     
+    // Set progress indicator for project creation
+    setProgress({
+      status: 'Creating project...',
+      progress: 10,
+      indeterminate: false
+    });
+    
     try {
+      // Get the user ID first to avoid nested async calls
+      const { data: userData, error: userError } = await supabase.auth.getUser();
+      if (userError) throw userError;
+      if (!userData.user?.id) throw new Error('User not authenticated');
+      
+      const userId = userData.user.id;
+      
       // Create new project
       const { data: project, error: projectError } = await supabase
         .from('projects')
@@ -439,7 +461,7 @@ function SpyGlass() {
           name: projectData.name,
           description: projectData.description,
           image_url: projectData.image_url,
-          user_id: (await supabase.auth.getUser()).data.user?.id
+          user_id: userId
         })
         .select()
         .single();
@@ -447,42 +469,342 @@ function SpyGlass() {
       if (projectError) throw projectError;
       if (!project) throw new Error('Failed to create project');
 
-      // Save all subreddits
-      // Save subreddits sequentially to avoid overwhelming the API
-      const savedSubreddits = [];
-      for (const freq of frequencies) {
-        const subreddit = await saveSubreddit(freq.name);
-        
-        // Add to project
-        await supabase
-          .from('project_subreddits')
-          .insert({
-            project_id: project.id,
-            subreddit_id: subreddit.id
-          });
+      // Add user as project owner
+      const { error: memberError } = await supabase
+        .from('project_members')
+        .insert({
+          project_id: project.id,
+          user_id: userId,
+          role: 'owner'
+        });
 
-        savedSubreddits.push(subreddit);
+      if (memberError) {
+        console.error('Error adding project owner:', memberError);
+        // Continue anyway since the user is already set as the user_id in the projects table
       }
 
-      setSaveStatus({
-        subreddits: {
-          all: {
-            type: 'success',
-            message: `Saved ${savedSubreddits.length} subreddits to new project`,
-            saving: false,
-            saved: true
-          }
-        }
+      console.log('Project created successfully:', project);
+      console.log('Frequencies to save:', frequencies.length);
+      
+      if (frequencies.length === 0) {
+        throw new Error('No subreddits to save to project');
+      }
+      
+      // Store the project ID for later use if the RLS error occurs
+      const createdProjectId = project.id;
+      
+      // Update progress for subreddit saving
+      setProgress({
+        status: `Saving ${frequencies.length} subreddits to project...`,
+        progress: 30,
+        indeterminate: false
       });
 
-      // Navigate to new project
+      // Diagnostic logging of frequency data
+      console.log('Frequency data to be processed:', 
+        frequencies.map(f => ({
+          name: f.name, 
+          subscribers: f.subscribers,
+          hasIconImg: !!f.icon_img,
+          hasCommunityIcon: !!f.community_icon
+        }))
+      );
+
+      // First save all subreddits then add them to the project in a single batch
+      const savedSubreddits = [];
+      let savedCount = 0;
+      const totalToSave = frequencies.length;
+      
+      // Step 1: Save/create all subreddits first
+      for (const freq of frequencies) {
+        try {
+          // Update progress periodically
+          if (savedCount % 3 === 0 || savedCount === totalToSave - 1) {
+            const progressPercent = 30 + Math.round((savedCount / totalToSave) * 30); // Use 30% of progress bar for saving
+            setProgress({
+              status: `Saving subreddit ${savedCount+1}/${totalToSave}...`,
+              progress: progressPercent,
+              indeterminate: false
+            });
+          }
+        
+          console.log(`Saving subreddit: r/${freq.name}`);
+          const subreddit = await saveSubreddit(freq.name);
+          console.log(`Subreddit saved:`, subreddit);
+          
+          if (!subreddit || !subreddit.id) {
+            console.error(`Invalid subreddit data returned for ${freq.name}`, subreddit);
+            continue; // Skip this subreddit but continue with others
+          }
+          
+          savedSubreddits.push(subreddit);
+          savedCount++;
+        } catch (subredditError) {
+          console.error(`Error processing r/${freq.name}:`, subredditError);
+          // Continue with next subreddit rather than failing the entire operation
+        }
+      }
+
+      console.log(`Saved ${savedSubreddits.length} out of ${frequencies.length} subreddits`);
+      
+      let rlsPolicyError = false;
+      
+      // Step 2: Add all subreddits to the project in a single batch operation
+      if (savedSubreddits.length > 0) {
+        try {
+          setProgress({
+            status: `Adding subreddits to project...`,
+            progress: 70,
+            indeterminate: false
+          });
+
+          // Log detailed information about subreddits we're trying to add
+          console.log('Adding these subreddits to project:', 
+            savedSubreddits.map(sub => ({
+              id: sub.id,
+              name: sub.name,
+              subscriber_count: sub.subscriber_count
+            }))
+          );
+
+          // Create batch insert records for ALL subreddits
+          const projectSubredditRecords = savedSubreddits.map(subreddit => ({
+            project_id: project.id,
+            subreddit_id: subreddit.id
+          }));
+          
+          console.log(`Preparing to add ${projectSubredditRecords.length} subreddits to project ${project.id}`);
+          
+          // Insert in smaller batches to avoid potential limits
+          const BATCH_SIZE = 20;
+          let successCount = 0;
+          
+          try {
+            for (let i = 0; i < projectSubredditRecords.length; i += BATCH_SIZE) {
+              const batch = projectSubredditRecords.slice(i, i + BATCH_SIZE);
+              console.log(`Processing batch ${i/BATCH_SIZE + 1}, size: ${batch.length}`);
+              
+              try {
+                const { data: batchData, error: batchError } = await supabase
+                  .from('project_subreddits')
+                  .insert(batch)
+                  .select();
+                  
+                if (batchError) {
+                  // Handle the RLS policy recursion error specifically
+                  if (batchError.code === '42P17') {
+                    console.error('RLS policy recursion detected during batch insert:', batchError.message);
+                    rlsPolicyError = true;
+                    
+                    // Add user-friendly notification
+                    addNotification(
+                      'Project created but subreddits could not be associated due to a database configuration issue. ' +
+                      'Please contact your administrator to fix the project_members RLS policy.', 
+                      'error'
+                    );
+                    
+                    break; // Exit the loop early since all other batches will fail too
+                  }
+                  
+                  console.error(`Error in batch ${i/BATCH_SIZE + 1}:`, batchError);
+                  
+                  // Fall back to individual inserts for this batch
+                  console.log('Falling back to individual inserts for this batch...');
+                  
+                  for (const record of batch) {
+                    try {
+                      const { data, error } = await supabase
+                        .from('project_subreddits')
+                        .insert(record)
+                        .select();
+                        
+                      if (error) {
+                        // Also check for the RLS policy error in individual inserts
+                        if (error.code === '42P17') {
+                          rlsPolicyError = true;
+                          throw new Error('RLS policy recursion detected. Please contact your administrator.');
+                        }
+                        
+                        if (error.code === '23505') { // PostgreSQL unique violation code
+                          console.log(`Record already exists in project (duplicate): ${record.subreddit_id}`);
+                          successCount++; // Count as success since it's already there
+                        } else {
+                          console.error(`Error adding record to project:`, error);
+                        }
+                      } else {
+                        console.log(`Successfully added record: ${record.subreddit_id}`);
+                        successCount++;
+                      }
+                    } catch (e) {
+                      console.error(`Exception adding record:`, e);
+                      
+                      // If it's our specific RLS error, break out of the loop
+                      if (e instanceof Error && e.message.includes('RLS policy recursion')) {
+                        rlsPolicyError = true;
+                        break; // Break out of the individual inserts loop
+                      }
+                    }
+                  }
+                  
+                  // If we detected the RLS error during individual inserts, break out of the batch loop too
+                  if (rlsPolicyError) {
+                    break;
+                  }
+                } else {
+                  console.log(`Successfully added batch ${i/BATCH_SIZE + 1}: ${batchData?.length || 0} records`);
+                  successCount += batchData?.length || 0;
+                }
+              } catch (batchError) {
+                console.error(`Exception in batch ${i/BATCH_SIZE + 1}:`, batchError);
+                
+                // If it's our specific RLS error, break out of the loop
+                if (batchError instanceof Error && batchError.message.includes('RLS policy recursion')) {
+                  rlsPolicyError = true;
+                  break; // Break out of the batch loop
+                }
+              }
+            }
+            
+            console.log(`Successfully added ${successCount} out of ${projectSubredditRecords.length} subreddits to project`);
+          } catch (insertError) {
+            console.error('Error during association of subreddits to project:', insertError);
+            
+            // Special handling for the RLS policy recursion error
+            if (insertError instanceof Error && insertError.message.includes('RLS policy recursion')) {
+              rlsPolicyError = true;
+              addNotification(
+                'Project created but subreddits could not be associated due to a database configuration issue. ' +
+                'Please contact your administrator to fix the project_members RLS policy.', 
+                'error'
+              );
+            } else {
+              addNotification(
+                `Project created but only ${successCount} of ${projectSubredditRecords.length} subreddits were added.`, 
+                'error'
+              );
+            }
+          }
+        } catch (batchError) {
+          console.error('Error during association of subreddits to project:', batchError);
+        }
+      }
+      
+      // If we had the RLS error, skip the verification step which will also fail
+      if (!rlsPolicyError) {
+        // Step 3: Verify the association by doing a final check
+        try {
+          setProgress({
+            status: `Verifying project subreddits...`,
+            progress: 90,
+            indeterminate: false
+          });
+          
+          // First get the associations
+          const { data: associations, error: associationsError } = await supabase
+            .from('project_subreddits')
+            .select('subreddit_id')
+            .eq('project_id', project.id);
+            
+          if (associationsError) {
+            // Check for the RLS policy error here too
+            if (associationsError.code === '42P17') {
+              rlsPolicyError = true;
+              console.error('RLS policy recursion detected during verification:', associationsError.message);
+            } else {
+              console.error('Error checking project_subreddits associations:', associationsError);
+            }
+          } else if (!associations || associations.length === 0) {
+            console.error('CRITICAL: No subreddit associations found for the newly created project!');
+          } else {
+            console.log(`Verification found ${associations.length} subreddit associations`);
+            
+            // Now get the actual subreddits
+            const subredditIds = associations.map(a => a.subreddit_id);
+            const { data: projectSubreddits, error: subredditsError } = await supabase
+              .from('subreddits')
+              .select('id, name, subscriber_count')
+              .in('id', subredditIds);
+              
+            if (subredditsError) {
+              console.error('Error fetching associated subreddits:', subredditsError);
+            } else {
+              console.log(`Found ${projectSubreddits?.length || 0} out of ${subredditIds.length} associated subreddits`);
+              console.log('Subreddits in project:', projectSubreddits?.map(s => s.name).sort());
+            }
+          }
+        } catch (verifyError) {
+          console.error('Error during final verification:', verifyError);
+          
+          // Check if this is also the RLS error
+          if (verifyError instanceof Error && verifyError.message.includes('policy recursion')) {
+            rlsPolicyError = true;
+          }
+        }
+      }
+      
+      // Final progress update
+      setProgress({
+        status: 'Opening new project...',
+        progress: 100,
+        indeterminate: false
+      });
+      
+      // Log detailed information about what was saved
+      console.log('Final project creation summary:');
+      console.log(`- Project: ${project.id} (${project.name})`);
+      console.log(`- Attempted to save ${frequencies.length} subreddits`);
+      console.log(`- Successfully saved ${savedSubreddits.length} subreddits`);
+      console.log(`- Project subreddits should include:`, savedSubreddits.map(s => ({ 
+        id: s.id, 
+        name: s.name,
+        subscribers: s.subscriber_count
+      })));
+      
+      if (rlsPolicyError) {
+        // If we had an RLS error, specifically tell the user that the project was created 
+        // but they'll need to add subreddits manually
+        setSaveStatus({
+          subreddits: {
+            all: {
+              type: 'error',
+              message: `Project created but subreddits couldn't be associated. You'll need to add them manually.`,
+              saving: false,
+              saved: true
+            }
+          }
+        });
+        
+        // More descriptive notification
+        addNotification(
+          'Project created, but subreddits could not be associated due to a database policy error. ' +
+          'This is a known issue with the RLS policy on project_members. ' +
+          'You can still use your project and add subreddits manually.',
+          'error'
+        );
+      } else {
+        // Normal success case
+        setSaveStatus({
+          subreddits: {
+            all: {
+              type: 'success',
+              message: `Saved ${savedSubreddits.length} subreddits to new project`,
+              saving: false,
+              saved: true
+            }
+          }
+        });
+      }
+
+      // Navigate to new project - always do this even if there was an RLS error
+      // as the project itself was created successfully
       navigate(`/projects/${project.id}`);
     } catch (err) {
+      console.error('Error creating project with subreddits:', err);
       setSaveStatus({
         subreddits: {
           all: {
             type: 'error',
-            message: 'Failed to save subreddits to project',
+            message: err instanceof Error ? err.message : 'Failed to save subreddits to project',
             saving: false,
             saved: false
           }
@@ -682,8 +1004,17 @@ function SpyGlass() {
                     className="primary flex items-center gap-2 h-9 px-4 text-sm"
                     disabled={savingAll || !username}
                   >
-                    <FolderPlus size={16} />
-                    {savingAll ? 'Saving...' : 'Save All to New Project'}
+                    {savingAll ? (
+                      <>
+                        <div className="animate-spin text-sm h-4 w-4 border-2 border-white border-t-transparent rounded-full" />
+                        <span>Processing...</span>
+                      </>
+                    ) : (
+                      <>
+                        <FolderPlus size={16} />
+                        <span>Save All to New Project</span>
+                      </>
+                    )}
                   </button>
                 </div>
 
@@ -921,7 +1252,7 @@ function SpyGlass() {
           setSavingAll(false);
         }}
         onSubmit={handleCreateProject}
-        defaultName={username ? `${username}'s Subreddits` : ''}
+        defaultName={username ? `u/${username}'s Subreddits` : ''}
         defaultDescription={username ? `Subreddits analyzed from u/${username}'s posting history` : ''}
       />
     </div>
@@ -929,3 +1260,115 @@ function SpyGlass() {
 }
 
 export default SpyGlass;
+
+// Debug helper function - can be called from browser console
+// Example usage: window.debugProjectSubreddits('project-id-here')
+window.debugProjectSubreddits = async (projectId: string) => {
+  console.log(`Debugging project ID: ${projectId}`);
+  
+  try {
+    // Check if project exists
+    const { data: project, error: projectError } = await supabase
+      .from('projects')
+      .select('*')
+      .eq('id', projectId)
+      .single();
+      
+    if (projectError) {
+      console.error('Project lookup error:', projectError);
+      return;
+    }
+    
+    console.log('Project details:', project);
+    
+    // First get project_subreddits associations
+    console.log('Fetching project-subreddit associations...');
+    const { data: projectSubreddits, error: psError } = await supabase
+      .from('project_subreddits')
+      .select('id, project_id, subreddit_id')
+      .eq('project_id', projectId);
+      
+    if (psError) {
+      console.error('Error fetching project subreddits:', psError);
+      
+      // Check for the specific RLS policy recursion error
+      if (psError.code === '42P17') {
+        console.warn('=============================================');
+        console.warn('DETECTED RLS POLICY RECURSION ERROR');
+        console.warn('This is a Supabase database configuration issue.');
+        console.warn('');
+        console.warn('The issue occurs in policies on the project_members table.');
+        console.warn('It creates an infinite loop during authorization checks.');
+        console.warn('');
+        console.warn('To fix this, go to the Supabase dashboard:');
+        console.warn('1. Navigate to Authentication > Policies');
+        console.warn('2. Find policies for the project_members table');
+        console.warn('3. Look for policies that may be creating circular references');
+        console.warn('4. Update the policies to break the circular dependency');
+        console.warn('=============================================');
+        
+        // Try to get some basic project info as a fallback
+        console.log('Trying to fetch basic project info as a fallback...');
+        return {
+          project,
+          error: 'RLS policy recursion detected',
+          errorCode: psError.code,
+          message: psError.message,
+          timestamp: new Date().toISOString()
+        };
+      }
+      
+      return;
+    }
+    
+    console.log(`Found ${projectSubreddits?.length || 0} project-subreddit associations`);
+    
+    if (!projectSubreddits || projectSubreddits.length === 0) {
+      console.log('No subreddits associated with this project');
+      return;
+    }
+    
+    // Extract subreddit IDs
+    const subredditIds = projectSubreddits.map(ps => ps.subreddit_id);
+    console.log('Associated subreddit IDs:', subredditIds);
+    
+    // Then fetch the actual subreddit data
+    const { data: subreddits, error: subredditsError } = await supabase
+      .from('subreddits')
+      .select('id, name, subscriber_count')
+      .in('id', subredditIds);
+      
+    if (subredditsError) {
+      console.error('Error fetching subreddits:', subredditsError);
+      return;
+    }
+    
+    console.log(`Fetched ${subreddits?.length || 0} out of ${subredditIds.length} subreddits`);
+    console.log('Subreddit details:', subreddits);
+    
+    // Check for missing subreddits
+    const missingIds = subredditIds.filter(id => 
+      !subreddits.some(s => s.id === id)
+    );
+    
+    if (missingIds.length > 0) {
+      console.log(`WARNING: ${missingIds.length} subreddit IDs have associations but no subreddit records`);
+      console.log('Missing IDs:', missingIds);
+    }
+    
+    return {
+      project,
+      associations: projectSubreddits,
+      subreddits
+    };
+  } catch (error) {
+    console.error('Debug function error:', error);
+  }
+};
+
+// Add to global window type
+declare global {
+  interface Window {
+    debugProjectSubreddits: (projectId: string) => Promise<any>;
+  }
+}

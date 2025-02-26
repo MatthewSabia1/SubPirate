@@ -2,6 +2,7 @@
 
 import { SubredditInfo, SubredditPost } from './reddit';
 import { AnalysisResult, AnalysisProgress } from './analysis';
+import { analyzeSubreddit } from './openRouter';
 
 interface WorkerMessage {
   info: SubredditInfo;
@@ -22,16 +23,16 @@ self.onconnect = (e: MessageEvent) => {
       port.postMessage({ 
         type: 'progress', 
         analysisId, 
-        data: { progress: 0, message: 'Starting analysis...', indeterminate: false } 
+        data: { progress: 0, status: 'Starting analysis...', indeterminate: true } 
       });
 
-      // Basic analysis first (fast metrics)
-      const basicMetrics: AnalysisResult = {
+      // First prepare a basic analysis to show while waiting for the AI
+      const basicAnalysis: AnalysisResult = {
         info: {
           ...info,
           rules: info.rules.map(rule => ({
             ...rule,
-            marketingImpact: 'medium' as const
+            marketingImpact: determineMarketingImpact(rule)
           }))
         },
         posts: posts.map(post => ({
@@ -42,82 +43,124 @@ self.onconnect = (e: MessageEvent) => {
         })),
         analysis: {
           marketingFriendliness: {
-            score: 0.7,
-            reasons: ['Initial analysis'],
-            recommendations: ['Preliminary recommendation']
+            score: 50, // Default generous score while waiting for AI
+            reasons: ['Initial analysis in progress...', 'Full AI analysis coming soon...'],
+            recommendations: ['Wait for complete analysis...']
           },
           postingLimits: {
-            frequency: posts.length / 30,
-            bestTimeToPost: ['9:00 AM EST'],
+            frequency: Math.ceil(posts.length / 7), // Simple estimate
+            bestTimeToPost: ['Morning', 'Afternoon', 'Evening'],
             contentRestrictions: []
           },
           contentStrategy: {
-            recommendedTypes: ['text', 'image'],
-            topics: ['general'],
-            style: 'casual',
-            dos: ['Be engaging'],
-            donts: ['Avoid spam']
+            recommendedTypes: ['text'],
+            topics: ['Initial analysis'],
+            style: 'Informative',
+            dos: ['Wait for full analysis'],
+            donts: ['Don\'t act on initial data']
           },
           titleTemplates: {
-            patterns: ['[Topic] Discussion'],
+            patterns: ['[Category] Title'],
             examples: ['Example Title'],
-            effectiveness: 0.8
+            effectiveness: 70
           },
           strategicAnalysis: {
-            strengths: ['Active community'],
-            weaknesses: ['Areas to improve'],
-            opportunities: ['Growth potential'],
-            risks: ['Competition']
+            strengths: ['Full analysis coming soon'],
+            weaknesses: ['Analysis in progress'],
+            opportunities: ['Wait for complete data'],
+            risks: ['Preliminary only']
           },
           gamePlan: {
-            immediate: ['Start engaging'],
-            shortTerm: ['Build presence'],
-            longTerm: ['Establish authority']
+            immediate: ['Wait for AI analysis'],
+            shortTerm: ['Coming soon'],
+            longTerm: ['Analysis in progress']
           }
         }
       };
 
+      // Send the basic analysis for immediate display
       port.postMessage({
         type: 'basicAnalysis',
         analysisId,
-        data: basicMetrics
+        data: basicAnalysis
       });
 
-      // Simulate deeper analysis with progress updates
-      for (let i = 1; i <= 5; i++) {
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        port.postMessage({
-          type: 'progress',
-          analysisId,
-          data: { progress: i * 20, message: `Processing phase ${i}...`, indeterminate: false }
-        });
-      }
+      // Update progress
+      port.postMessage({
+        type: 'progress',
+        analysisId,
+        data: { progress: 30, status: 'Running AI analysis...', indeterminate: false }
+      });
 
-      // Final analysis result - in a real implementation, this would be more detailed
-      const result: AnalysisResult = {
-        ...basicMetrics,
+      // Prepare input for AI analysis
+      const analysisInput = {
+        name: info.name,
+        title: info.title,
+        description: info.description,
+        rules: (info.rules || []).map(rule => ({
+          title: rule.title || '',
+          description: rule.description || '',
+          priority: 1,
+          marketingImpact: determineMarketingImpact(rule)
+        })),
+        content_categories: [],
+        posting_requirements: {
+          karma_required: info.description?.toLowerCase().includes('karma') || false,
+          account_age_required: info.description?.toLowerCase().includes('account age') || false,
+          manual_approval: info.description?.toLowerCase().includes('approval') || false
+        },
+        allowed_content_types: determineAllowedContentTypes(info, posts)
+      };
+
+      // Log the analysis input and rules specifically to debug
+      console.log('Sending to OpenRouter:', analysisInput);
+      console.log('Rules being sent:', JSON.stringify(info.rules || []));
+
+      // Now run the actual AI analysis
+      const aiResult = await analyzeSubreddit(analysisInput);
+      
+      // Log the result to debug
+      console.log('OpenRouter result:', aiResult);
+
+      // Update progress
+      port.postMessage({
+        type: 'progress',
+        analysisId,
+        data: { progress: 90, status: 'Finalizing analysis...', indeterminate: false }
+      });
+
+      // Create the final result by combining AI analysis with our data
+      const finalResult: AnalysisResult = {
+        info: basicAnalysis.info,
+        posts: basicAnalysis.posts,
         analysis: {
-          ...basicMetrics.analysis,
           marketingFriendliness: {
-            score: 0.85,
-            reasons: ['High engagement rate', 'Active moderation', 'Relevant topics'],
-            recommendations: ['Post during peak hours', 'Focus on quality content', 'Engage with comments']
+            score: typeof aiResult.marketingFriendliness?.score === 'number' 
+              ? normalizeMarketingScore(aiResult.marketingFriendliness.score)
+              : 50, // Default to 50% if no score is provided
+            reasons: Array.isArray(aiResult.marketingFriendliness?.reasons) 
+              ? aiResult.marketingFriendliness.reasons 
+              : ['Analysis complete'],
+            recommendations: Array.isArray(aiResult.marketingFriendliness?.recommendations) 
+              ? aiResult.marketingFriendliness.recommendations 
+              : ['Follow recommended strategies']
           },
-          contentStrategy: {
-            ...basicMetrics.analysis.contentStrategy,
-            topics: ['Trending topics', 'Community interests', 'Current events'],
-            dos: ['Research before posting', 'Follow community guidelines', 'Add value to discussions'],
-            donts: ['Avoid self-promotion', 'Don\'t spam', 'Don\'t ignore feedback']
-          }
+          postingLimits: aiResult.postingLimits,
+          contentStrategy: aiResult.contentStrategy,
+          titleTemplates: aiResult.titleTemplates,
+          strategicAnalysis: aiResult.strategicAnalysis,
+          gamePlan: aiResult.gamePlan
         }
       };
 
+      // Send the complete result
       port.postMessage({
         type: 'complete',
         analysisId,
-        data: result
+        data: finalResult
       });
     } catch (err: any) {
+      console.error('Analysis error:', err);
       port.postMessage({
         type: 'error',
         analysisId,
@@ -127,4 +170,57 @@ self.onconnect = (e: MessageEvent) => {
   };
 
   port.start();
-}; 
+};
+
+// Helper function to determine marketing impact of rules
+function determineMarketingImpact(rule: any): 'high' | 'medium' | 'low' {
+  if (!rule || !rule.title && !rule.description) {
+    return 'low';
+  }
+
+  const text = `${rule.title || ''} ${rule.description || ''}`.toLowerCase();
+  
+  const highImpactKeywords = [
+    'no promotion', 'no advertising', 'no marketing', 'no self-promotion',
+    'spam', 'banned', 'prohibited', 'not allowed'
+  ];
+  
+  const mediumImpactKeywords = [
+    'limit', 'restrict', 'guideline', 'approval', 'permission'
+  ];
+  
+  if (highImpactKeywords.some(keyword => text.includes(keyword))) {
+    return 'high';
+  }
+  
+  if (mediumImpactKeywords.some(keyword => text.includes(keyword))) {
+    return 'medium';
+  }
+  
+  return 'low';
+}
+
+// Helper function to determine allowed content types
+function determineAllowedContentTypes(info: any, posts: any[]): string[] {
+  const types = new Set<string>(['text']);
+  
+  // Check post types
+  posts.forEach(post => {
+    if (post.url?.match(/\.(jpg|jpeg|png|gif)$/i)) types.add('image');
+    if (post.url?.match(/\.(mp4|webm)$/i)) types.add('video');
+    if (post.url?.match(/^https?:\/\//)) types.add('link');
+  });
+  
+  return Array.from(types);
+}
+
+// Helper function to normalize marketing score to ensure it's in the 0-100 range
+function normalizeMarketingScore(score: number): number {
+  // Convert decimal scores (0-1) to percentage (0-100)
+  if (score < 1) {
+    score = score * 100;
+  }
+  
+  // Apply minimum threshold of 30%
+  return Math.max(30, Math.min(100, Math.round(score)));
+} 

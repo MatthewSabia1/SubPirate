@@ -161,6 +161,20 @@ function AddToProjectModal({ isOpen, onClose, subredditId, subredditName }: AddT
       
       if (!project) throw new Error('Failed to create project');
 
+      // Add user as project owner
+      const { error: memberError } = await supabase
+        .from('project_members')
+        .insert({
+          project_id: project.id,
+          user_id: user?.id,
+          role: 'owner'
+        });
+
+      if (memberError) {
+        console.error('Error adding project owner:', memberError);
+        // Continue anyway since the user is already set as the user_id in the projects table
+      }
+
       // Add subreddit to new project with error handling
       const { error: addError } = await supabase
         .from('project_subreddits')

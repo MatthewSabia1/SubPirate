@@ -1,6 +1,12 @@
 # Active Context
 
 ## Current Focus
+- Preparing Stripe integration for production environment
+- Improving environment detection for Stripe configuration (test vs. production)
+- Implementing robust verification tools for Stripe production readiness
+- Enhancing webhook handling based on environment
+- Creating comprehensive documentation for production Stripe setup
+- Ensuring secure handling of production API keys and webhook secrets
 - Data structure consistency fixes across subreddit analysis components
 - Standardizing property naming between AI service and frontend components
 - Improving error handling and validation
@@ -34,6 +40,31 @@
 - Implementing Google Authentication for enhanced login options
 
 ## Recent Changes
+- Prepared Stripe integration for production environment:
+  - Created verification script (`scripts/verify-stripe-production.js`) to check:
+    - Environment variables for production keys
+    - Stripe account connection and activation status
+    - Webhook endpoints with proper configuration
+    - Active products and prices
+    - Database tables and relations
+  - Enhanced environment detection logic in Stripe client:
+    - Added domain-based environment detection
+    - Properly handle test vs. production mode based on both build environment and domain
+    - Clear logging of environment status for debugging
+  - Updated webhook handling for production:
+    - Environment-specific webhook secrets
+    - Enhanced error handling
+    - Improved logging of webhook events
+  - Created comprehensive production setup guide (`docs/stripe-production-setup.md`):
+    - Detailed steps for Stripe account preparation
+    - Instructions for configuring production API keys
+    - Webhook setup procedures
+    - Database configuration requirements
+    - Testing strategies for production environment
+  - Added npm scripts for easier production setup:
+    - Added verification script command
+    - Created webhook setup commands
+    - Provided streamlined production setup workflow
 - Restored the "Add to Project" button in the SavedList component:
   - Added back the missing button that allows users to add subreddits to their projects
   - Ensured proper integration with the existing AddToProjectModal component

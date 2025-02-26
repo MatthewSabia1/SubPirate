@@ -7,11 +7,25 @@ const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
 const supabaseServiceKey = import.meta.env.VITE_SUPABASE_SERVICE_ROLE_KEY || '';
 const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-// FORCE TEST MODE during development
-const useTestMode = true;
-console.log('Stripe client running in TEST MODE');
+// Determine if we're in production mode based on environment and domain
+const isProductionBuild = import.meta.env.PROD === true;
+const isDevelopmentHost = typeof window !== 'undefined' && 
+  (window.location.hostname === 'localhost' || 
+   window.location.hostname === '127.0.0.1' ||
+   window.location.hostname.includes('.vercel.app'));
 
-// Use Vite's import.meta.env instead of process.env
+// Use test mode on localhost even in production builds
+// Only use production mode on the actual production domain AND in a production build
+const isProduction = isProductionBuild && !isDevelopmentHost;
+const useTestMode = !isProduction;
+
+if (useTestMode) {
+  console.log('Stripe client running in TEST MODE');
+} else {
+  console.log('Stripe client running in PRODUCTION MODE');
+}
+
+// Use the appropriate API key based on the environment
 const stripeSecretKey = useTestMode 
   ? import.meta.env.VITE_STRIPE_TEST_SECRET_KEY || import.meta.env.VITE_STRIPE_SECRET_KEY || ''
   : import.meta.env.VITE_STRIPE_SECRET_KEY || '';
@@ -25,6 +39,7 @@ export const stripe = new Stripe(stripeSecretKey, {
 
 // Display which key we're using (partial for security)
 console.log(`Using Stripe key: ${stripeSecretKey ? stripeSecretKey.substring(0, 8) + '...' : 'No key found!'}`);
+console.log(`Running on domain: ${typeof window !== 'undefined' ? window.location.hostname : 'server'}`);
 
 // Helper type for Stripe Product with expanded price data
 type StripeProductWithPrice = Stripe.Product & {
@@ -269,4 +284,90 @@ export function isValidStripeWebhookEvent(
     typeof event.object === 'string' &&
     event.object === 'event'
   );
+}
+
+// Get features for a specific product from the database
+export async function getProductFeatures(productId: string) {
+  try {
+    // First fetch feature records from product_features table
+    const { data: productFeatures, error: featuresError } = await supabase
+      .from('product_features')
+      .select(`
+        id,
+        stripe_product_id,
+        feature_key,
+        enabled,
+        subscription_features:feature_key(
+          name,
+          description
+        )
+      `)
+      .eq('stripe_product_id', productId)
+      .eq('enabled', true);
+    
+    if (featuresError || !productFeatures) {
+      console.error('Error fetching product features:', featuresError);
+      return [];
+    }
+    
+    // Format the features for frontend display
+    return productFeatures.map(feature => {
+      // Access subscription feature data safely
+      const featureData = feature.subscription_features as unknown as { 
+        name?: string; 
+        description?: string;
+      } | null;
+      
+      return {
+        id: feature.id,
+        key: feature.feature_key,
+        name: featureData?.name || 'Unknown Feature',
+        description: featureData?.description || '',
+        enabled: feature.enabled
+      };
+    });
+  } catch (error) {
+    console.error('Error fetching product features:', error);
+    return [];
+  }
+}
+
+// Get all defined features from the database
+export async function getAllFeatures() {
+  try {
+    const { data: features, error: featuresError } = await supabase
+      .from('subscription_features')
+      .select('*');
+      
+    if (featuresError) {
+      console.error('Error fetching features:', featuresError);
+      return [];
+    }
+    
+    return features;
+  } catch (error) {
+    console.error('Error fetching all features:', error);
+    return [];
+  }
+}
+
+export async function getAvailablePlans() {
+  try {
+    const products = await getActiveProducts();
+    const prices = await getActivePrices();
+
+    // Map prices to products
+    const plans = products.map(product => {
+      const productPrices = prices.filter(price => price.product === product.id);
+      return {
+        product,
+        prices: productPrices
+      };
+    });
+
+    return plans;
+  } catch (error) {
+    console.error('Error getting available plans:', error);
+    throw error;
+  }
 } 

@@ -2,7 +2,8 @@ import axios from 'axios';
 import type { SubredditPost } from './reddit';
 import { SYSTEM_PROMPT, ANALYSIS_PROMPT } from '../features/subreddit-analysis/lib/prompts';
 
-const OPENROUTER_API_KEY = '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';
+// Use environment variable with fallback to the hardcoded key
+const OPENROUTER_API_KEY = import.meta.env.VITE_OPENROUTER_API_KEY || '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';
 const MODEL = 'nvidia/llama-3.1-nemotron-70b-instruct:free';
 const API_URL = 'https://openrouter.ai/api/v1/chat/completions';
 
@@ -402,7 +403,7 @@ export async function analyzeSubreddit(input: SubredditAnalysisInput): Promise<A
       const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${process.env.OPENROUTER_API_KEY}`,
+          'Authorization': `Bearer ${OPENROUTER_API_KEY}`,
           'Content-Type': 'application/json',
           'X-Title': 'SubPirate - Reddit Marketing Analysis'
         },
@@ -572,39 +573,58 @@ function validateAndTransformOutput(result: unknown): AIAnalysisOutput {
 }
 
 function extractTitlePatterns(rules: any[]): string[] {
-  const patterns = new Set<string>();
+  // Start with a default structured pattern that works well with our UI
+  const patterns = new Set<string>([
+    '[QUESTION] about [TOPIC] for [GOAL] - need [SPECIFIC] advice',
+    'Need help with [CONTEXT] - [DETAIL] for [KEYWORD]?',
+    '[QUESTION] - [CONTEXT] - Looking to [GOAL]'
+  ]);
+  
   const ruleText = Array.isArray(rules) ? rules.join(' ').toLowerCase() : '';
 
+  // Add pattern variants based on rule analysis
   if (ruleText.includes('[') && ruleText.includes(']')) {
-    patterns.add('[Category/Topic] Your Title');
+    patterns.add('[Category] Your descriptive title with [SPECIFIC] details');
   }
   
   if (ruleText.includes('flair')) {
-    patterns.add('Title with Required Flair');
+    patterns.add('[TOPIC] - Detailed explanation of [CONTEXT] with [SPECIFIC] needs');
   }
 
-  if (patterns.size === 0) {
-    patterns.add('Descriptive Title');
-    patterns.add('Question Format Title?');
-    patterns.add('[Topic] - Description');
-  }
-
-  return Array.from(patterns);
+  // Always return at least one structured pattern even if no rules suggest patterns
+  return Array.from(patterns).slice(0, 3); // Limit to 3 patterns max
 }
 
 function generateTitleExamples(patterns: string[]): string[] {
-  return patterns.map(pattern => {
-    if (pattern.includes('[Category/Topic]')) {
-      return '[Discussion] How to Improve Your Content';
+  // Generate real-world examples that match the first pattern
+  const examples = [];
+  
+  if (patterns.length > 0) {
+    const firstPattern = patterns[0];
+    
+    if (firstPattern.includes('[QUESTION]')) {
+      examples.push('How do I improve my content strategy for growing my email list? - need technical advice');
+      examples.push('What processes work best for content creation? - need workflow advice');
+    } else if (firstPattern.includes('[TOPIC]')) {
+      examples.push('Marketing Strategy - Detailed explanation of email funnel with automation needs');
+      examples.push('Content Creation - Overview of video production with editing software recommendations');
+    } else if (firstPattern.includes('[Category]')) {
+      examples.push('[Discussion] Your comprehensive guide to content marketing with actionable steps');
+      examples.push('[Help] Your step-by-step approach to social media strategy with analytics focus');
+    } else {
+      examples.push('Need help with marketing automation - setting up sequences for product launch?');
+      examples.push('Seeking advice on content strategy - creating videos for B2B audience?');
     }
-    if (pattern.includes('Question')) {
-      return 'What Are Your Best Tips for Success?';
-    }
-    if (pattern.includes('Descriptive')) {
-      return 'The Complete Guide to Getting Started';
-    }
-    return 'Professional Guide: Best Practices';
-  });
+  }
+  
+  // Add fallback examples if none were generated
+  if (examples.length === 0) {
+    examples.push('How do I improve my content strategy for my specific audience?');
+    examples.push('Need help with email marketing - creating sequences for product launch?');
+    examples.push('Content Strategy - Detailed explanation of video marketing with ROI analysis');
+  }
+
+  return examples;
 }
 
 function formatNumber(num: number): string {

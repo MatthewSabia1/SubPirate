@@ -96,36 +96,21 @@ function CreateProjectModal({
     setError(null);
 
     try {
-      // Create new project
-      const { data: project, error: projectError } = await supabase
-        .from('projects')
-        .insert({
-          name: name.trim(),
-          description: description.trim() || null,
-          image_url: imageUrl,
-          user_id: user.id
-        })
-        .select()
-        .single();
-
-      if (projectError) throw projectError;
-      if (!project) throw new Error('Failed to create project');
-
-      // Call onSubmit with the created project
+      // Call onSubmit with the project data instead of creating it here
+      // This prevents duplicate project creation since the parent component will handle it
       await onSubmit({
-        ...project,
-        name: project.name,
-        description: project.description,
-        image_url: project.image_url
+        name: name.trim(),
+        description: description.trim() || null,
+        image_url: imageUrl
       });
 
-      onClose();
+      // No need to call onClose() here as the parent component will do this
     } catch (err) {
       console.error('Error creating project:', err);
       setError('Failed to create project');
-    } finally {
-      setSaving(false);
+      setSaving(false); // Only reset saving state on error
     }
+    // Note: We don't reset saving state on success because the modal will be closed by the parent
   };
 
   return (

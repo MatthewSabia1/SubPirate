@@ -592,7 +592,7 @@ export async function analyzeSubredditData(
       analysis: {
         ...basicResult.analysis,
         marketingFriendliness: {
-          score: Math.round(aiAnalysis.marketingFriendliness.score),
+          score: aiAnalysis.marketingFriendliness.score,
           reasons: aiAnalysis.marketingFriendliness.reasons,
           recommendations: aiAnalysis.marketingFriendliness.recommendations
         },

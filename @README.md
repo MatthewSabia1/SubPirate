@@ -4,6 +4,13 @@ A comprehensive Reddit marketing analysis tool that helps users discover, analyz
 
 ## Recent Updates
 
+### Stripe Production Setup
+- Production-ready Stripe integration with environment detection
+- Automatic switching between test and production modes based on domain and build environment
+- Comprehensive verification tools for production readiness
+- Enhanced webhook handling with environment-specific secrets
+- Detailed production setup guide in docs/stripe-production-setup.md
+
 ### NSFW Content Support
 - Full support for all Reddit content types
 - Enhanced image handling system
@@ -24,6 +31,13 @@ A comprehensive Reddit marketing analysis tool that helps users discover, analyz
 
 ## Features
 
+### Subscriptions & Payments
+- Seamless Stripe integration for handling subscriptions
+- Multiple subscription tiers with feature access control
+- Automatic subscription status verification
+- Webhook-based event processing
+- Development and production environment separation
+
 ### Content Display
 - Display all Reddit content types without filtering
 - Robust image loading with multiple fallbacks
@@ -43,6 +57,25 @@ A comprehensive Reddit marketing analysis tool that helps users discover, analyz
 - Content planning
 
 ## Technical Details
+
+### Environment Detection
+```typescript
+// Automatic environment detection for Stripe
+const isDevelopmentHost = 
+  typeof window !== 'undefined' && 
+  (window.location.hostname === 'localhost' || 
+   window.location.hostname === '127.0.0.1' ||
+   window.location.hostname.includes('.vercel.app'));
+
+const isProduction = 
+  process.env.NODE_ENV === 'production' && 
+  !isDevelopmentHost;
+
+// Use appropriate API keys based on environment
+const stripeKey = isProduction 
+  ? process.env.VITE_STRIPE_SECRET_KEY 
+  : process.env.VITE_STRIPE_TEST_SECRET_KEY;
+```
 
 ### Image Handling
 ```typescript
@@ -90,10 +123,24 @@ npm run dev
 
 ### Environment Variables
 ```env
+# Supabase Configuration
 VITE_SUPABASE_URL=your_supabase_url
 VITE_SUPABASE_ANON_KEY=your_supabase_key
+
+# Reddit API Configuration
 VITE_REDDIT_APP_ID=your_reddit_app_id
 VITE_REDDIT_APP_SECRET=your_reddit_app_secret
+
+# Stripe Configuration - Development/Test
+VITE_STRIPE_TEST_SECRET_KEY=sk_test_...
+VITE_STRIPE_TEST_PUBLISHABLE_KEY=pk_test_...
+VITE_STRIPE_TEST_WEBHOOK_SECRET=whsec_...
+
+# Stripe Configuration - Production
+VITE_STRIPE_SECRET_KEY=sk_live_...
+VITE_STRIPE_PUBLISHABLE_KEY=pk_live_...
+VITE_STRIPE_WEBHOOK_SECRET=whsec_...
+VITE_STRIPE_BASE_URL=https://subpirate.com
 ```
 
 ### Reddit API Setup
@@ -101,7 +148,24 @@ VITE_REDDIT_APP_SECRET=your_reddit_app_secret
 2. Set up OAuth2 credentials
 3. Configure redirect URI
 
+### Stripe Setup
+1. Create a Stripe account at https://stripe.com
+2. Set up products and prices in the Stripe Dashboard
+3. Configure webhooks for subscription event handling
+4. Run the verification script before production deployment:
+```bash
+npm run stripe:verify
+```
+
 ## Development
+
+### Stripe Development Tools
+```bash
+npm run stripe:sync      # Sync Stripe products with local database
+npm run stripe:verify    # Verify Stripe production setup
+npm run stripe:webhook   # Set up webhook endpoint
+npm run dev:webhook      # Run dev server with webhook forwarding
+```
 
 ### Running Tests
 ```bash
@@ -113,6 +177,12 @@ npm run test:e2e    # Run end-to-end tests
 ```bash
 npm run build
 ```
+
+### Deploying to Production
+1. Configure environment variables in Vercel
+2. Verify Stripe production setup
+3. Build and deploy the application
+4. Test the production environment with a small purchase
 
 ### Linting
 ```bash

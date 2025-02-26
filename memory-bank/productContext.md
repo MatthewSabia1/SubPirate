@@ -40,6 +40,14 @@ SubPirateV2 provides an AI-powered analysis tool that:
 - Easy filtering and sorting of saved subreddits
 - Efficient data exploration
 
+### 5. Payment Experience
+- Seamless subscription management
+- Transparent pricing information
+- Secure payment processing
+- Easy plan upgrades and downgrades
+- Clear indication of feature access based on subscription
+- Automated renewal with notification
+
 ## Key Features
 
 ### 1. Analytics Dashboard
@@ -66,6 +74,13 @@ SubPirateV2 provides an AI-powered analysis tool that:
 - Performance monitoring
 - Shared analytics
 
+### 5. Subscription Management
+- Automatic feature access control
+- Seamless Stripe checkout integration
+- Self-service plan management
+- Subscription status dashboard
+- Usage tracking and limits
+
 ## Target Users
 1. Reddit marketers
 2. Content creators
@@ -79,6 +94,8 @@ SubPirateV2 provides an AI-powered analysis tool that:
 3. Enhanced data-driven strategies
 4. Improved campaign understanding
 5. Advanced analytics capabilities
+6. Healthy subscription conversion rate
+7. Strong subscription retention
 
 # Product Context
 
@@ -147,6 +164,14 @@ We offer four subscription tiers designed to accommodate different user needs an
    - Usage-based recommendations
    - Proactive support
 
+4. **Payment Experience**
+   - Secure Stripe checkout
+   - Transparent pricing display
+   - Clear feature comparison
+   - Seamless card processing
+   - Instant access upon payment
+   - Automated receipts and invoicing
+
 ### Business Goals
 
 1. **Revenue Objectives**
@@ -164,6 +189,13 @@ We offer four subscription tiers designed to accommodate different user needs an
    - Feature-driven upgrades
    - Agency partnerships
 
+4. **Subscription Metrics**
+   - Monthly recurring revenue (MRR)
+   - Customer acquisition cost (CAC)
+   - Churn rate monitoring
+   - Conversion rate optimization
+   - Upgrade path analysis
+
 ### Customer Support
 
 1. **Tier-Based Support**
@@ -175,8 +207,11 @@ We offer four subscription tiers designed to accommodate different user needs an
    - Comprehensive feature guides
    - API documentation
    - Best practices resources
+   - Billing and subscription FAQs
+   - Payment troubleshooting guides
 
 3. **Success Metrics**
    - User engagement tracking
    - Feature utilization
    - Customer satisfaction scores
+   - Payment success rate

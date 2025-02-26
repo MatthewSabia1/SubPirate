@@ -8,6 +8,7 @@ interface PricingCardProps {
   features: string[];
   isPopular?: boolean;
   onSelect: () => void;
+  buttonText?: string;
 }
 
 export function PricingCard({
@@ -17,6 +18,7 @@ export function PricingCard({
   features,
   isPopular,
   onSelect,
+  buttonText = 'Get Started',
 }: PricingCardProps) {
   return (
     <div className={`relative rounded-2xl bg-[#050505] border ${
@@ -47,7 +49,7 @@ export function PricingCard({
           {features.map((feature, index) => (
             <li key={index} className="flex items-start">
               <Check className="h-5 w-5 text-[#C69B7B] shrink-0 mt-0.5" />
-              <span className="ml-3 text-gray-300">{feature}</span>
+              <span className="ml-3 text-gray-300" dangerouslySetInnerHTML={{ __html: feature }}></span>
             </li>
           ))}
         </ul>
@@ -61,7 +63,7 @@ export function PricingCard({
             : 'bg-[#0f0f0f] text-white hover:bg-[#1A1A1A] border border-[#333333] active:bg-[#222222]'
         }`}
       >
-        Get Started
+        {buttonText}
       </button>
     </div>
   );

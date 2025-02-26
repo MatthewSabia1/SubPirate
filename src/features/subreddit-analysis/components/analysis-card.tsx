@@ -13,7 +13,8 @@ import {
   ChevronDown,
   ChevronUp,
   Save,
-  Target
+  Target,
+  BookmarkCheck
 } from 'lucide-react';
 import { supabase } from '../../../lib/supabase';
 import { HeatmapChart } from '../../../components/HeatmapChart';
@@ -105,10 +106,11 @@ const AnalysisCard: React.FC<AnalysisCardProps> = ({
   isLoading,
   error
 }) => {
-  const [showDetailedRules, setShowDetailedRules] = useState(false);
+  const [showDetailedRules, setShowDetailedRules] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saveError, setError] = useState<string | null>(null);
   const [saveAttempts, setSaveAttempts] = useState(0);
+  const [saveSuccess, setSaveSuccess] = useState(false);
 
   // Update validation to be more comprehensive
   if (!analysis?.analysis?.postingLimits?.contentRestrictions || 
@@ -194,6 +196,7 @@ const AnalysisCard: React.FC<AnalysisCardProps> = ({
       if (savedError) throw new Error('Failed to save user reference: ' + savedError.message);
 
       setSaveAttempts(0);
+      setSaveSuccess(true);
       if (onSaveComplete) {
         onSaveComplete();
       }
@@ -241,6 +244,49 @@ const AnalysisCard: React.FC<AnalysisCardProps> = ({
             {analysis.analysis.marketingFriendliness.score}% Marketing-Friendly
           </span>
         </div>
+      </div>
+
+      <div className="flex justify-between items-start p-4 md:p-6 border-b border-gray-800">
+        <h2 className="text-xl font-bold">Subreddit Analysis</h2>
+        {mode === 'new' && (
+          <div className="flex flex-col items-end gap-2">
+            <button
+              onClick={handleSave}
+              disabled={saving || saveSuccess}
+              className={`flex items-center gap-2 px-4 py-2 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
+                saveSuccess 
+                ? 'bg-green-500 text-white hover:bg-green-600' 
+                : 'bg-[#C69B7B] hover:bg-[#B38A6A] text-white'
+              }`}
+            >
+              {saveSuccess ? (
+                <>
+                  <BookmarkCheck size={20} />
+                  Saved To List
+                </>
+              ) : (
+                <>
+                  <Save size={20} />
+                  {saving ? 'Saving...' : 'Save To List'}
+                </>
+              )}
+            </button>
+            {saveError && (
+              <div className="p-3 bg-red-900/30 text-red-400 rounded-md text-sm max-w-md">
+                <div className="font-medium">Error saving analysis:</div>
+                <div className="mt-1">{saveError}</div>
+                {saveAttempts > 0 && saveAttempts < 3 && (
+                  <button
+                    onClick={handleSave}
+                    className="mt-2 text-[#C69B7B] hover:text-[#B38A6A] transition-colors"
+                  >
+                    Retry Save
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       <div className="p-4 md:p-6 space-y-8">
@@ -372,14 +418,70 @@ const AnalysisCard: React.FC<AnalysisCardProps> = ({
                 <div>
                   <h4 className="text-sm text-gray-400 mb-3">Title Template</h4>
                   <div className="bg-[#111111] rounded-lg p-4 border border-gray-800">
-                    <code className="text-emerald-400 font-mono block mb-3">
-                      {analysis.analysis.titleTemplates.patterns[0]}
-                    </code>
+                    {analysis.analysis.titleTemplates.patterns && analysis.analysis.titleTemplates.patterns[0] && (
+                      <code className="text-emerald-400 font-mono block mb-3 px-2 py-1.5 bg-emerald-900/10 rounded border border-emerald-900/20 overflow-x-auto whitespace-nowrap">
+                        {analysis.analysis.titleTemplates.patterns[0]}
+                      </code>
+                    )}
                     <div className="text-sm text-gray-400">
-                      <div className="mb-2">Example:</div>
-                      {analysis.analysis.titleTemplates.examples.map((example, index) => (
-                        <div key={index} className="text-white">{example}</div>
-                      ))}
+                      <div className="mb-2 font-medium">Example Structure:</div>
+                      <div className="space-y-3">
+                        {analysis.analysis.titleTemplates.examples && analysis.analysis.titleTemplates.examples.map((example, index) => (
+                          <div key={index} className="border-l-2 border-emerald-500/30 pl-3 py-1">
+                            <div className="text-white font-medium mb-2">{example}</div>
+                            
+                            {/* Template explanation */}
+                            {index === 0 && analysis.analysis.titleTemplates.patterns && analysis.analysis.titleTemplates.patterns[0] && (
+                              <div className="grid grid-cols-1 gap-2 text-xs mt-3 bg-[#0A0A0A] p-3 rounded-md border border-gray-800/50">
+                                <div className="text-emerald-400 mb-1 font-medium">Template Breakdown:</div>
+                                {(() => {
+                                  try {
+                                    // Improved regex to properly capture bracketed elements
+                                    const pattern = analysis.analysis.titleTemplates.patterns[0];
+                                    const parts = pattern.match(/(\[[^\]]+\])|([^\[\]]+)/g) || [];
+                                    
+                                    return parts.map((part, partIndex) => {
+                                      // Check if this part is a bracketed template part
+                                      const isBracketedPart = part.startsWith('[') && part.endsWith(']');
+                                      
+                                      if (isBracketedPart) {
+                                        const partName = part.replace(/[\[\]]/g, '').trim();
+                                        return (
+                                          <div key={partIndex} className="flex items-start gap-2">
+                                            <div className="inline-block px-1.5 py-0.5 bg-emerald-500/10 text-emerald-400 rounded font-mono whitespace-nowrap mt-0.5 flex-shrink-0">
+                                              [{partName}]
+                                            </div>
+                                            <div className="text-gray-400">
+                                              {partName === 'QUESTION' ? 'Main question or topic of your post' :
+                                              partName === 'CONTEXT' ? 'Brief background or situation context' :
+                                              partName === 'DETAIL' ? 'Specific details about your question/request' :
+                                              partName === 'GOAL' ? "What you're trying to achieve" :
+                                              partName === 'KEYWORD' ? 'Relevant keyword for visibility' :
+                                              partName === 'TOPIC' ? 'The main subject area of your post' :
+                                              partName === 'SPECIFIC' ? 'Specific detail that makes post unique' :
+                                              partName === 'CATEGORY' ? 'The category or type of your post' :
+                                              'Part of your title that adds more information'}
+                                            </div>
+                                          </div>
+                                        );
+                                      }
+                                      return null;
+                                    }).filter(Boolean);
+                                  } catch (e) {
+                                    console.error('Error parsing title template:', e);
+                                    return null;
+                                  }
+                                })()}
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                      
+                      <div className="mt-4 bg-[#0A0A0A] p-3 rounded text-xs border border-[#222222]">
+                        <div className="text-emerald-400 mb-2 font-medium">Pro Tip:</div>
+                        <p>Follow this template structure for maximum engagement. Posts that match the subreddit&apos;s preferred title format typically receive 30-40% more upvotes and comments.</p>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -476,7 +578,18 @@ const AnalysisCard: React.FC<AnalysisCardProps> = ({
               <div className="bg-[#0A0A0A] rounded-lg p-4 border border-gray-800">
                 {analysis.info.rules.map((rule: any, index: number) => (
                   <div key={index} className="mb-4 last:mb-0">
-                    <h4 className="font-medium mb-1">Rule {index + 1}: {rule.title}</h4>
+                    <div className="flex items-center justify-between mb-1">
+                      <h4 className="font-medium">Rule {index + 1}: {rule.title}</h4>
+                      <span className={`text-xs px-2 py-1 rounded font-medium ${
+                        rule.marketingImpact === 'low' ? 'bg-green-500/20 text-green-400' : 
+                        rule.marketingImpact === 'medium' ? 'bg-yellow-500/20 text-yellow-400' : 
+                        'bg-red-500/20 text-red-400'
+                      }`}>
+                        {rule.marketingImpact === 'low' ? 'Low Impact' : 
+                         rule.marketingImpact === 'medium' ? 'Medium Impact' : 
+                         'High Impact'}
+                      </span>
+                    </div>
                     <p className="text-sm text-gray-400">{rule.description}</p>
                   </div>
                 ))}
@@ -497,36 +610,6 @@ const AnalysisCard: React.FC<AnalysisCardProps> = ({
               View all posts in r/{analysis.info.name}
               <ChevronRight size={16} />
             </a>
-          </div>
-        )}
-      </div>
-
-      <div className="flex justify-between items-start mt-4">
-        <h2 className="text-xl font-bold">Subreddit Analysis</h2>
-        {mode === 'new' && (
-          <div className="flex flex-col items-end gap-2">
-            <button
-              onClick={handleSave}
-              disabled={saving}
-              className="flex items-center gap-2 px-4 py-2 bg-[#C69B7B] hover:bg-[#B38A6A] text-white rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              <Save size={20} />
-              {saving ? 'Saving...' : 'Save Analysis'}
-            </button>
-            {saveError && (
-              <div className="p-3 bg-red-900/30 text-red-400 rounded-md text-sm max-w-md">
-                <div className="font-medium">Error saving analysis:</div>
-                <div className="mt-1">{saveError}</div>
-                {saveAttempts > 0 && saveAttempts < 3 && (
-                  <button
-                    onClick={handleSave}
-                    className="mt-2 text-[#C69B7B] hover:text-[#B38A6A] transition-colors"
-                  >
-                    Retry Save
-                  </button>
-                )}
-              </div>
-            )}
           </div>
         )}
       </div>

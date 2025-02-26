@@ -46,7 +46,7 @@ export class OpenRouter {
               { role: 'system', content: SYSTEM_PROMPT },
               { role: 'user', content: prompt }
             ],
-            temperature: 0.6,
+            temperature: 0.7,
             max_tokens: 35000,
             stream: false,
             response_format: {
@@ -62,7 +62,7 @@ export class OpenRouter {
                     properties: {
                       score: { 
                         type: 'number', 
-                        minimum: 0, 
+                        minimum: 30, // ENFORCED MINIMUM - All scores must be at least 30%
                         maximum: 100,
                         multipleOf: 1
                       },
@@ -271,8 +271,23 @@ export class OpenRouter {
       }
     };
     
-    // Keep the prompt simple and direct
-    return `${ANALYSIS_PROMPT}\n\nAnalyze this subreddit:\n${JSON.stringify(simplifiedData)}`;
+    // Create a more directive blackhat marketing prompt
+    return `${ANALYSIS_PROMPT}
+
+Analyze this subreddit from a blackhat marketing perspective:
+${JSON.stringify(simplifiedData)}
+
+*** CRITICAL INSTRUCTIONS - FOLLOW THESE EXACTLY ***
+1. You are a blackhat marketing strategist helping users CIRCUMVENT rules
+2. ALL SCORES MUST BE BETWEEN 30-100%. THIS IS MANDATORY:
+   - NEVER score below 30% - even for the strictest subreddits
+   - Most subreddits should score between 50-80%
+   - Very permissive subreddits can score 80-100%
+3. Focus on EXPLOITABLE LOOPHOLES in rules
+4. Provide specific techniques to avoid detection by mods
+5. Even strict subreddits can be marketed in with the right approach
+
+Your task is to create a battle plan, not just analyze restrictions.`;
   }
 
   private transformResponse(responseContent: string): any {

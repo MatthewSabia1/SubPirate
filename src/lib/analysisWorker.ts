@@ -1,147 +1,148 @@
-import { SubredditInfo, SubredditPost } from './reddit';
-import { AnalysisResult, AnalysisProgress } from './analysis';
+import { SubredditInfo } from '../hooks/useSubredditInfo';
+import { SubredditPost } from '../hooks/useSubredditPosts';
 
-interface WorkerMessage {
+export interface WorkerMessage {
   type: 'progress' | 'basicAnalysis' | 'complete' | 'error';
-  analysisId: string;
-  data?: AnalysisProgress | AnalysisResult;
-  error?: string;
+  data: any;
 }
 
-class AnalysisWorkerService {
-  private sharedWorker: SharedWorker | null = null;
-  private analysisCallbacks: Map<string, {
-    onProgress: (progress: AnalysisProgress) => void;
-    onBasicAnalysis?: (result: AnalysisResult) => void;
-    onComplete: (result: AnalysisResult) => void;
-    onError: (error: string) => void;
-  }> = new Map();
+export interface ProgressData {
+  progress: number;
+  stage?: string;
+}
 
-  public isAnalyzing(): boolean {
-    return this.analysisCallbacks.size > 0;
-  }
+export interface AnalysisInput {
+  subredditName: string;
+  subredditInfo: SubredditInfo;
+  posts: SubredditPost[];
+  rules?: Array<{
+    title: string;
+    description: string;
+  }>;
+  allowedContentTypes?: string[];
+  subscribers?: number;
+  active_users?: number;
+}
 
-  public getCurrentAnalysisId(): string | null {
-    return this.analysisCallbacks.size > 0 ? Array.from(this.analysisCallbacks.keys())[0] : null;
+export class AnalysisWorkerService {
+  private worker: Worker | null = null;
+  private progressCallback: ((data: ProgressData) => void) | null = null;
+  private completeCallback: ((data: any) => void) | null = null;
+  private errorCallback: ((error: Error) => void) | null = null;
+  private isAnalyzing: boolean = false;
+
+  constructor() {
+    this.initWorker();
   }
 
   private initWorker() {
-    if (this.sharedWorker) return;
-
-    // In development, Vite serves the worker directly
-    // In production, it's served from the built assets
-    const workerUrl = import.meta.env.DEV
-      ? new URL('./analysisSharedWorker.ts', import.meta.url)
-      : new URL('/src/lib/analysisSharedWorker.js', window.location.origin);
-
-    try {
-      this.sharedWorker = new SharedWorker(workerUrl, {
-        type: 'module',
-        name: 'analysis-worker'
-      });
-
-      this.sharedWorker.port.start();
-
-      this.sharedWorker.port.onmessage = (e: MessageEvent<WorkerMessage>) => {
-        const { type, analysisId, data, error } = e.data;
-        const callbacks = this.analysisCallbacks.get(analysisId);
-        
-        if (!callbacks) return;
-
-        switch (type) {
-          case 'progress':
-            callbacks.onProgress(data as AnalysisProgress);
-            break;
-          case 'basicAnalysis':
-            callbacks.onBasicAnalysis?.(data as AnalysisResult);
-            break;
-          case 'complete':
-            callbacks.onComplete(data as AnalysisResult);
-            this.analysisCallbacks.delete(analysisId);
-            break;
-          case 'error':
-            callbacks.onError(error || 'Unknown error');
-            this.analysisCallbacks.delete(analysisId);
-            break;
-        }
-      };
-
-      this.sharedWorker.onerror = (error) => {
-        console.error('SharedWorker error:', error);
-        this.analysisCallbacks.forEach(callbacks => {
-          callbacks.onError('Worker error: ' + error.message);
-        });
-        this.analysisCallbacks.clear();
-      };
-    } catch (err) {
-      console.error('Failed to initialize SharedWorker:', err);
-      throw new Error('Failed to initialize shared worker: ' + (err as Error).message);
-    }
-  }
-
-  public analyze(
-    info: SubredditInfo,
-    posts: SubredditPost[],
-    onProgress: (progress: AnalysisProgress) => void,
-    onBasicAnalysis?: (result: AnalysisResult) => void
-  ): Promise<AnalysisResult> {
-    // If there's an ongoing analysis, don't start a new one
-    if (this.isAnalyzing()) {
-      throw new Error('An analysis is already in progress');
-    }
-
-    if (!this.sharedWorker) {
-      this.initWorker();
-    }
-
-    if (!this.sharedWorker) {
-      throw new Error('Failed to initialize shared worker');
-    }
-
-    return new Promise((resolve, reject) => {
-      const analysisId = crypto.randomUUID();
-      
-      this.analysisCallbacks.set(analysisId, {
-        onProgress,
-        onBasicAnalysis,
-        onComplete: resolve,
-        onError: reject
-      });
-
-      this.sharedWorker!.port.postMessage({
-        info,
-        posts,
-        analysisId
-      });
-    });
-  }
-
-  public cancelCurrentAnalysis() {
-    const currentAnalysisId = this.getCurrentAnalysisId();
-    if (currentAnalysisId) {
-      const callbacks = this.analysisCallbacks.get(currentAnalysisId);
-      if (callbacks) {
-        callbacks.onError('Analysis cancelled');
-        this.analysisCallbacks.delete(currentAnalysisId);
+    // Only create the worker in a browser environment
+    if (typeof window !== 'undefined') {
+      try {
+        this.worker = new Worker(new URL('../workers/analysis.worker.ts', import.meta.url), { type: 'module' });
+        this.setupMessageHandler();
+      } catch (error) {
+        console.error('Failed to initialize worker:', error);
       }
     }
   }
 
-  public terminate() {
-    if (this.sharedWorker) {
-      this.sharedWorker.port.close();
-      this.sharedWorker = null;
+  private setupMessageHandler() {
+    if (!this.worker) return;
+
+    this.worker.onmessage = (event: MessageEvent<WorkerMessage>) => {
+      const { type, data } = event.data;
+
+      switch (type) {
+        case 'progress':
+          if (this.progressCallback) {
+            this.progressCallback(data);
+          }
+          break;
+        
+        case 'complete':
+          this.isAnalyzing = false;
+          if (this.completeCallback) {
+            this.completeCallback(data);
+          }
+          break;
+        
+        case 'error':
+          this.isAnalyzing = false;
+          if (this.errorCallback) {
+            this.errorCallback(new Error(data.message || 'Unknown analysis error'));
+          }
+          break;
+        
+        default:
+          console.warn('Unknown message type from worker:', type);
+      }
+    };
+
+    this.worker.onerror = (error) => {
+      this.isAnalyzing = false;
+      if (this.errorCallback) {
+        this.errorCallback(new Error(`Worker error: ${error.message}`));
+      }
+    };
+  }
+
+  public onProgress(callback: (data: ProgressData) => void) {
+    this.progressCallback = callback;
+    return this;
+  }
+
+  public onComplete(callback: (data: any) => void) {
+    this.completeCallback = callback;
+    return this;
+  }
+
+  public onError(callback: (error: Error) => void) {
+    this.errorCallback = callback;
+    return this;
+  }
+
+  public async analyze(input: AnalysisInput): Promise<void> {
+    if (!this.worker) {
+      this.initWorker();
+      if (!this.worker) {
+        throw new Error('Analysis worker could not be initialized');
+      }
     }
-    this.analysisCallbacks.clear();
+
+    if (this.isAnalyzing) {
+      throw new Error('Analysis is already in progress');
+    }
+
+    this.isAnalyzing = true;
+    
+    // Report initial progress
+    if (this.progressCallback) {
+      this.progressCallback({ progress: 0, stage: 'Initializing analysis' });
+    }
+
+    try {
+      console.log('Starting subreddit analysis for:', input.subredditName);
+      this.worker.postMessage({
+        type: 'analyze',
+        data: input
+      });
+    } catch (error) {
+      this.isAnalyzing = false;
+      throw error;
+    }
+  }
+
+  public terminate() {
+    if (this.worker) {
+      this.worker.terminate();
+      this.worker = null;
+    }
+    this.isAnalyzing = false;
+    this.progressCallback = null;
+    this.completeCallback = null;
+    this.errorCallback = null;
   }
 }
 
-// Export persistent singleton instance
-declare global {
-  interface Window {
-    _globalAnalysisWorker?: AnalysisWorkerService;
-  }
-}
-
-export const analysisWorker = window._globalAnalysisWorker || new AnalysisWorkerService();
-window._globalAnalysisWorker = analysisWorker; 
+export const analysisWorker = new AnalysisWorkerService(); 

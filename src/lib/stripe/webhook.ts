@@ -260,6 +260,46 @@ async function handleCheckoutSessionCompleted(session: any) {
   }
 }
 
+// Helper function to handle product deletion
+async function handleProductDeleted(product: any) {
+  try {
+    const { data, error } = await supabase
+      .from('stripe_products')
+      .update({ active: false, updated_at: new Date().toISOString() })
+      .eq('stripe_product_id', product.id);
+
+    if (error) {
+      console.error(`Error marking product ${product.id} as inactive:`, error);
+      throw error;
+    }
+
+    console.log(`Successfully marked product ${product.id} as inactive`);
+  } catch (error) {
+    console.error('Error handling product deletion:', error);
+    throw error;
+  }
+}
+
+// Helper function to handle price deletion
+async function handlePriceDeleted(price: any) {
+  try {
+    const { data, error } = await supabase
+      .from('stripe_prices')
+      .update({ active: false, updated_at: new Date().toISOString() })
+      .eq('id', price.id);
+
+    if (error) {
+      console.error(`Error marking price ${price.id} as inactive:`, error);
+      throw error;
+    }
+
+    console.log(`Successfully marked price ${price.id} as inactive`);
+  } catch (error) {
+    console.error('Error handling price deletion:', error);
+    throw error;
+  }
+}
+
 // Main webhook handler
 export async function handleWebhookEvent(
   rawBody: string,
@@ -310,10 +350,18 @@ export async function handleWebhookEvent(
       case 'product.updated':
         await syncProductData(stripeEvent.data.object);
         break;
+        
+      case 'product.deleted':
+        await handleProductDeleted(stripeEvent.data.object);
+        break;
 
       case 'price.created':
       case 'price.updated':
         await syncPriceData(stripeEvent.data.object);
+        break;
+        
+      case 'price.deleted':
+        await handlePriceDeleted(stripeEvent.data.object);
         break;
 
       default:

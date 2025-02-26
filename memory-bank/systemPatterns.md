@@ -63,6 +63,26 @@ flowchart TD
     UpdateStatus --> DatabaseUpdate[Update Database]
 ```
 
+### Environment Detection Pattern
+```mermaid
+flowchart TD
+    Initialize[Initialize Stripe Client] --> CheckBuild{Is Production Build?}
+    CheckBuild -->|Yes| CheckDomain{Check Domain}
+    CheckBuild -->|No| UseTestMode[Use Test Mode]
+    
+    CheckDomain -->|Production Domain| UseProductionMode[Use Production Mode]
+    CheckDomain -->|Dev/Preview Domain| UseTestMode
+    
+    UseTestMode --> LoadTestKeys[Load Test API Keys]
+    UseProductionMode --> LoadProductionKeys[Load Production API Keys]
+    
+    LoadTestKeys --> InitStripe[Initialize Stripe Client]
+    LoadProductionKeys --> InitStripe
+    
+    InitStripe --> LogMode[Log Current Mode]
+    LogMode --> Ready[Client Ready]
+```
+
 ## Component Structure
 
 ### Core Components
@@ -127,13 +147,33 @@ flowchart TD
 
 ### 5. Stripe Integration Patterns
 - Test/Production mode separation
+- Domain and build-based environment detection
+  - Production mode only for production domain and production build
+  - Test mode for development, local environments and preview deployments
+  - Clear logging of current environment for debugging
+- Environment-specific API keys and webhook secrets
 - Fallback price IDs for reliability
-- Forced test mode during development
 - Visual indicators for test environment
 - Webhook server for event handling
 - Comprehensive logging for debugging
+- Verification tools for production readiness
 
-### 6. Database Patterns
+### 6. Production Readiness Pattern
+```mermaid
+flowchart TD
+    Start[Start Verification] --> CheckEnv[Check Environment Variables]
+    CheckEnv --> CheckAPI[Verify API Connection]
+    CheckAPI --> CheckWebhooks[Verify Webhook Setup]
+    CheckWebhooks --> CheckProducts[Verify Products & Prices]
+    CheckProducts --> CheckDB[Verify Database Tables]
+    CheckDB --> Summary[Generate Summary Report]
+    Summary --> Decision{All Checks Passed?}
+    Decision -->|Yes| Ready[Production Ready]
+    Decision -->|No| Issues[Address Issues]
+    Issues --> Start
+```
+
+### 7. Database Patterns
 - Idempotent migrations for safety
   - Use IF EXISTS/IF NOT EXISTS clauses
   - DROP before CREATE for functions/triggers
@@ -146,7 +186,7 @@ flowchart TD
 - Explicit foreign key constraints
 - Regular database maintenance
 
-### 7. User Usage Tracking Pattern
+### 8. User Usage Tracking Pattern
 ```mermaid
 flowchart TD
     UserAction[User Action] --> CheckTier[Check Subscription Tier]
@@ -172,7 +212,7 @@ This pattern ensures usage tracking is:
 4. **Maintainable**: Clear separation of concerns
 5. **Resilient**: Error handling at multiple levels
 
-### 8. Image Loading Pattern
+### 9. Image Loading Pattern
 ```mermaid
 flowchart TD
     Component[UI Component] --> RedditImage[RedditImage Component]
@@ -193,7 +233,7 @@ This pattern ensures image loading is:
 4. **Efficient**: Uses lazy loading for performance
 5. **Maintainable**: Centralizes image loading logic
 
-### 9. Authentication Pattern
+### 10. Authentication Pattern
 ```mermaid
 flowchart TD
     Component[UI Component] --> AuthContext[AuthContext]

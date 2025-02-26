@@ -21,9 +21,69 @@ import {
 } from 'lucide-react';
 import Logo from '../components/Logo';
 import { useRedirectHandler } from '../hooks/useRedirectHandler';
+import { 
+  getActiveProducts, 
+  getActivePrices, 
+  getProductFeatures 
+} from '../lib/stripe/client';
+import type { Stripe } from 'stripe';
 
-// Define styles outside the component
+// Map of plan names to their corresponding product IDs
+const PRODUCT_ID_MAP = {
+  Starter: 'prod_RpekF2EAu1npzb',
+  Creator: 'prod_RpekhttqS8GKpE',
+  Pro: 'prod_RpekrPRCVGOqJM',
+  Agency: 'prod_Rpek1uw0yBJmLG'
+};
+
+// Fallback feature lists for landing page if database features can't be loaded
+const FALLBACK_FEATURES = {
+  Starter: [
+    '<span class="font-bold text-white">10</span> subreddit analyses per month',
+    '<span class="font-bold text-white">Unlimited</span> competitor intelligence',
+    '<span class="font-bold text-white">50</span> opportunity finder subreddits',
+    '<span class="font-bold text-white">1</span> Reddit account protection',
+    '<span class="font-bold text-white">2</span> marketing campaigns',
+  ],
+  Pro: [
+    '<span class="font-bold text-white">50</span> subreddit analyses monthly',
+    '<span class="font-bold text-white">Advanced</span> competitor intelligence dashboard',
+    '<span class="font-bold text-white">Unlimited</span> opportunity finder subreddits',
+    '<span class="font-bold text-white">5</span> Reddit account protection system',
+    '<span class="font-bold text-white">10</span> marketing campaigns with team access',
+    '<span class="font-bold text-white">AI-powered</span> optimal posting scheduler',
+  ],
+  Agency: [
+    '<span class="font-bold text-white">Unlimited</span> subreddit analysis',
+    '<span class="font-bold text-white">Premium</span> content strategy AI assistant',
+    '<span class="font-bold text-white">Unlimited</span> subreddit targeting',
+    '<span class="font-bold text-white">Unlimited</span> Reddit account management',
+    '<span class="font-bold text-white">Unlimited</span> campaigns & team members',
+    '<span class="font-bold text-white">Priority</span> upgrades & dedicated strategist',
+  ]
+};
+
+// Default descriptions - matching those in Pricing.tsx
+const DEFAULT_DESCRIPTIONS = {
+  Starter: 'Generate substantial Reddit traffic quickly and efficiently.',
+  Creator: 'Ideal for individual creators and small businesses.',
+  Pro: 'Scale your Reddit presence for significant traffic growth.',
+  Agency: 'Comprehensive solution for agencies and power users.'
+};
+
+// CSS for the animated background gradients
 const customStyles = `
+  @keyframes move-gradient {
+    0% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+    100% { background-position: 0% 50%; }
+  }
+  .animated-gradient {
+    background: linear-gradient(-45deg, #C69B7B, #A0796C, #87685E, #C69B7B);
+    background-size: 400% 400%;
+    animation: move-gradient 15s ease infinite;
+  }
+
   .badge {
     display: inline-flex;
     align-items: center;
@@ -115,9 +175,31 @@ const customStyles = `
   }
 `;
 
+// Interface for product features from the database
+interface ProductFeature {
+  id: string;
+  key: string;
+  name: string;
+  description: string;
+  enabled: boolean;
+}
+
+// Create a TestModeIndicator component
+const TestModeIndicator = () => (
+  <div className="bg-amber-900/20 border border-amber-800 text-amber-200 px-4 py-2 rounded-md text-sm mb-6 max-w-3xl mx-auto text-center">
+    <p><span className="font-bold">Test Mode Active:</span> Using Stripe test data. All plans use test prices and features.</p>
+  </div>
+);
+
 const LandingPage = () => {
   // Add this to handle OAuth redirects that might end up at the root URL
   useRedirectHandler();
+
+  const [products, setProducts] = React.useState<Stripe.Product[]>([]);
+  const [prices, setPrices] = React.useState<Stripe.Price[]>([]);
+  const [pricingLoaded, setPricingLoaded] = React.useState(false);
+  const [productFeatures, setProductFeatures] = React.useState<Record<string, ProductFeature[]>>({});
+  const [isTestMode, setIsTestMode] = React.useState(false);
 
   // Add the styles to the document head
   React.useEffect(() => {
@@ -129,6 +211,130 @@ const LandingPage = () => {
       document.head.removeChild(styleElement);
     };
   }, []);
+
+  // Fetch Stripe products and prices for the pricing section
+  React.useEffect(() => {
+    async function fetchPricingData() {
+      try {
+        const [productsData, pricesData] = await Promise.all([
+          getActiveProducts(),
+          getActivePrices()
+        ]);
+        
+        setProducts(productsData);
+        setPrices(pricesData);
+        
+        // Check if we're in test mode
+        const testMode = pricesData.some(price => 
+          price.livemode === false
+        );
+        setIsTestMode(testMode);
+        
+        // After setting products, fetch features for each product
+        const featuresPromises = Object.values(PRODUCT_ID_MAP).map(productId => 
+          getProductFeatures(productId).then(features => ({ productId, features }))
+        );
+        
+        const featuresResults = await Promise.all(featuresPromises);
+        
+        // Convert array of results to a record object for easy lookup
+        const featuresMap: Record<string, ProductFeature[]> = {};
+        featuresResults.forEach(result => {
+          featuresMap[result.productId] = result.features;
+        });
+        
+        setProductFeatures(featuresMap);
+        setPricingLoaded(true);
+      } catch (err) {
+        console.error('Failed to fetch pricing data:', err);
+        // Still set pricing loaded to true to show fallback data
+        setPricingLoaded(true);
+      }
+    }
+    fetchPricingData();
+  }, []);
+
+  // Function to get price for a specific product
+  const getPriceForProduct = (productId: string): Stripe.Price | undefined => {
+    return prices.find(price => 
+      price.product === productId && 
+      price.active && 
+      price.type === 'recurring'
+    );
+  };
+
+  // Function to get a formatted price with fallback
+  const getFormattedPrice = (planName: string): string => {
+    const productId = PRODUCT_ID_MAP[planName as keyof typeof PRODUCT_ID_MAP];
+    
+    if (!productId || !pricingLoaded) {
+      // Fallback prices if Stripe data isn't loaded
+      return planName === 'Starter' ? '$29' :
+             planName === 'Pro' ? '$79' :
+             planName === 'Agency' ? '$199' : '$0';
+    }
+    
+    const price = getPriceForProduct(productId);
+    if (!price || !price.unit_amount) {
+      // Fallback prices if price isn't found
+      return planName === 'Starter' ? '$29' :
+             planName === 'Pro' ? '$79' :
+             planName === 'Agency' ? '$199' : '$0';
+    }
+    
+    // Format the price from cents to dollars
+    return `$${(price.unit_amount / 100)}`;
+  };
+
+  // Function to get product description with fallback
+  const getProductDescription = (planName: string): string => {
+    const productId = PRODUCT_ID_MAP[planName as keyof typeof PRODUCT_ID_MAP];
+    if (!productId || !pricingLoaded) {
+      return DEFAULT_DESCRIPTIONS[planName as keyof typeof DEFAULT_DESCRIPTIONS] || '';
+    }
+    
+    const product = products.find(p => p.id === productId);
+    return product?.description || 
+      DEFAULT_DESCRIPTIONS[planName as keyof typeof DEFAULT_DESCRIPTIONS] || '';
+  };
+
+  // Get features for a plan from the database or use fallbacks
+  const getFeatures = (planName: string): string[] => {
+    const productId = PRODUCT_ID_MAP[planName as keyof typeof PRODUCT_ID_MAP];
+    const features = productFeatures[productId];
+    
+    if (!features || features.length === 0) {
+      // Use fallback features if database features aren't available
+      return FALLBACK_FEATURES[planName as keyof typeof FALLBACK_FEATURES] || [];
+    }
+    
+    // Transform database features into formatted HTML strings
+    return features.map(feature => {
+      // Extract any numeric values from the feature description for highlighting
+      const description = feature.description;
+      const numberMatch = description.match(/(\d+)/);
+      
+      if (numberMatch) {
+        const number = numberMatch[1];
+        // Replace the number with a highlighted version
+        return description.replace(
+          number, 
+          `<span class="font-bold text-white">${number}</span>`
+        );
+      }
+      
+      // If no number found, just return the description
+      return description;
+    });
+  };
+
+  // Handle the pricing section click
+  const handlePricingLearnMore = () => {
+    const pricingSection = document.getElementById('pricing');
+    if (pricingSection) {
+      pricingSection.scrollIntoView({ behavior: 'smooth' });
+    }
+  };
 
   return (
     <div className="bg-[#050505] min-h-screen text-white font-[system-ui]">
@@ -326,38 +532,26 @@ const LandingPage = () => {
             </p>
           </div>
 
+          {isTestMode && <TestModeIndicator />}
+
           <div className="grid md:grid-cols-3 gap-8 max-w-5xl mx-auto">
-            {/* Basic Plan */}
+            {/* Starter Plan */}
             <div className="pricing-card">
-              <h3 className="text-xl font-semibold mb-2">Essentials</h3>
-              <div className="text-[#C69B7B] text-4xl font-bold mb-2">$29<span className="text-lg text-gray-400">/mo</span></div>
-              <p className="text-gray-400 mb-6">Generate substantial Reddit traffic quickly and efficiently.</p>
+              <h3 className="text-xl font-semibold mb-2">Starter</h3>
+              <div className="text-[#C69B7B] text-4xl font-bold mb-2">{getFormattedPrice('Starter')}<span className="text-lg text-gray-400">/mo</span></div>
+              <p className="text-gray-400 mb-6">{getProductDescription('Starter')}</p>
               
               <ul className="space-y-3 mb-8 flex-grow">
-                <li className="flex items-start gap-2">
-                  <Check size={18} className="text-[#C69B7B] shrink-0 mt-0.5" />
-                  <span><span className="font-bold text-white">10</span> subreddit analyses per month</span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <Check size={18} className="text-[#C69B7B] shrink-0 mt-0.5" />
-                  <span><span className="font-bold text-white">Unlimited</span> competitor intelligence</span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <Check size={18} className="text-[#C69B7B] shrink-0 mt-0.5" />
-                  <span><span className="font-bold text-white">50</span> opportunity finder subreddits</span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <Check size={18} className="text-[#C69B7B] shrink-0 mt-0.5" />
-                  <span><span className="font-bold text-white">1</span> Reddit account protection</span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <Check size={18} className="text-[#C69B7B] shrink-0 mt-0.5" />
-                  <span><span className="font-bold text-white">2</span> marketing campaigns</span>
-                </li>
+                {getFeatures('Starter').map((feature, index) => (
+                  <li key={index} className="flex items-start gap-2">
+                    <Check size={18} className="text-[#C69B7B] shrink-0 mt-0.5" />
+                    <span dangerouslySetInnerHTML={{ __html: feature }}></span>
+                  </li>
+                ))}
               </ul>
               
               <Link to="/login" className="pricing-button button-outline">
-                Start Free Trial
+                Get Started
               </Link>
             </div>
 
@@ -367,89 +561,54 @@ const LandingPage = () => {
                 MOST POPULAR
               </div>
               <h3 className="text-xl font-semibold mb-2">Professional</h3>
-              <div className="text-[#C69B7B] text-4xl font-bold mb-2">$79<span className="text-lg text-gray-400">/mo</span></div>
-              <p className="text-gray-400 mb-6">Scale your Reddit presence for significant traffic growth.</p>
+              <div className="text-[#C69B7B] text-4xl font-bold mb-2">{getFormattedPrice('Pro')}<span className="text-lg text-gray-400">/mo</span></div>
+              <p className="text-gray-400 mb-6">{getProductDescription('Pro')}</p>
               
               <ul className="space-y-3 mb-8 flex-grow">
-                <li className="flex items-start gap-2">
-                  <Check size={18} className="text-[#C69B7B] shrink-0 mt-0.5" />
-                  <span><span className="font-bold text-white">50</span> subreddit analyses monthly</span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <Check size={18} className="text-[#C69B7B] shrink-0 mt-0.5" />
-                  <span><span className="font-bold text-white">Advanced</span> competitor intelligence dashboard</span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <Check size={18} className="text-[#C69B7B] shrink-0 mt-0.5" />
-                  <span><span className="font-bold text-white">Unlimited</span> opportunity finder subreddits</span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <Check size={18} className="text-[#C69B7B] shrink-0 mt-0.5" />
-                  <span><span className="font-bold text-white">5</span> Reddit account protection system</span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <Check size={18} className="text-[#C69B7B] shrink-0 mt-0.5" />
-                  <span><span className="font-bold text-white">10</span> marketing campaigns with team access</span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <Check size={18} className="text-[#C69B7B] shrink-0 mt-0.5" />
-                  <span><span className="font-bold text-white">AI-powered</span> optimal posting scheduler</span>
-                </li>
+                {getFeatures('Pro').map((feature, index) => (
+                  <li key={index} className="flex items-start gap-2">
+                    <Check size={18} className="text-[#C69B7B] shrink-0 mt-0.5" />
+                    <span dangerouslySetInnerHTML={{ __html: feature }}></span>
+                  </li>
+                ))}
               </ul>
               
               <Link to="/login" className="pricing-button button-primary">
-                Start Free Trial
+                Get Started
               </Link>
             </div>
 
-            {/* Enterprise Plan */}
+            {/* Agency Plan */}
             <div className="pricing-card">
               <h3 className="text-xl font-semibold mb-2">Agency</h3>
-              <div className="text-[#C69B7B] text-4xl font-bold mb-2">$199<span className="text-lg text-gray-400">/mo</span></div>
-              <p className="text-gray-400 mb-6">Comprehensive solution for agencies and power users.</p>
+              <div className="text-[#C69B7B] text-4xl font-bold mb-2">{getFormattedPrice('Agency')}<span className="text-lg text-gray-400">/mo</span></div>
+              <p className="text-gray-400 mb-6">{getProductDescription('Agency')}</p>
               
               <ul className="space-y-3 mb-8 flex-grow">
-                <li className="flex items-start gap-2">
-                  <Check size={18} className="text-[#C69B7B] shrink-0 mt-0.5" />
-                  <span><span className="font-bold text-white">Unlimited</span> subreddit analysis</span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <Check size={18} className="text-[#C69B7B] shrink-0 mt-0.5" />
-                  <span><span className="font-bold text-white">Premium</span> content strategy AI assistant</span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <Check size={18} className="text-[#C69B7B] shrink-0 mt-0.5" />
-                  <span><span className="font-bold text-white">Unlimited</span> subreddit targeting</span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <Check size={18} className="text-[#C69B7B] shrink-0 mt-0.5" />
-                  <span><span className="font-bold text-white">Unlimited</span> Reddit account management</span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <Check size={18} className="text-[#C69B7B] shrink-0 mt-0.5" />
-                  <span><span className="font-bold text-white">Unlimited</span> campaigns & team members</span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <Check size={18} className="text-[#C69B7B] shrink-0 mt-0.5" />
-                  <span><span className="font-bold text-white">Priority</span> upgrades & dedicated strategist</span>
-                </li>
+                {getFeatures('Agency').map((feature, index) => (
+                  <li key={index} className="flex items-start gap-2">
+                    <Check size={18} className="text-[#C69B7B] shrink-0 mt-0.5" />
+                    <span dangerouslySetInnerHTML={{ __html: feature }}></span>
+                  </li>
+                ))}
               </ul>
               
               <Link to="/login" className="pricing-button button-outline">
-                Schedule Consultation
+                Get Started
               </Link>
             </div>
           </div>
         </div>
       </section>
 
-      {/* New High-Impact Call to Action Section */}
+      {/* High-Impact Call to Action Section */}
       <section className="py-24 relative">
         <div className="absolute inset-0 overflow-hidden">
           <div className="absolute -top-[300px] -left-[300px] w-[600px] h-[600px] bg-[#C69B7B]/5 rounded-full blur-[150px] opacity-70"></div>
           <div className="absolute -bottom-[300px] -right-[300px] w-[600px] h-[600px] bg-[#C69B7B]/5 rounded-full blur-[150px] opacity-70"></div>
         </div>
         <div className="container mx-auto px-6 relative z-10">
+          {isTestMode && <TestModeIndicator />}
           <div className="max-w-7xl mx-auto">
             <div className="grid lg:grid-cols-5 gap-0 overflow-hidden rounded-2xl border border-[#222] bg-gradient-to-br from-black to-[#0c0c0c]">
               {/* Left content */}
@@ -470,7 +629,7 @@ const LandingPage = () => {
                       <Check size={14} className="text-[#C69B7B]" />
                     </div>
                     <p className="text-gray-300">
-                      <span className="font-bold text-white">Risk-free 14-day trial</span> - Experience the full platform with no commitment
+                      <span className="font-bold text-white">Immediate access</span> - Get started right away with our intuitive platform
                     </p>
                   </div>
                   <div className="flex items-start gap-3">
@@ -492,7 +651,7 @@ const LandingPage = () => {
                 </div>
                 <div className="flex flex-col sm:flex-row gap-5">
                   <Link to="/login" className="px-8 py-5 rounded-lg bg-gradient-to-r from-[#C69B7B] to-[#B38A6A] hover:from-[#B38A6A] hover:to-[#A37959] text-black text-base font-semibold shadow-2xl shadow-[#C69B7B]/10 transition-all transform hover:scale-105 flex items-center justify-center gap-2 group">
-                    <span className="font-bold">Begin Your Free Trial</span>
+                    <span className="font-bold">Get Started Today</span>
                     <ArrowRight size={18} className="group-hover:translate-x-1 transition-transform" />
                   </Link>
                   <Link to="#pricing" className="px-8 py-5 rounded-lg border-2 border-[#333] hover:border-[#C69B7B]/30 text-white text-base font-semibold transition-all flex items-center justify-center hover:bg-[#0c0c0c]">
@@ -615,7 +774,7 @@ const LandingPage = () => {
             <div className="faq-card">
               <h3 className="text-xl font-semibold mb-2">What guarantees do you offer if the platform doesn't meet my expectations?</h3>
               <p className="text-gray-400">
-                We offer a comprehensive satisfaction guarantee: First, our 14-day free trial provides full access to test all features without any payment required. Following your trial, you're protected by our 30-day money-back guarantee. If you don't see meaningful traffic increases, simply contact our support team with your analytics, and we'll process a complete refund. We confidently offer this guarantee because our churn rate is below 4%, compared to the industry average of 23%.
+                We offer a comprehensive satisfaction guarantee: If you don't see meaningful traffic increases within 30 days, simply contact our support team with your analytics, and we'll process a complete refund. We confidently offer this guarantee because our churn rate is below 4%, compared to the industry average of 23%.
               </p>
             </div>
             
@@ -640,7 +799,7 @@ const LandingPage = () => {
                 While your competitors explore new strategies to capture Reddit traffic, you have the opportunity to implement a proven system with measurable results. Make an informed decision today.
               </p>
               <Link to="/login" className="inline-flex items-center px-8 py-4 rounded-md bg-gradient-to-r from-[#C69B7B] to-[#B38A6A] hover:from-[#B38A6A] hover:to-[#A37959] text-black text-base font-semibold shadow-xl shadow-[#C69B7B]/10 transition-all transform hover:scale-105 gap-2">
-                START YOUR FREE TRIAL
+                GET STARTED
                 <ArrowRight size={18} />
               </Link>
             </div>

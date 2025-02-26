@@ -23,7 +23,11 @@
 - **Storage**: Supabase Storage
 - **Real-time**: Supabase Realtime
 - **AI**: OpenRouter
-- **Payments**: Stripe API (Test Mode)
+- **Payments**: Stripe API
+  - Environment detection for test/production modes
+  - Test mode for development and preview environments
+  - Production mode for the live site
+  - Verification tools for production readiness
 - **Usage Tracking**: Custom Supabase RPC functions and tables
 
 ### External APIs
@@ -32,8 +36,13 @@
 - **DiceBear**: Avatar generation
 - **Google OAuth**: User authentication
 - **Stripe API**: Subscription and payment processing
-  - Test Mode configuration for development
-  - Separate webhook server for event handling
+  - Environment-aware configuration:
+    - Test keys for development and preview environments
+    - Production keys for the live site
+    - Automatic detection based on domain and build mode
+  - Feature-complete webhook handling
+  - Comprehensive verification tools
+  - Detailed setup documentation
 
 ## Application Routes
 
@@ -125,19 +134,15 @@ VITE_REDDIT_APP_SECRET=
 # No additional environment variables needed for client-side implementation
 
 # Stripe Configuration
-# Test API keys (use these during development)
+# Test API keys (used in development and preview environments)
 VITE_STRIPE_TEST_SECRET_KEY=
 VITE_STRIPE_TEST_PUBLISHABLE_KEY=
+VITE_STRIPE_TEST_WEBHOOK_SECRET=
 
-# Production API keys (do not use during development)
+# Production API keys (used in production environment)
 VITE_STRIPE_SECRET_KEY=
 VITE_STRIPE_PUBLISHABLE_KEY=
-
-# Local development webhook secret from Stripe CLI
 VITE_STRIPE_WEBHOOK_SECRET=
-# Test environment webhook secret
-VITE_STRIPE_TEST_WEBHOOK_SECRET=
-# Production webhook secret
 VITE_STRIPE_PROD_WEBHOOK_SECRET=
 VITE_STRIPE_BASE_URL=
 ```
@@ -149,11 +154,12 @@ VITE_STRIPE_BASE_URL=
     "dev": "vite",
     "build": "tsc && vite build",
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
-    "preview": "vite preview",
+    "stripe:sync": "node src/lib/stripe/sync-products.js",
+    "stripe:verify": "node scripts/verify-stripe-production.js",
+    "stripe:prod-setup": "npm run stripe:sync && npm run stripe:verify",
     "stripe:webhook": "ts-node scripts/setup-stripe-webhook.ts",
-    "server": "node server.js",
-    "webhook": "node webhook-server.js",
-    "dev:webhook": "cross-env NODE_ENV=development STRIPE_TEST_MODE=true concurrently \"npm run dev\" \"npm run webhook\" \"stripe listen --forward-to http://localhost:4242/api/stripe/webhook\""
+    "dev:webhook": "cross-env NODE_ENV=development STRIPE_TEST_MODE=true concurrently \"npm run dev\" \"npm run webhook\" \"stripe listen --forward-to http://localhost:4242/api/stripe/webhook\"",
+    "server": "node server.js"
   }
 }
 ```

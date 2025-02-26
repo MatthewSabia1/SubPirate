@@ -61,7 +61,7 @@ USING (
   auth.uid() IN (
     SELECT user_id 
     FROM public.project_members 
-    WHERE project_id = project_id AND role = 'owner'
+    WHERE project_id = NEW.project_id AND role = 'owner'
   )
 );
 
@@ -71,7 +71,7 @@ WITH CHECK (
   auth.uid() IN (
     SELECT user_id 
     FROM public.project_members 
-    WHERE project_id = project_id AND role = 'owner'
+    WHERE project_id = NEW.project_id AND role = 'owner'
   )
 );
 
@@ -81,7 +81,7 @@ USING (
   auth.uid() IN (
     SELECT user_id 
     FROM public.project_members 
-    WHERE project_id = project_id AND role = 'owner'
+    WHERE project_id = NEW.project_id AND role = 'owner'
   )
 );
 
@@ -91,7 +91,7 @@ USING (
   auth.uid() IN (
     SELECT user_id 
     FROM public.project_members 
-    WHERE project_id = project_id AND role = 'owner'
+    WHERE project_id = OLD.project_id AND role = 'owner'
   )
 );
 

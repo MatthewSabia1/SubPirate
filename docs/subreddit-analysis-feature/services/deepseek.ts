@@ -123,7 +123,7 @@ export class DeepSeek {
         subscribers: parsed.subscribers,
         activeUsers: parsed.activeUsers,
         marketingFriendliness: {
-          score: Math.min(100, Math.max(0, parsed.marketingFriendliness.score)),
+          score: parsed.marketingFriendliness.score,
           reasons: parsed.marketingFriendliness.reasons || [],
           recommendations: parsed.marketingFriendliness.recommendations || [],
         },

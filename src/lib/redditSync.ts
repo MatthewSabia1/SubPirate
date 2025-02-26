@@ -105,7 +105,14 @@ export async function syncRedditAccountPosts(accountId: string): Promise<void> {
           reddit_account_id: accountId,
           subreddit_id: subredditMap.get(post.subreddit.toLowerCase()),
           post_id: post.id,
-          created_at: postDate.toISOString() // Use original post date
+          created_at: postDate.toISOString(), // Use original post date
+          title: post.title,
+          url: post.url,
+          selftext: post.selftext,
+          score: post.score,
+          num_comments: post.num_comments,
+          thumbnail: post.thumbnail,
+          preview_url: post.preview_url
         };
       })
       .filter(post => post.subreddit_id); // Only keep posts with valid subreddit IDs
@@ -119,15 +126,25 @@ export async function syncRedditAccountPosts(accountId: string): Promise<void> {
         reddit_account_id: firstPost.reddit_account_id,
         subreddit_id: firstPost.subreddit_id,
         post_id: firstPost.post_id,
-        created_at: firstPost.created_at
+        created_at: firstPost.created_at,
+        title: firstPost.title
       });
     }
 
-    // Insert posts with fallback for schema issues
-    await insertPostsWithFallback(postsToUpsert);
+    // Insert posts 
+    const { error: insertError } = await supabase
+      .from('reddit_posts')
+      .upsert(postsToUpsert, {
+        onConflict: 'reddit_account_id,post_id',
+        ignoreDuplicates: false
+      });
 
-    // We no longer need to update all existing posts to today's date
-    // as we want to preserve the original posting dates
+    if (insertError) {
+      console.error('Error upserting posts:', insertError);
+      throw insertError;
+    }
+    
+    console.log(`Successfully inserted ${postsToUpsert.length} posts to database`);
 
     // Update account stats
     const { error: updateError } = await supabase
@@ -145,9 +162,6 @@ export async function syncRedditAccountPosts(accountId: string): Promise<void> {
       .eq('id', accountId);
 
     if (updateError) throw updateError;
-    
-    // Verify posts were saved properly
-    await verifyPostsSaved(accountId, limitedPosts);
     
     const duration = ((Date.now() - startTime) / 1000).toFixed(2);
     console.log(`Sync completed successfully for u/${account.username} in ${duration}s`);
@@ -242,117 +256,6 @@ async function processSyncSubreddits(subredditNames: string[]): Promise<void> {
   }
 }
 
-/**
- * Inserts posts with fallback for schema issues
- */
-async function insertPostsWithFallback(posts: any[]): Promise<void> {
-  if (posts.length === 0) return;
-
-  try {
-    // The database schema only has these basic fields, so only use these
-    const minimalPosts = posts.map(post => ({
-      reddit_account_id: post.reddit_account_id,
-      subreddit_id: post.subreddit_id,
-      post_id: post.post_id,
-      created_at: post.created_at
-    }));
-    
-    console.log(`Inserting ${minimalPosts.length} posts with minimal fields only`);
-    
-    const { error: insertError } = await supabase
-      .from('reddit_posts')
-      .upsert(minimalPosts, {
-        onConflict: 'reddit_account_id,post_id',
-        ignoreDuplicates: false
-      });
-
-    if (insertError) {
-      console.error('Error upserting posts:', insertError);
-      
-      // If we still get an error, try inserting posts one by one
-      if (insertError.message.includes('violates foreign key constraint')) {
-        console.log('Foreign key violation - trying posts one by one');
-        
-        let successCount = 0;
-        for (const post of minimalPosts) {
-          try {
-            const { error } = await supabase
-              .from('reddit_posts')
-              .upsert([post], {
-                onConflict: 'reddit_account_id,post_id',
-                ignoreDuplicates: false
-              });
-              
-            if (!error) {
-              successCount++;
-            } else {
-              console.error(`Error inserting individual post (${post.post_id}):`, error);
-            }
-          } catch (err) {
-            console.error(`Exception inserting individual post (${post.post_id}):`, err);
-          }
-        }
-        
-        console.log(`Individually inserted ${successCount} out of ${posts.length} posts`);
-      } else {
-        // Log detailed error info to help debug
-        console.error('Detailed error info:', {
-          message: insertError.message,
-          details: insertError.details,
-          hint: insertError.hint,
-          code: insertError.code
-        });
-        throw insertError;
-      }
-    } else {
-      console.log(`Successfully inserted ${minimalPosts.length} posts to database`);
-    }
-  } catch (err) {
-    console.error('Error during post insertion:', err);
-    throw err;
-  }
-}
-
-/**
- * Verifies that posts were actually saved to the database
- */
-async function verifyPostsSaved(accountId: string, originalPosts: any[]): Promise<void> {
-  try {
-    // Get the actual count of posts in the database for this account
-    const { data, error, count } = await supabase
-      .from('reddit_posts')
-      .select('post_id', { count: 'exact' })
-      .eq('reddit_account_id', accountId);
-      
-    if (error) {
-      console.error('Error verifying posts:', error);
-      return;
-    }
-    
-    console.log(`Verification - Account has ${count} posts in database compared to ${originalPosts.length} fetched`);
-    
-    // Check if specific post IDs exist
-    if (originalPosts.length > 0 && data && data.length > 0) {
-      // Get post_ids that should be in the database
-      const existingPostIds = new Set(data.map(p => p.post_id));
-      const samplePosts = originalPosts.slice(0, 3);
-      
-      console.log('Checking if sample posts exist in database:');
-      
-      // Check each sample post
-      for (const post of samplePosts) {
-        const postId = post.id;
-        const exists = existingPostIds.has(postId);
-        console.log(`- Post ${postId}: ${exists ? 'EXISTS' : 'MISSING'}`);
-      }
-    } else if (originalPosts.length > 0) {
-      console.warn('No posts found in database even though posts were retrieved from Reddit');
-    }
-  } catch (err) {
-    console.error('Error in verification process:', err);
-  }
-}
-
 export async function syncAllRedditAccounts(): Promise<void> {
   try {
     // Get accounts that need syncing
@@ -377,23 +280,23 @@ export async function syncAllRedditAccounts(): Promise<void> {
 // Check if database needs migration and execute if needed
 export async function ensureRedditPostsSchema(): Promise<boolean> {
   try {
-    // Check if we have a synced_at column, which would indicate the newer schema
+    // Check if we have a title column, which would indicate the newer schema
     const { data, error } = await supabase
       .from('reddit_posts')
-      .select('id')
+      .select('id, title')
       .limit(1);
       
     if (error) {
       // Check if the error is specifically about a missing column
       if (error.message.includes('column') && error.message.includes('does not exist')) {
-        console.log('Missing columns in reddit_posts table, working with current schema');
+        console.log('Missing columns in reddit_posts table, need to run migrations');
         return false;
       }
       throw error;
     }
 
-    // If we got here, the table exists in some form
-    console.log('Reddit posts table exists, proceeding with sync');
+    // If we got here, the table exists with the title column
+    console.log('Reddit posts table exists with title column, proceeding with sync');
     return true;
   } catch (err) {
     console.error('Error checking reddit_posts schema:', err);

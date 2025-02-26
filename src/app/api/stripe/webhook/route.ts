@@ -1,10 +1,27 @@
 import { handleWebhookEvent } from '../../../../lib/stripe/webhook';
 
-const webhookSecret = import.meta.env.VITE_STRIPE_WEBHOOK_SECRET || '';
+// Determine if we're in production mode based on environment
+const isProductionBuild = process.env.NODE_ENV === 'production';
+
+// Use the appropriate webhook secret based on environment
+const webhookSecret = isProductionBuild
+  ? process.env.VITE_STRIPE_PROD_WEBHOOK_SECRET || process.env.VITE_STRIPE_WEBHOOK_SECRET || ''
+  : process.env.VITE_STRIPE_TEST_WEBHOOK_SECRET || process.env.VITE_STRIPE_WEBHOOK_SECRET || '';
 
 export async function POST(request: Request) {
   try {
-    console.log('Stripe webhook request received');
+    // Check the host to determine if we're in production or development
+    const host = request.headers.get('host') || '';
+    const isDevelopmentHost = 
+      host.includes('localhost') || 
+      host.includes('127.0.0.1') || 
+      host.includes('.vercel.app');
+    
+    // Only use production mode on the actual production domain AND in a production build
+    const isProduction = isProductionBuild && !isDevelopmentHost;
+    
+    console.log(`Stripe webhook request received in ${isProduction ? 'PRODUCTION' : 'TEST'} mode`);
+    console.log(`Running on host: ${host}`);
     
     if (!webhookSecret) {
       console.error('No webhook secret found in environment variables');
@@ -58,10 +75,10 @@ export async function POST(request: Request) {
       );
     }
   } catch (error: any) {
-    console.error('Unexpected webhook error:', error);
+    console.error('Unexpected webhook error:', error.message);
     
     return new Response(
-      JSON.stringify({ error: 'Webhook handler failed', message: error.message }),
+      JSON.stringify({ error: 'Unexpected error', message: error.message }),
       { 
         status: 500,
         headers: { 'Content-Type': 'application/json' }

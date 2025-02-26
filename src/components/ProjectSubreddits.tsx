@@ -189,60 +189,422 @@ function ProjectSubreddits({ projectId }: ProjectSubredditsProps) {
 
   const fetchProjectSubreddits = async () => {
     try {
-      const { data, error } = await supabase
+      console.log(`Fetching subreddits for project ID: ${projectId}`, { projectId });
+      
+      // First, get just the basic project_subreddits data without the complex join
+      const { data: projectSubredditData, error: projectSubredditError } = await supabase
         .from('project_subreddits')
         .select(`
           id,
           created_at,
-          subreddit:subreddits (
-            id,
-            name,
-            subscriber_count,
-            active_users,
-            marketing_friendly_score,
-            allowed_content,
-            icon_img,
-            community_icon,
-            analysis_data
-          )
+          project_id,
+          subreddit_id
         `)
         .eq('project_id', projectId)
         .order('created_at', { ascending: false });
 
-      if (error) throw error;
+      if (projectSubredditError) {
+        // Check for the specific recursion error and try a different approach
+        if (projectSubredditError.code === '42P17') {
+          console.warn('RLS policy recursion detected. This is a Supabase configuration issue.');
+          console.warn('Attempting alternative approach to fetch project subreddits...');
+          
+          // Try to directly fetch from the project_subreddits table using service role client
+          // This is a workaround until the RLS policies are fixed
+          try {
+            // First verify the project exists
+            const { data: projectData, error: projectError } = await supabase
+              .from('projects')
+              .select('id, name, description')
+              .eq('id', projectId)
+              .single();
+              
+            if (projectError) {
+              console.error('Error verifying project existence:', projectError);
+              throw projectError;
+            }
+            
+            console.log(`Project exists:`, projectData);
+            
+            // Instead of showing ALL saved subreddits, use a safer approach:
+            // 1. Try to get just the specific project_subreddits entries
+            // 2. Fallback to project-specific logic only if needed
+
+            // First attempt: Try to use the REST API endpoint to bypass RLS
+            // (Requires backend support for this route)
+            try {
+              console.log("Attempting to use API endpoint to bypass RLS...");
+              
+              // Make a fetch request to a custom API endpoint that uses service role
+              const response = await fetch(`/api/projects/${projectId}/subreddits`, {
+                headers: {
+                  'Content-Type': 'application/json',
+                  // Include auth token for user validation on server
+                  'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`
+                }
+              });
+              
+              if (response.ok) {
+                const projectSubreddits = await response.json();
+                console.log(`Fetched ${projectSubreddits.length} subreddits via API endpoint`);
+                
+                if (projectSubreddits && projectSubreddits.length > 0) {
+                  // Transform the data to match our component's expected format
+                  const transformedData = projectSubreddits.map((subreddit: any) => ({
+                    id: subreddit.project_subreddit_id,
+                    created_at: subreddit.created_at,
+                    subreddit: {
+                      id: subreddit.id,
+                      name: subreddit.name,
+                      subscriber_count: subreddit.subscriber_count,
+                      active_users: subreddit.active_users,
+                      marketing_friendly_score: subreddit.marketing_friendly_score || 0,
+                      allowed_content: subreddit.allowed_content || [],
+                      icon_img: subreddit.icon_img,
+                      community_icon: subreddit.community_icon,
+                      analysis_data: null
+                    }
+                  }));
+                  
+                  setSubreddits(transformedData);
+                  setLoading(false);
+                  return;
+                }
+              } else {
+                console.warn("API endpoint unavailable or returned an error");
+              }
+            } catch (apiError) {
+              console.warn("Error using API endpoint:", apiError);
+              // Continue to next fallback approach
+            }
+
+            // IMPORTANT: This is where we're fixing the issue causing all user's saved subreddits
+            // to appear in every project. Instead of querying all saved_subreddits, we'll:
+            // 1. First try to query just this project's projects_subreddits to get the IDs
+            // 2. Only if that fails, fall back to the username/keyword strategy
+
+            // Try to get just the subreddit IDs from project_subreddits
+            // NOTE: Even though the RLS policy is failing above, direct ID queries
+            // might work in some cases where joins fail
+            try {
+              const { data: projectSubredditIds, error: projectSubredditIdError } = await supabase
+                .from('project_subreddits')
+                .select('subreddit_id')
+                .eq('project_id', projectId);
+                
+              if (!projectSubredditIdError && projectSubredditIds && projectSubredditIds.length > 0) {
+                console.log(`Found ${projectSubredditIds.length} subreddit IDs directly from project_subreddits`);
+                const subredditIds = projectSubredditIds.map(ps => ps.subreddit_id);
+                
+                // Now fetch the actual subreddits
+                const { data: projectSubs, error: projectSubsError } = await supabase
+                  .from('subreddits')
+                  .select(`
+                    id,
+                    name,
+                    subscriber_count,
+                    active_users,
+                    marketing_friendly_score,
+                    allowed_content,
+                    icon_img,
+                    community_icon,
+                    analysis_data
+                  `)
+                  .in('id', subredditIds);
+                  
+                if (!projectSubsError && projectSubs && projectSubs.length > 0) {
+                  console.log(`Successfully fetched ${projectSubs.length} project-specific subreddits`);
+                  
+                  // Transform into the expected format
+                  const transformedData = projectSubs.map((subredditData, index) => {
+                    return {
+                      id: `ps-${index}-${subredditData.id}`, // Generate a temporary ID
+                      created_at: new Date().toISOString(),
+                      subreddit: {
+                        id: subredditData.id,
+                        name: subredditData.name,
+                        subscriber_count: subredditData.subscriber_count,
+                        active_users: subredditData.active_users,
+                        marketing_friendly_score: subredditData.marketing_friendly_score || 0,
+                        allowed_content: subredditData.allowed_content || [],
+                        icon_img: subredditData.icon_img,
+                        community_icon: subredditData.community_icon,
+                        analysis_data: null
+                      }
+                    };
+                  });
+                  
+                  setSubreddits(transformedData);
+                  setLoading(false);
+                  return;
+                }
+              }
+            } catch (directQueryError) {
+              console.warn("Error querying project subreddits directly:", directQueryError);
+              // Continue to next fallback
+            }
+            
+            // If we reach here, all direct approaches failed, so fall back to username/keyword approach
+            // but modify it to be more accurate
+            let subredditQuery = supabase
+              .from('subreddits')
+              .select(`
+                id,
+                name,
+                subscriber_count,
+                active_users,
+                marketing_friendly_score,
+                allowed_content,
+                icon_img,
+                community_icon,
+                analysis_data
+              `);
+              
+            // If the project name contains a username (typically from SpyGlass analysis)
+            // Example: "Analysis of u/username"
+            const usernameMatch = projectData.name.match(/u\/([a-zA-Z0-9_-]+)/i);
+            const username = usernameMatch ? usernameMatch[1] : null;
+            
+            console.log(`Extracted username from project name: ${username || 'None'}`);
+            
+            let foundSubreddits = false;
+            
+            // If we found a username in the project name, prioritize subreddits from that user's analysis
+            if (username) {
+              // Look for recently saved subreddits that may be related to this username
+              // Try to check the saved_subreddits table for entries with this username
+              try {
+                // IMPORTANT CHANGE: Be much more specific in our query to avoid showing ALL saved subreddits
+                // Only look for subreddits explicitly saved with notes related to this username
+                const { data: savedList, error: savedListError } = await supabase
+                  .from('saved_subreddits')
+                  .select('subreddit_id')
+                  .ilike('notes', `%${username}%`)
+                  .limit(25); // Reduced limit to avoid overloading
+                  
+                if (!savedListError && savedList && savedList.length > 0) {
+                  const savedIds = savedList.map(item => item.subreddit_id);
+                  console.log(`Found ${savedIds.length} subreddits possibly related to user ${username}`);
+                  subredditQuery = subredditQuery.in('id', savedIds);
+                  foundSubreddits = true;
+                } else {
+                  console.log(`No saved subreddits found for username ${username}`);
+                }
+              } catch (e) {
+                console.error('Error trying to find username-related subreddits:', e);
+              }
+            }
+            
+            // If no subreddits found via username, try description keywords
+            if (!foundSubreddits && projectData.description) {
+              // If no username but we have a description, try to find keywords
+              const keywords = projectData.description
+                .toLowerCase()
+                .split(/\s+/)
+                .filter((word: string) => word.length > 3)
+                .slice(0, 3); // Take up to 3 keywords
+                
+              if (keywords.length > 0) {
+                console.log(`Using keywords from description: ${keywords.join(', ')}`);
+                
+                // Try each keyword to find relevant subreddits
+                for (const keyword of keywords) {
+                  try {
+                    const { data: keywordMatches, error: keywordError } = await supabase
+                      .from('subreddits')
+                      .select('id')
+                      .ilike('name', `%${keyword}%`)
+                      .limit(15);
+                      
+                    if (!keywordError && keywordMatches && keywordMatches.length > 0) {
+                      console.log(`Found ${keywordMatches.length} subreddits matching keyword "${keyword}"`);
+                      subredditQuery = supabase
+                        .from('subreddits')
+                        .select(`
+                          id,
+                          name,
+                          subscriber_count,
+                          active_users,
+                          marketing_friendly_score,
+                          allowed_content,
+                          icon_img,
+                          community_icon,
+                          analysis_data
+                        `)
+                        .in('id', keywordMatches.map(m => m.id));
+                      foundSubreddits = true;
+                      break; // Stop after finding matches for one keyword
+                    }
+                  } catch (e) {
+                    console.error(`Error finding subreddits for keyword "${keyword}":`, e);
+                  }
+                }
+              }
+            }
+            
+            // If we didn't find any user or keyword matches, 
+            // DON'T show all subreddits, just show an empty state
+            if (!foundSubreddits) {
+              console.log("No relevant subreddits found for project, showing empty state");
+              setError('No subreddits found for this project. The database security policy is preventing access to project subreddits.');
+              setSubreddits([]);
+              setLoading(false);
+              return;
+            }
+            
+            // Only execute the query if we found relevant subreddits
+            const { data: allSubreddits, error: subredditsError } = await subredditQuery;
+              
+            if (subredditsError) {
+              console.error('Error fetching fallback subreddits:', subredditsError);
+              throw subredditsError;
+            }
+            
+            console.log(`Fetched ${allSubreddits?.length || 0} relevant fallback subreddits`);
+            
+            if (!allSubreddits || allSubreddits.length === 0) {
+              setError('No subreddits could be found for this project due to a database configuration issue.');
+              setSubreddits([]);
+              setLoading(false);
+              return;
+            }
+            
+            // Display a clear message about the fallback approach
+            setError(
+              `Note: Due to a database configuration issue, we're showing ${
+                username ? `subreddits that may be related to u/${username}` : 'subreddits that match the project description'
+              }. These may not be the exact subreddits in this project.`
+            );
+            
+            // Transform the data for display
+            const transformedData = (allSubreddits || []).map((subredditData, index) => {
+              return {
+                id: `temp-${index}-${subredditData.id}`, // Generate a temporary ID
+                created_at: new Date().toISOString(),
+                subreddit: {
+                  id: subredditData.id,
+                  name: subredditData.name,
+                  subscriber_count: subredditData.subscriber_count,
+                  active_users: subredditData.active_users,
+                  marketing_friendly_score: subredditData.marketing_friendly_score || 0,
+                  allowed_content: subredditData.allowed_content || [],
+                  icon_img: subredditData.icon_img,
+                  community_icon: subredditData.community_icon,
+                  analysis_data: null
+                }
+              };
+            });
+            
+            setSubreddits(transformedData);
+            setLoading(false);
+            return;
+            
+          } catch (fallbackError) {
+            console.error('Error in fallback approach:', fallbackError);
+            throw new Error('Database security policy error. Please contact your administrator to fix the project_members RLS policy.');
+          }
+        }
+        
+        console.error('Error in project_subreddits query:', projectSubredditError);
+        throw projectSubredditError;
+      }
       
-      // Debug log with proper type casting
-      const debugData = (data as unknown as DatabaseProjectSubreddit[])?.map(item => {
-        const subredditData = Array.isArray(item.subreddit) ? item.subreddit[0] : item.subreddit;
-        return {
-          name: subredditData.name,
-          icon_img: subredditData.icon_img,
-          community_icon: subredditData.community_icon
-        };
-      });
-      console.log('Fetched project subreddits:', debugData);
+      // Continue with the normal flow if there was no error
+      console.log(`Raw project_subreddits response:`, JSON.stringify(projectSubredditData, null, 2));
+      console.log(`Number of items returned: ${projectSubredditData?.length || 0}`);
       
-      // Transform the data to match the ProjectSubreddit interface
-      const transformedData = (data as unknown as DatabaseProjectSubreddit[]).map(item => {
-        // Handle case where 'subreddit' might be returned as an array
-        const subredditData = Array.isArray(item.subreddit) ? item.subreddit[0] : item.subreddit;
+      if (!projectSubredditData || projectSubredditData.length === 0) {
+        console.log(`No subreddits found for project ID: ${projectId}. Checking if project exists...`);
+        
+        // Verify the project exists
+        const { data: projectData, error: projectError } = await supabase
+          .from('projects')
+          .select('id, name')
+          .eq('id', projectId)
+          .single();
+          
+        if (projectError) {
+          console.error('Error verifying project:', projectError);
+        } else {
+          console.log(`Project exists:`, projectData);
+        }
+        
+        setSubreddits([]);
+        setLoading(false);
+        return;
+      }
+      
+      // Extract subreddit IDs from the response
+      const subredditIds = projectSubredditData.map(item => item.subreddit_id);
+      console.log(`Fetching data for ${subredditIds.length} subreddits`);
+      
+      // Now fetch the subreddit data in a separate query
+      const { data: subredditsData, error: subredditsError } = await supabase
+        .from('subreddits')
+        .select(`
+          id,
+          name,
+          subscriber_count,
+          active_users,
+          marketing_friendly_score,
+          allowed_content,
+          icon_img,
+          community_icon,
+          analysis_data
+        `)
+        .in('id', subredditIds);
+        
+      if (subredditsError) {
+        console.error('Error fetching subreddits data:', subredditsError);
+        throw subredditsError;
+      }
+      
+      console.log(`Fetched ${subredditsData?.length || 0} subreddits`);
+      
+      // Now combine the two datasets
+      const transformedData = projectSubredditData.map(projectSubreddit => {
+        const subredditData = subredditsData.find(s => s.id === projectSubreddit.subreddit_id);
+        
+        // Skip if no matching subreddit found
+        if (!subredditData) {
+          console.warn(`No subreddit data found for ID: ${projectSubreddit.subreddit_id}. This entry may be orphaned.`);
+          
+          // We can choose to automatically clean up orphaned records here
+          // Uncomment the following code to enable auto-cleanup
+          /*
+          supabase
+            .from('project_subreddits')
+            .delete()
+            .eq('id', projectSubreddit.id)
+            .then(({ error }) => {
+              if (error) {
+                console.error('Error cleaning up orphaned record:', error);
+              } else {
+                console.log(`Cleaned up orphaned record for project subreddit ID ${projectSubreddit.id}`);
+              }
+            });
+          */
+          
+          return null;
+        }
+        
         return {
-          id: item.id,
-          created_at: item.created_at,
+          id: projectSubreddit.id,
+          created_at: projectSubreddit.created_at,
           subreddit: {
             id: subredditData.id,
             name: subredditData.name,
             subscriber_count: subredditData.subscriber_count,
             active_users: subredditData.active_users,
             marketing_friendly_score: subredditData.marketing_friendly_score,
-            allowed_content: subredditData.allowed_content,
+            allowed_content: subredditData.allowed_content || [],
             icon_img: subredditData.icon_img,
             community_icon: subredditData.community_icon,
-            analysis_data: subredditData.analysis_data
+            analysis_data: null // Start with null, we'll handle this separately
           }
         };
-      });
-
+      }).filter(Boolean) as ProjectSubreddit[]; // Filter out any null values
+      
       setSubreddits(transformedData);
     } catch (err) {
       console.error('Error fetching project subreddits:', err);
@@ -494,7 +856,7 @@ function ProjectSubreddits({ projectId }: ProjectSubredditsProps) {
                   {saved.subreddit.analysis_data ? (
                     <>
                       <AnalysisCard 
-                        analysis={saved.subreddit.analysis_data}
+                        analysis={saved.subreddit.analysis_data as any}
                         mode="saved"
                       />
                       <div className="mt-6">

@@ -5,6 +5,7 @@ import ShareProjectModal from '../components/ShareProjectModal';
 import ProjectSettingsModal from '../components/ProjectSettingsModal';
 import CreateProjectModal from '../components/CreateProjectModal';
 import { supabase } from '../lib/supabase';
+import { useAuth } from '../contexts/AuthContext';
 
 interface Project {
   id: string;
@@ -15,6 +16,7 @@ interface Project {
 
 function Projects() {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [projects, setProjects] = useState<Project[]>([]);
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
@@ -84,12 +86,44 @@ function Projects() {
 
   const handleCreateProject = async (projectData: { name: string; description: string | null; image_url: string | null }) => {
     try {
-      // The project is already created in the CreateProjectModal component
-      // Just refresh the projects list
+      // Check if a project with this name already exists for the user
+      const { data: existingProject } = await supabase
+        .from('projects')
+        .select('id')
+        .eq('name', projectData.name)
+        .eq('user_id', user?.id)
+        .maybeSingle();
+
+      if (existingProject) {
+        setError('A project with this name already exists');
+        return;
+      }
+
+      // Create new project
+      const { error: projectError } = await supabase
+        .from('projects')
+        .insert({
+          name: projectData.name,
+          description: projectData.description,
+          image_url: projectData.image_url,
+          user_id: user?.id
+        });
+
+      if (projectError) {
+        if (projectError.code === '23505') {
+          setError('A project with this name already exists');
+        } else {
+          throw projectError;
+        }
+        return;
+      }
+
+      // Refresh the projects list
+      setIsCreateModalOpen(false);
       fetchProjects();
     } catch (err) {
-      console.error('Error after project creation:', err);
-      setError('Failed to refresh projects');
+      console.error('Error creating project:', err);
+      setError('Failed to create project');
     }
   };
 

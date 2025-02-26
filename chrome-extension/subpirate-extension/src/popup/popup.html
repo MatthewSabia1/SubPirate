@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SubPirate Helper</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body class="bg-black text-white">
+  <div class="container">
+    <!-- Header with Logo -->
+    <div class="header">
+      <div class="logo-container">
+        <img src="../images/SubPirate_light_icon_logo.svg" alt="SubPirate Icon" class="logo-icon">
+        <img src="../images/SubPirate_light_logo_full_text.svg" alt="SubPirate" class="logo-text">
+      </div>
+    </div>
+
+    <!-- Login Section (shown when not logged in) -->
+    <div id="login-section" class="section">
+      <p class="text-center">Sign in to access SubPirate features</p>
+      <button id="login-button" class="btn btn-primary">Sign In</button>
+    </div>
+
+    <!-- Subreddit Actions Section (shown when logged in) -->
+    <div id="actions-section" class="section hidden">
+      <div id="current-subreddit" class="subreddit-info">
+        <p>Currently browsing: <span id="subreddit-name" class="subreddit-name">r/unknown</span></p>
+      </div>
+      
+      <div class="action-buttons">
+        <button id="save-subreddit" class="btn btn-action">
+          <span class="icon">📌</span> Save Subreddit
+        </button>
+        <button id="analyze-subreddit" class="btn btn-action">
+          <span class="icon">🔍</span> Analyze Subreddit
+        </button>
+        <button id="add-to-project" class="btn btn-action">
+          <span class="icon">📂</span> Add to Project
+        </button>
+      </div>
+      
+      <div id="project-selector" class="project-selector hidden">
+        <select id="project-list" class="select">
+          <option value="">Select a project...</option>
+          <!-- Projects will be loaded here -->
+        </select>
+        <button id="confirm-add-to-project" class="btn btn-sm">Add</button>
+      </div>
+    </div>
+
+    <!-- Status Messages -->
+    <div id="status-message" class="status hidden"></div>
+
+    <!-- Footer with User Info -->
+    <div id="user-section" class="user-section hidden">
+      <div class="user-info">
+        <span id="user-name">User</span>
+        <button id="logout-button" class="btn btn-sm">Sign Out</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>

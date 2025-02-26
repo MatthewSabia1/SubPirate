@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
+import { useRedditAccounts } from '../contexts/RedditAccountContext';
 
 export default function RedditOAuthCallback() {
   const [searchParams] = useSearchParams();
@@ -9,6 +10,9 @@ export default function RedditOAuthCallback() {
   const { user } = useAuth();
   const [error, setError] = useState<string | null>(null);
   const [exchangeAttempted, setExchangeAttempted] = useState(false);
+
+  // Here we need to force a re-check of the accounts after the callback is complete
+  const { connectRedditAccount, refreshAccountStatus } = useRedditAccounts();
 
   useEffect(() => {
     const handleCallback = async () => {
@@ -253,28 +257,34 @@ export default function RedditOAuthCallback() {
         // Clean up state from session storage
         sessionStorage.removeItem('reddit_oauth_state');
 
-        // Redirect to accounts page
-        navigate('/accounts', { replace: true });
+        // After successfully storing the account, refresh the account status
+        await refreshAccountStatus();
+        
+        // Navigate back to dashboard
+        navigate('/dashboard');
       } catch (err) {
-        console.error('OAuth callback error:', err);
-        setError(err instanceof Error ? err.message : 'Failed to connect Reddit account');
+        console.error('Error during OAuth callback:', err);
+        setError(err instanceof Error ? err.message : 'An error occurred during authentication');
       }
     };
 
-    handleCallback();
-  }, [searchParams.get('code'), searchParams.get('state'), user, navigate, exchangeAttempted]);
+    if (user) {
+      handleCallback();
+    }
+  }, [user, searchParams.get('code'), searchParams.get('state'), navigate, exchangeAttempted, refreshAccountStatus]);
 
   if (error) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-900">
-        <div className="bg-red-900/50 p-6 rounded-lg shadow-lg max-w-md w-full">
-          <h2 className="text-xl font-semibold text-red-200 mb-4">Connection Failed</h2>
-          <p className="text-red-100 mb-4">{error}</p>
+      <div className="min-h-screen flex items-center justify-center bg-gray-900 p-4">
+        <div className="bg-gray-800 p-8 rounded-xl shadow-lg max-w-md w-full text-center">
+          <div className="text-red-500 text-5xl mb-4">⚠️</div>
+          <h1 className="text-2xl font-bold text-white mb-4">Authentication Error</h1>
+          <p className="text-gray-300 mb-6">{error}</p>
           <button
             onClick={() => navigate('/accounts')}
-            className="w-full bg-red-700 hover:bg-red-600 text-white font-medium py-2 px-4 rounded transition-colors"
+            className="w-full py-3 px-4 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-lg transition duration-200"
           >
-            Return to Accounts
+            Back to Accounts
           </button>
         </div>
       </div>
@@ -282,13 +292,11 @@ export default function RedditOAuthCallback() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-900">
-      <div className="bg-gray-800 p-6 rounded-lg shadow-lg max-w-md w-full">
-        <div className="animate-pulse flex flex-col items-center">
-          <div className="rounded-full bg-gray-700 h-12 w-12 mb-4"></div>
-          <div className="h-4 bg-gray-700 rounded w-3/4 mb-2"></div>
-          <div className="h-4 bg-gray-700 rounded w-1/2"></div>
-        </div>
+    <div className="min-h-screen flex items-center justify-center bg-gray-900 p-4">
+      <div className="bg-gray-800 p-8 rounded-xl shadow-lg max-w-md w-full text-center">
+        <div className="animate-spin text-5xl mb-4">⚙️</div>
+        <h1 className="text-2xl font-bold text-white mb-4">Connecting Your Reddit Account</h1>
+        <p className="text-gray-300">Please wait while we authenticate your Reddit account...</p>
       </div>
     </div>
   );

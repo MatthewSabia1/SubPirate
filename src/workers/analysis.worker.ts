@@ -3,6 +3,9 @@ import { analyzeSubreddit } from '../lib/openRouter';
 import { SubredditInfo, SubredditPost } from '../lib/reddit';
 import { AnalysisResult, AnalysisProgress } from '../lib/analysis';
 
+// Add a marker to show we're using the updated worker
+console.log("*** USING UPDATED ANALYSIS WORKER WITH GENEROUS SCORING ***");
+
 interface WorkerMessage {
   info: SubredditInfo;
   posts: SubredditPost[];
@@ -134,25 +137,30 @@ function analyzeRuleMarketingImpact(rule: { title: string; description: string }
 }
 
 function calculateMarketingScore(input: AnalysisInput): number {
-  let score = 50;
+  // Start with a high baseline
+  let score = 85;
   
-  const subscriberScore = Math.min(input.subscribers / 1000000, 1) * 15;
-  const activityScore = input.subscribers > 0 ? Math.min(input.active_users / input.subscribers, 1) * 15 : 0;
-  score += subscriberScore + activityScore;
-
-  const totalEngagement = input.engagement_metrics.avg_score + input.engagement_metrics.avg_comments;
-  const engagementRatio = input.subscribers > 0 ? (totalEngagement / input.subscribers) * 100 : 0;
-  const engagementScore = Math.min(engagementRatio, 30);
-  score += engagementScore;
-
-  const highImpactRules = input.rules.filter(r => r.marketingImpact === 'high').length;
-  const mediumImpactRules = input.rules.filter(r => r.marketingImpact === 'medium').length;
-  score -= (highImpactRules * 4) + (mediumImpactRules * 2);
-
-  const postFrequencyScore = Math.min(input.posts_per_day / 10, 1) * 10;
-  score += postFrequencyScore;
-
-  return Math.max(0, Math.min(100, Math.round(score)));
+  // Reduced penalties for restrictive rules
+  const restrictiveRules = input.rules.filter(r => 
+    r.marketingImpact === 'high' || 
+    r.title.toLowerCase().includes('promot') || 
+    r.title.toLowerCase().includes('spam')
+  );
+  
+  score -= restrictiveRules.length * 4; // Reduced penalty
+  
+  // Bonus for active communities
+  if (input.active_users > 1000) {
+    score += 5;
+  }
+  
+  // Bonus for post frequency
+  if (input.posts_per_day > 50) {
+    score += 3;
+  }
+  
+  // Never go below 60%
+  return Math.min(98, Math.max(60, score));
 }
 
 function prepareAnalysisInput(info: SubredditInfo, posts: SubredditPost[]): AnalysisInput {

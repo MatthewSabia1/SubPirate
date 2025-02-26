@@ -202,99 +202,106 @@ export function HeatmapChart({ posts }: Props) {
   };
 
   return (
-    <div className="overflow-x-auto">
-      <div className="min-w-[800px] relative">
-        {/* Hour labels */}
-        <div className="flex">
-          <div className="w-16" />
-          {HOURS.map(hour => (
-            <div
-              key={hour}
-              className="flex-1 text-center text-xs text-gray-400"
-            >
-              {hour % 3 === 0 && formatTime(hour)}
-            </div>
-          ))}
+    <div className="w-full">
+      <div className="w-full">
+        {/* Hour labels with improved alignment */}
+        <div className="flex mb-2 pl-[1px]">
+          <div className="w-16" /> {/* Same width as day labels */}
+          <div className="flex flex-1">
+            {HOURS.map(hour => (
+              <div
+                key={hour}
+                className="flex-1 flex justify-center text-xs text-gray-400"
+                style={{ paddingRight: hour === 23 ? '1px' : '0' }}
+              >
+                {hour % 4 === 0 && (
+                  <span className="inline-block text-center truncate font-medium">{formatTime(hour)}</span>
+                )}
+              </div>
+            ))}
+          </div>
         </div>
 
-        {/* Grid */}
+        {/* Grid with consistent spacing */}
         {DAYS.map((day, dayIndex) => (
-          <div key={day} className="flex items-center">
-            <div className="w-16 text-xs text-gray-400 pr-2">{day}</div>
-            {HOURS.map((hour) => {
-              const intensity = getCellIntensity(dayIndex, hour);
-              const cellPosts = grid[dayIndex][hour].posts;
-              const topPosts = getTopPosts(cellPosts);
+          <div key={day} className="flex items-center h-full mb-[2px]">
+            <div className="w-16 text-xs text-gray-400 pr-3 text-right font-medium">{day}</div>
+            <div className="flex flex-1">
+              {HOURS.map((hour) => {
+                const intensity = getCellIntensity(dayIndex, hour);
+                const cellPosts = grid[dayIndex][hour].posts;
+                const topPosts = getTopPosts(cellPosts);
 
-              return (
-                <div
-                  key={hour}
-                  className="flex-1 aspect-square relative group"
-                  ref={cellRef}
-                >
+                return (
                   <div
-                    className="w-full h-full border border-[#222222] transition-all duration-300 hover:border-emerald-500/30 group-hover:z-10"
-                    style={{
-                      backgroundColor: getCellBackground(intensity, false),
-                      boxShadow: getCellGlow(intensity, false),
-                      transition: 'all 0.2s ease-out',
-                      ['--tw-ring-color' as string]: 'rgba(76, 175, 80, 0.1)',
-                    }}
-                    onMouseEnter={(e) => {
-                      const cell = e.currentTarget;
-                      cell.style.backgroundColor = getCellBackground(intensity, true);
-                      cell.style.boxShadow = getCellGlow(intensity, true);
-                      cell.style.borderColor = 'rgba(76, 175, 80, 0.5)';
-                      
-                      if (topPosts.length > 0) {
-                        showTooltip(cell, cellPosts, dayIndex, hour);
-                      }
-                      
-                      // Add hover effect to neighboring cells with flat aesthetic
-                      const neighbors = getNeighborCoords(dayIndex, hour);
-                      neighbors.forEach(([d, h], index) => {
-                        const neighborCell = document.querySelector(`[data-day="${d}"][data-hour="${h}"]`);
-                        if (neighborCell) {
-                          const distance = Math.sqrt(
-                            Math.pow(d - dayIndex, 2) + Math.pow(h - hour, 2)
-                          );
-                          const falloff = Math.exp(-distance * 1.2); // Steeper falloff for cleaner edges
-                          neighborCell.classList.add('neighbor-hover');
-                          (neighborCell as HTMLElement).style.opacity = `${1 - falloff * 0.1}`; // Subtle opacity change
-                          (neighborCell as HTMLElement).style.backgroundColor = interpolateColor(
-                            Math.min(getCellIntensity(d, h) + falloff * 0.15, 1) // Reduced intensity boost
-                          );
-                          (neighborCell as HTMLElement).style.borderColor = `rgba(76, 175, 80, ${falloff * 0.2})`; // Subtle border highlight
+                    key={hour}
+                    className="flex-1 aspect-square relative group"
+                    ref={cellRef}
+                  >
+                    <div
+                      className="w-full h-full border border-[#222222] transition-all duration-300 hover:border-emerald-500/30 group-hover:z-10"
+                      style={{
+                        backgroundColor: getCellBackground(intensity, false),
+                        boxShadow: getCellGlow(intensity, false),
+                        transition: 'all 0.2s ease-out',
+                        ['--tw-ring-color' as string]: 'rgba(76, 175, 80, 0.1)',
+                      }}
+                      onMouseEnter={(e) => {
+                        const cell = e.currentTarget;
+                        cell.style.backgroundColor = getCellBackground(intensity, true);
+                        cell.style.boxShadow = getCellGlow(intensity, true);
+                        cell.style.borderColor = 'rgba(76, 175, 80, 0.5)';
+                        
+                        if (topPosts.length > 0) {
+                          showTooltip(cell, cellPosts, dayIndex, hour);
                         }
-                      });
-                    }}
-                    onMouseLeave={(e) => {
-                      const cell = e.currentTarget;
-                      cell.style.backgroundColor = getCellBackground(intensity, false);
-                      cell.style.boxShadow = getCellGlow(intensity, false);
-                      cell.style.borderColor = '#222222';
-                      
-                      hideTooltip();
-                      
-                      // Remove hover effect from neighboring cells
-                      document.querySelectorAll('.neighbor-hover').forEach(cell => {
-                        cell.classList.remove('neighbor-hover');
-                        (cell as HTMLElement).style.opacity = '';
-                        (cell as HTMLElement).style.borderColor = '#222222';
-                        const day = parseInt(cell.getAttribute('data-day') || '0');
-                        const hour = parseInt(cell.getAttribute('data-hour') || '0');
-                        (cell as HTMLElement).style.backgroundColor = getCellBackground(
-                          getCellIntensity(day, hour),
-                          false
-                        );
-                      });
-                    }}
-                    data-day={dayIndex}
-                    data-hour={hour}
-                  />
-                </div>
-              );
-            })}
+                        
+                        // Add hover effect to neighboring cells with flat aesthetic
+                        const neighbors = getNeighborCoords(dayIndex, hour);
+                        neighbors.forEach(([d, h], index) => {
+                          const neighborCell = document.querySelector(`[data-day="${d}"][data-hour="${h}"]`);
+                          if (neighborCell) {
+                            const distance = Math.sqrt(
+                              Math.pow(d - dayIndex, 2) + Math.pow(h - hour, 2)
+                            );
+                            const falloff = Math.exp(-distance * 1.2); // Steeper falloff for cleaner edges
+                            neighborCell.classList.add('neighbor-hover');
+                            (neighborCell as HTMLElement).style.opacity = `${1 - falloff * 0.1}`; // Subtle opacity change
+                            (neighborCell as HTMLElement).style.backgroundColor = interpolateColor(
+                              Math.min(getCellIntensity(d, h) + falloff * 0.15, 1) // Reduced intensity boost
+                            );
+                            (neighborCell as HTMLElement).style.borderColor = `rgba(76, 175, 80, ${falloff * 0.2})`; // Subtle border highlight
+                          }
+                        });
+                      }}
+                      onMouseLeave={(e) => {
+                        const cell = e.currentTarget;
+                        cell.style.backgroundColor = getCellBackground(intensity, false);
+                        cell.style.boxShadow = getCellGlow(intensity, false);
+                        cell.style.borderColor = '#222222';
+                        
+                        hideTooltip();
+                        
+                        // Remove hover effect from neighboring cells
+                        document.querySelectorAll('.neighbor-hover').forEach(cell => {
+                          cell.classList.remove('neighbor-hover');
+                          (cell as HTMLElement).style.opacity = '';
+                          (cell as HTMLElement).style.borderColor = '#222222';
+                          const day = parseInt(cell.getAttribute('data-day') || '0');
+                          const hour = parseInt(cell.getAttribute('data-hour') || '0');
+                          (cell as HTMLElement).style.backgroundColor = getCellBackground(
+                            getCellIntensity(day, hour),
+                            false
+                          );
+                        });
+                      }}
+                      data-day={dayIndex}
+                      data-hour={hour}
+                    />
+                  </div>
+                );
+              })}
+            </div>
           </div>
         ))}
       </div>

@@ -51,6 +51,17 @@
 - Use meaningful test descriptions
 - Mock external dependencies
 
+### 9. Stripe Integration
+- Always check both build environment AND domain name when determining production mode
+- Never hardcode test mode flags - use environment detection
+- Use different environment variables for test vs. production API keys
+- Verify webhook endpoint configuration before deploying to production
+- Log detailed information about the current environment for debugging
+- Run verification script before production deployment
+- Handle test mode in UI with clear visual indicators
+- Implement comprehensive error handling for payment failures
+- Never commit actual API keys to the repository
+
 ## Project Preferences
 
 ### 1. Code Style
@@ -81,4 +92,12 @@
 - Use semantic HTML
 - Provide alt text for images
 - Ensure proper contrast
-- Support keyboard navigation 
+- Support keyboard navigation
+
+### 6. Environment Configuration
+- Use separate .env files for development and production
+- Clearly differentiate between test and production API keys
+- Follow environment-specific logging patterns
+- Include verification steps in deployment process
+- Document required environment variables for each environment
+- Use domain and build-based environment detection for third-party services 
