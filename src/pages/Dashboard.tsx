@@ -49,7 +49,7 @@ const customStyles = `
   }
   
   .button-outline {
-    color: #C69B7B;
+    color: #ffffff;
     border: 1px solid #C69B7B;
   }
   
@@ -373,10 +373,13 @@ function Dashboard() {
           </p>
         </div>
       )}
-      <h1 className="text-xl md:text-5xl font-bold text-center mb-4">Welcome to Your War Room</h1>
-      <p className="text-gray-400 text-center text-base md:text-lg mb-20">
-        Use the tools below to find, analyze and add subreddits to your projects.
-      </p>
+      
+      <div className="mb-8">
+        <h1 className="text-2xl md:text-4xl font-bold leading-tight mb-4">Reddit <span className="text-[#C69B7B]">War Room</span></h1>
+        <p className="text-gray-400 max-w-2xl leading-relaxed">
+          Access powerful tools to find, analyze, and organize subreddits for your strategic marketing campaigns.
+        </p>
+      </div>
 
       <div className="flex flex-col gap-8 max-w-5xl mx-auto mb-12">
         {/* Analyze Specific Subreddit */}

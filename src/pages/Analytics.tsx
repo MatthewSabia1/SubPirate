@@ -357,41 +357,41 @@ function Analytics() {
   return (
     <div className="p-4 md:p-8 space-y-6">
       {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
-        <div>
-          <h1 className="text-2xl md:text-4xl font-bold">Analytics Dashboard</h1>
-          <p className="text-gray-400 mt-2">Track and analyze your Reddit marketing performance</p>
-        </div>
+      <div className="flex flex-col mb-8">
+        <h1 className="text-2xl md:text-4xl font-bold leading-tight mb-4">Performance <span className="text-[#C69B7B]">Analytics</span></h1>
+        <p className="text-gray-400 max-w-2xl leading-relaxed">
+          Gain valuable insights into your Reddit marketing campaigns with comprehensive data and visualizations.
+        </p>
+      </div>
 
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => setIsFilterOpen(!isFilterOpen)}
-            className={`secondary flex items-center gap-2 ${isFilterOpen ? 'bg-[#1A1A1A]' : ''}`}
-          >
-            <Filter size={20} />
-            <span className="hidden md:inline">Filters</span>
-            {(filters.accounts.length > 0 || filters.subreddits.length > 0 || filters.projects.length > 0) && (
-              <span className="bg-[#C69B7B] text-white text-xs px-2 py-0.5 rounded-full">
-                {filters.accounts.length + filters.subreddits.length + filters.projects.length}
-              </span>
-            )}
-          </button>
-          <button
-            onClick={handleRefresh}
-            className="secondary flex items-center gap-2"
-            disabled={refreshing}
-          >
-            <RefreshCw size={20} className={refreshing ? 'animate-spin' : ''} />
-            <span className="hidden md:inline">Refresh</span>
-          </button>
-          <button
-            onClick={handleExport}
-            className="secondary flex items-center gap-2"
-          >
-            <Download size={20} />
-            <span className="hidden md:inline">Export</span>
-          </button>
-        </div>
+      <div className="flex justify-end items-center gap-2 mb-4">
+        <button
+          onClick={() => setIsFilterOpen(!isFilterOpen)}
+          className={`secondary flex items-center gap-2 ${isFilterOpen ? 'bg-[#1A1A1A]' : ''}`}
+        >
+          <Filter size={20} />
+          <span className="hidden md:inline">Filters</span>
+          {(filters.accounts.length > 0 || filters.subreddits.length > 0 || filters.projects.length > 0) && (
+            <span className="bg-[#C69B7B] text-white text-xs px-2 py-0.5 rounded-full">
+              {filters.accounts.length + filters.subreddits.length + filters.projects.length}
+            </span>
+          )}
+        </button>
+        <button
+          onClick={handleRefresh}
+          className="secondary flex items-center gap-2"
+          disabled={refreshing}
+        >
+          <RefreshCw size={20} className={refreshing ? 'animate-spin' : ''} />
+          <span className="hidden md:inline">Refresh</span>
+        </button>
+        <button
+          onClick={handleExport}
+          className="secondary flex items-center gap-2"
+        >
+          <Download size={20} />
+          <span className="hidden md:inline">Export</span>
+        </button>
       </div>
 
       {/* Filters Panel */}

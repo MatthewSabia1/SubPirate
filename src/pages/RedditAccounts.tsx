@@ -450,13 +450,14 @@ function RedditAccounts() {
   return (
     <>
       <div className="max-w-[1200px] mx-auto px-4 md:px-8">
-        <div className="flex items-center justify-between mb-8">
-          <div>
-            <h1 className="text-2xl md:text-4xl font-bold mb-2">Reddit Accounts</h1>
-            <p className="text-gray-400">
-              Connect and manage your Reddit accounts
-            </p>
-          </div>
+        <div className="flex flex-col mb-8">
+          <h1 className="text-2xl md:text-4xl font-bold leading-tight mb-4">Reddit <span className="text-[#C69B7B]">Accounts</span></h1>
+          <p className="text-gray-400 max-w-2xl leading-relaxed">
+            Build a resilient network of Reddit accounts to distribute your content strategically and maximize traffic.
+          </p>
+        </div>
+
+        <div className="flex justify-end mb-8">
           <button
             onClick={handleAddAccount}
             disabled={connecting}

@@ -102,17 +102,10 @@ function UserDetails({ userId }: UserDetailsProps) {
         if (profileError) throw profileError;
         setProfile(profileData);
         
-        // Fetch subscription data
+        // Fetch subscription data - using separate queries instead of joins
         const { data: subscriptionData, error: subError } = await supabase
           .from('customer_subscriptions')
-          .select(`
-            *,
-            stripe_prices:stripe_price_id (
-              unit_amount,
-              currency,
-              metadata
-            )
-          `)
+          .select('*')
           .eq('user_id', userId)
           .order('current_period_end', { ascending: false })
           .limit(1)
@@ -121,14 +114,39 @@ function UserDetails({ userId }: UserDetailsProps) {
         if (subError) throw subError;
         
         if (subscriptionData) {
-          const priceData = subscriptionData.stripe_prices;
+          // Fetch price data separately
+          const { data: priceData, error: priceError } = await supabase
+            .from('stripe_prices')
+            .select('*')
+            .eq('id', subscriptionData.stripe_price_id)
+            .maybeSingle();
+            
+          if (priceError) throw priceError;
+          
+          // Fetch product data separately if we have a product ID
+          let productData = null;
+          if (priceData?.stripe_product_id) {
+            const { data: product, error: productError } = await supabase
+              .from('stripe_products')
+              .select('*')
+              .eq('stripe_product_id', priceData.stripe_product_id)
+              .maybeSingle();
+              
+            if (productError) throw productError;
+            productData = product;
+          }
+          
+          // Get tier from product metadata if available
+          const tier = productData?.metadata?.tier || 
+                      (productData?.name ? productData.name : 'Unknown');
+                      
           setSubscription({
             id: subscriptionData.id,
             stripe_subscription_id: subscriptionData.stripe_subscription_id,
             stripe_price_id: subscriptionData.stripe_price_id,
             current_period_start: subscriptionData.current_period_start,
             current_period_end: subscriptionData.current_period_end,
-            tier: priceData?.metadata?.tier || 'Unknown',
+            tier: tier,
             price_amount: priceData?.unit_amount || 0,
             currency: priceData?.currency || 'usd',
             status: subscriptionData.status
@@ -169,7 +187,6 @@ function UserDetails({ userId }: UserDetailsProps) {
         const { data: searchesData, error: searchesError } = await supabase
           .from('frequent_searches')
           .select('id, username, search_count, last_searched_at')
-          .eq('user_id', userId)
           .order('search_count', { ascending: false })
           .limit(10);
         
@@ -200,7 +217,7 @@ function UserDetails({ userId }: UserDetailsProps) {
   if (loading) {
     return (
       <div className="flex justify-center py-10">
-        <div className="animate-spin rounded-full h-10 w-10 border-2 border-purple-500 border-t-transparent"></div>
+        <div className="animate-spin rounded-full h-10 w-10 border-2 border-[#D4B675] border-t-transparent"></div>
       </div>
     );
   }
@@ -249,7 +266,7 @@ function UserDetails({ userId }: UserDetailsProps) {
       {/* User Profile Section */}
       <div className="bg-[#111111] rounded-lg p-6">
         <h2 className="text-xl font-semibold mb-6 flex items-center">
-          <User className="mr-2 text-purple-500" size={20} />
+          <User className="mr-2 text-[#D4B675]" size={20} />
           User Profile
         </h2>
         
@@ -321,7 +338,7 @@ function UserDetails({ userId }: UserDetailsProps) {
       {/* Subscription Section */}
       <div className="bg-[#111111] rounded-lg p-6">
         <h2 className="text-xl font-semibold mb-6 flex items-center">
-          <CreditCard className="mr-2 text-purple-500" size={20} />
+          <CreditCard className="mr-2 text-[#D4B675]" size={20} />
           Subscription
         </h2>
         
@@ -330,7 +347,7 @@ function UserDetails({ userId }: UserDetailsProps) {
             <div>
               <div className="text-gray-400 text-sm mb-1">Plan</div>
               <div className="font-medium">
-                <span className="inline-flex items-center px-2 py-1 rounded text-sm font-medium bg-purple-900/30 text-purple-400">
+                <span className="inline-flex items-center px-2 py-1 rounded text-sm font-medium bg-[#D4B675]/30 text-[#D4B675]">
                   {subscription.tier.charAt(0).toUpperCase() + subscription.tier.slice(1)}
                 </span>
               </div>
@@ -380,7 +397,7 @@ function UserDetails({ userId }: UserDetailsProps) {
       {/* Usage Stats Section */}
       <div className="bg-[#111111] rounded-lg p-6">
         <h2 className="text-xl font-semibold mb-6 flex items-center">
-          <Activity className="mr-2 text-purple-500" size={20} />
+          <Activity className="mr-2 text-[#D4B675]" size={20} />
           Usage Statistics
         </h2>
         
@@ -417,7 +434,7 @@ function UserDetails({ userId }: UserDetailsProps) {
       {/* Reddit Accounts Section */}
       <div className="bg-[#111111] rounded-lg p-6">
         <h2 className="text-xl font-semibold mb-6 flex items-center">
-          <Link className="mr-2 text-purple-500" size={20} />
+          <Link className="mr-2 text-[#D4B675]" size={20} />
           Connected Reddit Accounts
         </h2>
         
@@ -453,7 +470,7 @@ function UserDetails({ userId }: UserDetailsProps) {
       {/* Frequent Searches Section */}
       <div className="bg-[#111111] rounded-lg p-6">
         <h2 className="text-xl font-semibold mb-6 flex items-center">
-          <Search className="mr-2 text-purple-500" size={20} />
+          <Search className="mr-2 text-[#D4B675]" size={20} />
           Frequent Searches
         </h2>
         
@@ -489,7 +506,7 @@ function UserDetails({ userId }: UserDetailsProps) {
       {/* Projects Section */}
       <div className="bg-[#111111] rounded-lg p-6">
         <h2 className="text-xl font-semibold mb-6 flex items-center">
-          <Folder className="mr-2 text-purple-500" size={20} />
+          <Folder className="mr-2 text-[#D4B675]" size={20} />
           Projects
         </h2>
         
@@ -519,7 +536,7 @@ function UserDetails({ userId }: UserDetailsProps) {
       {/* Saved Subreddits Section */}
       <div className="bg-[#111111] rounded-lg p-6">
         <h2 className="text-xl font-semibold mb-6 flex items-center">
-          <Bookmark className="mr-2 text-purple-500" size={20} />
+          <Bookmark className="mr-2 text-[#D4B675]" size={20} />
           Saved Subreddits
         </h2>
         

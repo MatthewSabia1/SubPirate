@@ -90,8 +90,8 @@ function AdminMetrics() {
       const { data: subscriptionsForRevenue, error: revenueSubsError } = await supabase
         .from('customer_subscriptions')
         .select(`
-          subscription_id,
-          price_id,
+          stripe_subscription_id,
+          stripe_price_id,
           status
         `)
         .eq('status', 'active');
@@ -103,27 +103,45 @@ function AdminMetrics() {
         .from('stripe_prices')
         .select(`
           id,
-          amount,
+          unit_amount,
           currency,
-          metadata
+          stripe_product_id
         `);
       
       if (pricesError) throw pricesError;
+      
+      // Get product data for tier information
+      const { data: productsData, error: productsError } = await supabase
+        .from('stripe_products')
+        .select(`
+          stripe_product_id,
+          name,
+          metadata
+        `);
+      
+      if (productsError) throw productsError;
       
       // Calculate monthly revenue and subscriptions by tier
       let monthlyRevenue = 0;
       let currency = 'usd';
       const tierCounts: Record<string, number> = {};
       
-      if (subscriptionsForRevenue && pricesData) {
+      if (subscriptionsForRevenue && pricesData && productsData) {
         subscriptionsForRevenue.forEach(sub => {
-          const price = pricesData.find(p => p.id === sub.price_id);
+          const price = pricesData.find(p => p.id === sub.stripe_price_id);
           if (price) {
-            monthlyRevenue += price.amount || 0;
+            monthlyRevenue += price.unit_amount || 0;
             currency = price.currency || 'usd';
             
-            // Count by tier
-            const tier = price.metadata?.tier || 'unknown';
+            // Find associated product to get tier info
+            const product = productsData.find(p => p.stripe_product_id === price.stripe_product_id);
+            // Get tier from product name or default to product name if metadata not available
+            let tier = 'unknown';
+            if (product) {
+              // Try to get tier from metadata or use product name as fallback
+              tier = (product.metadata && product.metadata.tier) || product.name || 'unknown';
+            }
+            
             tierCounts[tier] = (tierCounts[tier] || 0) + 1;
           }
         });
@@ -171,7 +189,7 @@ function AdminMetrics() {
   if (loading) {
     return (
       <div className="flex justify-center py-10">
-        <div className="animate-spin rounded-full h-10 w-10 border-2 border-purple-500 border-t-transparent"></div>
+        <div className="animate-spin rounded-full h-10 w-10 border-2 border-[#D4B675] border-t-transparent"></div>
       </div>
     );
   }
@@ -200,8 +218,8 @@ function AdminMetrics() {
         {/* Total Users Card */}
         <div className="bg-gradient-to-br from-[#111111] to-[#1a1a1a] rounded-lg p-6">
           <div className="flex items-center mb-4">
-            <div className="w-12 h-12 rounded-lg bg-purple-500/10 flex items-center justify-center mr-4">
-              <Users size={24} className="text-purple-500" />
+            <div className="w-12 h-12 rounded-lg bg-[#D4B675]/10 flex items-center justify-center mr-4">
+              <Users size={24} className="text-[#D4B675]" />
             </div>
             <div>
               <h3 className="text-gray-400 text-sm">Total Users</h3>
@@ -229,8 +247,8 @@ function AdminMetrics() {
             </div>
           </div>
           <div className="flex items-center text-sm">
-            <Users size={14} className="mr-1 text-purple-400" />
-            <span className="text-purple-400">{metricsData.activeSubscriptions}</span>
+            <Users size={14} className="mr-1 text-[#D4B675CC]" />
+            <span className="text-[#D4B675CC]">{metricsData.activeSubscriptions}</span>
             <span className="ml-1 text-gray-400">active subscriptions</span>
           </div>
         </div>
@@ -259,7 +277,7 @@ function AdminMetrics() {
         {/* Subscriptions by Tier */}
         <div className="bg-[#111111] rounded-lg p-6">
           <h3 className="text-lg font-medium mb-4 flex items-center">
-            <Users className="mr-2 text-purple-500" size={18} />
+            <Users className="mr-2 text-[#D4B675]" size={18} />
             Subscriptions by Tier
           </h3>
           
@@ -278,7 +296,7 @@ function AdminMetrics() {
                   <div className="w-24 ml-4">
                     <div className="h-2 bg-[#222222] rounded-full overflow-hidden">
                       <div 
-                        className="h-full bg-purple-500 rounded-full"
+                        className="h-full bg-[#D4B675] rounded-full"
                         style={{ 
                           width: `${Math.min(100, (item.count / metricsData.activeSubscriptions) * 100)}%`
                         }}
@@ -296,7 +314,7 @@ function AdminMetrics() {
         {/* User Growth */}
         <div className="bg-[#111111] rounded-lg p-6">
           <h3 className="text-lg font-medium mb-4 flex items-center">
-            <Calendar className="mr-2 text-purple-500" size={18} />
+            <Calendar className="mr-2 text-[#D4B675]" size={18} />
             Recent Activity
           </h3>
           
@@ -327,7 +345,7 @@ function AdminMetrics() {
           <div className="mt-4 text-center">
             <button
               onClick={fetchMetrics}
-              className="text-sm text-purple-400 hover:text-purple-300"
+              className="text-sm text-[#D4B675CC] hover:text-[#D4B675]"
             >
               Refresh Metrics
             </button>

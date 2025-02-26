@@ -1098,133 +1098,134 @@ function Calendar() {
 
   return (
     <div className="max-w-[1400px] mx-auto p-4 md:p-8 space-y-6 relative">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div className="flex-shrink-0">
-          <h1 className="text-2xl md:text-3xl font-bold text-white">Calendar</h1>
-          <p className="text-gray-300 text-sm mt-1 mb-2">View and manage your Reddit posting schedule</p>
-        </div>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={handleRefresh}
-            disabled={refreshing}
-            className={`bg-[#1A1A1A] hover:bg-[#252525] text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-all ${
-              refreshing ? 'opacity-50 cursor-not-allowed' : ''
-            }`}
-            title="Manually refresh Reddit data"
-          >
-            <RefreshCcw size={16} className={refreshing ? 'animate-spin' : ''} />
-            <span>{refreshing ? 'Refreshing...' : 'Refresh Data'}</span>
-          </button>
-          <div className="flex-1 bg-[#0A0A0A] p-4 rounded-lg shadow-sm" ref={dropdownRef}>
-            <div className="flex flex-wrap items-center gap-3">
-              <div className="relative">
-                <button
-                  onClick={() => setOpenDropdown(openDropdown === 'accounts' ? null : 'accounts')}
-                  className="flex items-center gap-2 px-4 py-2 bg-[#111111] rounded-md hover:bg-[#1A1A1A] transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-[#C69B7B]"
-                  aria-label="Filter by Reddit Accounts"
-                  aria-expanded={openDropdown === 'accounts'}
-                >
-                  <Users size={16} className="text-gray-400" />
-                  <span className="text-sm">Reddit Accounts</span>
-                  {filters.accounts.length > 0 && (
-                    <span className="bg-[#2B543A] text-white text-xs px-2 py-0.5 rounded-full">{filters.accounts.length}</span>
-                  )}
-                  <ChevronDown size={16} className="text-gray-400" />
-                </button>
-                {openDropdown === 'accounts' && (
-                  <div className="absolute top-full left-0 mt-2 w-72 bg-[#111111] rounded-lg shadow-md border border-[#333333] p-3 max-h-60 overflow-y-auto z-50">
-                    {accounts.length > 0 ? (
-                      accounts.map(account => (
-                        <button
-                          key={account.id}
-                          onClick={() => toggleFilter('accounts', account.id)}
-                          className={`flex items-center gap-2 w-full p-2 rounded hover:bg-[#1A1A1A] transition-all duration-200 ${
-                            filters.accounts.includes(account.id) ? 'bg-[#1A1A1A]' : ''
-                          }`}
-                        >
-                          <img src={account.image} alt={account.name} className="w-6 h-6 rounded-full" />
-                          <span className="text-sm truncate">{account.name}</span>
-                          {filters.accounts.includes(account.id) && <Check size={16} className="ml-auto text-[#C69B7B]" />}
-                        </button>
-                      ))
-                    ) : (
-                      <div className="p-2 text-gray-400 text-sm">No accounts found</div>
-                    )}
-                  </div>
+      <div className="flex flex-col mb-8">
+        <h1 className="text-2xl md:text-4xl font-bold leading-tight mb-4">Posting <span className="text-[#C69B7B]">Calendar</span></h1>
+        <p className="text-gray-400 max-w-2xl leading-relaxed">
+          Strategically schedule your Reddit content to maximize visibility and engagement across multiple accounts.
+        </p>
+      </div>
+
+      <div className="flex justify-end items-center gap-2 mb-4">
+        <button
+          onClick={handleRefresh}
+          disabled={refreshing}
+          className={`bg-[#1A1A1A] hover:bg-[#252525] text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-all ${
+            refreshing ? 'opacity-50 cursor-not-allowed' : ''
+          }`}
+          title="Manually refresh Reddit data"
+        >
+          <RefreshCcw size={16} className={refreshing ? 'animate-spin' : ''} />
+          <span>{refreshing ? 'Refreshing...' : 'Refresh Data'}</span>
+        </button>
+        <div className="flex-1 bg-[#0A0A0A] p-4 rounded-lg shadow-sm" ref={dropdownRef}>
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="relative">
+              <button
+                onClick={() => setOpenDropdown(openDropdown === 'accounts' ? null : 'accounts')}
+                className="flex items-center gap-2 px-4 py-2 bg-[#111111] rounded-md hover:bg-[#1A1A1A] transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-[#C69B7B]"
+                aria-label="Filter by Reddit Accounts"
+                aria-expanded={openDropdown === 'accounts'}
+              >
+                <Users size={16} className="text-gray-400" />
+                <span className="text-sm">Reddit Accounts</span>
+                {filters.accounts.length > 0 && (
+                  <span className="bg-[#2B543A] text-white text-xs px-2 py-0.5 rounded-full">{filters.accounts.length}</span>
                 )}
-              </div>
-              <div className="relative">
-                <button
-                  onClick={() => setOpenDropdown(openDropdown === 'subreddits' ? null : 'subreddits')}
-                  className="flex items-center gap-2 px-4 py-2 bg-[#111111] rounded-md hover:bg-[#1A1A1A] transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-[#C69B7B]"
-                  aria-label="Filter by Subreddits"
-                  aria-expanded={openDropdown === 'subreddits'}
-                >
-                  <Globe size={16} className="text-gray-400" />
-                  <span className="text-sm">Subreddits</span>
-                  {filters.subreddits.length > 0 && (
-                    <span className="bg-[#2B543A] text-white text-xs px-2 py-0.5 rounded-full">{filters.subreddits.length}</span>
+                <ChevronDown size={16} className="text-gray-400" />
+              </button>
+              {openDropdown === 'accounts' && (
+                <div className="absolute top-full left-0 mt-2 w-72 bg-[#111111] rounded-lg shadow-md border border-[#333333] p-3 max-h-60 overflow-y-auto z-50">
+                  {accounts.length > 0 ? (
+                    accounts.map(account => (
+                      <button
+                        key={account.id}
+                        onClick={() => toggleFilter('accounts', account.id)}
+                        className={`flex items-center gap-2 w-full p-2 rounded hover:bg-[#1A1A1A] transition-all duration-200 ${
+                          filters.accounts.includes(account.id) ? 'bg-[#1A1A1A]' : ''
+                        }`}
+                      >
+                        <img src={account.image} alt={account.name} className="w-6 h-6 rounded-full" />
+                        <span className="text-sm truncate">{account.name}</span>
+                        {filters.accounts.includes(account.id) && <Check size={16} className="ml-auto text-[#C69B7B]" />}
+                      </button>
+                    ))
+                  ) : (
+                    <div className="p-2 text-gray-400 text-sm">No accounts found</div>
                   )}
-                  <ChevronDown size={16} className="text-gray-400" />
-                </button>
-                {openDropdown === 'subreddits' && (
-                  <div className="absolute top-full left-0 mt-2 w-72 bg-[#111111] rounded-lg shadow-md border border-[#333333] p-3 max-h-60 overflow-y-auto z-50">
-                    {subreddits.length > 0 ? (
-                      subreddits.map(subreddit => (
-                        <button
-                          key={subreddit.id}
-                          onClick={() => toggleFilter('subreddits', subreddit.id)}
-                          className={`flex items-center gap-2 w-full p-2 rounded hover:bg-[#1A1A1A] transition-all duration-200 ${
-                            filters.subreddits.includes(subreddit.id) ? 'bg-[#1A1A1A]' : ''
-                          }`}
-                        >
-                          <img src={subreddit.image} alt={subreddit.name} className="w-6 h-6 rounded-md" />
-                          <span className="text-sm truncate">r/{subreddit.name}</span>
-                          {filters.subreddits.includes(subreddit.id) && <Check size={16} className="ml-auto text-[#C69B7B]" />}
-                        </button>
-                      ))
-                    ) : (
-                      <div className="p-2 text-gray-400 text-sm">No subreddits found</div>
-                    )}
-                  </div>
+                </div>
+              )}
+            </div>
+            <div className="relative">
+              <button
+                onClick={() => setOpenDropdown(openDropdown === 'subreddits' ? null : 'subreddits')}
+                className="flex items-center gap-2 px-4 py-2 bg-[#111111] rounded-md hover:bg-[#1A1A1A] transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-[#C69B7B]"
+                aria-label="Filter by Subreddits"
+                aria-expanded={openDropdown === 'subreddits'}
+              >
+                <Globe size={16} className="text-gray-400" />
+                <span className="text-sm">Subreddits</span>
+                {filters.subreddits.length > 0 && (
+                  <span className="bg-[#2B543A] text-white text-xs px-2 py-0.5 rounded-full">{filters.subreddits.length}</span>
                 )}
-              </div>
-              <div className="relative">
-                <button
-                  onClick={() => setOpenDropdown(openDropdown === 'projects' ? null : 'projects')}
-                  className="flex items-center gap-2 px-4 py-2 bg-[#111111] rounded-md hover:bg-[#1A1A1A] transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-[#C69B7B]"
-                  aria-label="Filter by Projects"
-                  aria-expanded={openDropdown === 'projects'}
-                >
-                  <FolderKanban size={16} className="text-gray-400" />
-                  <span className="text-sm">Projects</span>
-                  {filters.projects.length > 0 && (
-                    <span className="bg-[#2B543A] text-white text-xs px-2 py-0.5 rounded-full">{filters.projects.length}</span>
+                <ChevronDown size={16} className="text-gray-400" />
+              </button>
+              {openDropdown === 'subreddits' && (
+                <div className="absolute top-full left-0 mt-2 w-72 bg-[#111111] rounded-lg shadow-md border border-[#333333] p-3 max-h-60 overflow-y-auto z-50">
+                  {subreddits.length > 0 ? (
+                    subreddits.map(subreddit => (
+                      <button
+                        key={subreddit.id}
+                        onClick={() => toggleFilter('subreddits', subreddit.id)}
+                        className={`flex items-center gap-2 w-full p-2 rounded hover:bg-[#1A1A1A] transition-all duration-200 ${
+                          filters.subreddits.includes(subreddit.id) ? 'bg-[#1A1A1A]' : ''
+                        }`}
+                      >
+                        <img src={subreddit.image} alt={subreddit.name} className="w-6 h-6 rounded-md" />
+                        <span className="text-sm truncate">r/{subreddit.name}</span>
+                        {filters.subreddits.includes(subreddit.id) && <Check size={16} className="ml-auto text-[#C69B7B]" />}
+                      </button>
+                    ))
+                  ) : (
+                    <div className="p-2 text-gray-400 text-sm">No subreddits found</div>
                   )}
-                  <ChevronDown size={16} className="text-gray-400" />
-                </button>
-                {openDropdown === 'projects' && (
-                  <div className="absolute top-full left-0 mt-2 w-72 bg-[#111111] rounded-lg shadow-md border border-[#333333] p-3 max-h-60 overflow-y-auto z-50">
-                    {projects.length > 0 ? (
-                      projects.map(project => (
-                        <button
-                          key={project.id}
-                          onClick={() => toggleFilter('projects', project.id)}
-                          className={`flex items-center gap-2 w-full p-2 rounded hover:bg-[#1A1A1A] transition-all duration-200 ${
-                            filters.projects.includes(project.id) ? 'bg-[#1A1A1A]' : ''
-                          }`}
-                        >
-                          <img src={project.image} alt={project.name} className="w-6 h-6 rounded-lg" />
-                          <span className="text-sm truncate">{project.name}</span>
-                          {filters.projects.includes(project.id) && <Check size={16} className="ml-auto text-[#C69B7B]" />}
-                        </button>
-                      ))
-                    ) : (
-                      <div className="p-2 text-gray-400 text-sm">No projects found</div>
-                    )}
-                  </div>
+                </div>
+              )}
+            </div>
+            <div className="relative">
+              <button
+                onClick={() => setOpenDropdown(openDropdown === 'projects' ? null : 'projects')}
+                className="flex items-center gap-2 px-4 py-2 bg-[#111111] rounded-md hover:bg-[#1A1A1A] transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-[#C69B7B]"
+                aria-label="Filter by Projects"
+                aria-expanded={openDropdown === 'projects'}
+              >
+                <FolderKanban size={16} className="text-gray-400" />
+                <span className="text-sm">Projects</span>
+                {filters.projects.length > 0 && (
+                  <span className="bg-[#2B543A] text-white text-xs px-2 py-0.5 rounded-full">{filters.projects.length}</span>
                 )}
-              </div>
+                <ChevronDown size={16} className="text-gray-400" />
+              </button>
+              {openDropdown === 'projects' && (
+                <div className="absolute top-full left-0 mt-2 w-72 bg-[#111111] rounded-lg shadow-md border border-[#333333] p-3 max-h-60 overflow-y-auto z-50">
+                  {projects.length > 0 ? (
+                    projects.map(project => (
+                      <button
+                        key={project.id}
+                        onClick={() => toggleFilter('projects', project.id)}
+                        className={`flex items-center gap-2 w-full p-2 rounded hover:bg-[#1A1A1A] transition-all duration-200 ${
+                          filters.projects.includes(project.id) ? 'bg-[#1A1A1A]' : ''
+                        }`}
+                      >
+                        <img src={project.image} alt={project.name} className="w-6 h-6 rounded-lg" />
+                        <span className="text-sm truncate">{project.name}</span>
+                        {filters.projects.includes(project.id) && <Check size={16} className="ml-auto text-[#C69B7B]" />}
+                      </button>
+                    ))
+                  ) : (
+                    <div className="p-2 text-gray-400 text-sm">No projects found</div>
+                  )}
+                </div>
+              )}
             </div>
           </div>
         </div>

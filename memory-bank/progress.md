@@ -12,6 +12,7 @@
 - Save/bookmark subreddits
 - Progress tracking for analysis
 - User usage tracking and statistics
+- ✅ User-specific search history in FrequentSearches component
 - ✅ Subreddit analysis for marketing friendliness
 - ✅ User authentication system with multiple auth providers
 - ✅ Mandatory subscription requirement for new users

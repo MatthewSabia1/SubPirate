@@ -90,7 +90,7 @@ function AdminTools() {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
         <div className="bg-[#111111] rounded-lg p-6">
           <h3 className="text-lg font-medium flex items-center mb-4">
-            <UserPlus className="mr-2 text-purple-500" size={20} />
+            <UserPlus className="mr-2 text-[#D4B675]" size={20} />
             Create Special Role User
           </h3>
           
@@ -116,7 +116,7 @@ function AdminTools() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="user@example.com"
-                className="w-full bg-[#0a0a0a] border border-[#333333] rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                className="w-full bg-[#0a0a0a] border border-[#333333] rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-[#D4B675]"
                 required
               />
             </div>
@@ -128,7 +128,7 @@ function AdminTools() {
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="User's Name"
-                className="w-full bg-[#0a0a0a] border border-[#333333] rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                className="w-full bg-[#0a0a0a] border border-[#333333] rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-[#D4B675]"
                 required
               />
             </div>
@@ -144,7 +144,7 @@ function AdminTools() {
                     onChange={() => setRoleType('gift')}
                     className="w-4 h-4 mr-2"
                   />
-                  <Gift size={16} className="mr-1 text-yellow-400" />
+                  <Gift size={16} className="mr-1 text-[#D4B675]" />
                   <span>Gift User</span>
                 </label>
                 
@@ -168,7 +168,7 @@ function AdminTools() {
               className={`w-full py-2 px-4 rounded-lg flex items-center justify-center ${
                 roleType === 'admin' 
                   ? 'bg-red-500 hover:bg-red-600' 
-                  : 'bg-yellow-500 hover:bg-yellow-600'
+                  : 'bg-[#D4B675] hover:bg-[#C4A665]'
               } text-white font-medium`}
             >
               {loading ? (
@@ -191,7 +191,7 @@ function AdminTools() {
           
           <div className="mb-6">
             <div className="flex items-center mb-2">
-              <Gift size={18} className="mr-2 text-yellow-400" />
+              <Gift size={18} className="mr-2 text-[#D4B675]" />
               <h4 className="font-medium">Gift User</h4>
             </div>
             <p className="text-gray-400 text-sm ml-6">
@@ -225,7 +225,7 @@ function AdminTools() {
           </p>
           
           <p>
-            <span className="text-yellow-400 font-medium">Gift users</span> receive full premium features without 
+            <span className="text-[#D4B675] font-medium">Gift users</span> receive full premium features without 
             needing to provide payment information. This is useful for partners, beta testers, or promotional purposes.
           </p>
           

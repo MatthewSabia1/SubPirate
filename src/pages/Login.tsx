@@ -143,7 +143,7 @@ function Login() {
               <div className="flex justify-between mb-1">
                 <label className="block text-sm font-medium">Password</label>
                 {isLogin && (
-                  <a href="#" className="text-sm text-gray-400 hover:text-white">
+                  <a href="#" className="text-sm text-gray-400 hover:text-white" tabIndex={-1}>
                     Forgot password?
                   </a>
                 )}

@@ -8,9 +8,242 @@ import ProgressBar from '../components/ProgressBar';
 import AddToProjectModal from '../components/AddToProjectModal';
 import CreateProjectModal from '../components/CreateProjectModal';
 import FrequentSearches from '../components/FrequentSearches';
+import PricingCards from '../components/PricingCards';
 import { useCallback } from 'react';
 import { getSubredditInfo, getSubredditPosts } from '../lib/reddit';
 import { analyzeSubredditData } from '../lib/analysis';
+
+// Add to global window type
+declare global {
+  interface Window {
+    debugProjectSubreddits: (projectId: string) => Promise<any>;
+  }
+}
+
+// Custom styles matching Dashboard page
+const customStyles = `
+  .dashboard-card {
+    background-color: #0f0f0f;
+    border-radius: 1rem;
+    padding: 2rem;
+    border: 1px solid #222222;
+    display: flex;
+    flex-direction: column;
+    transition: all 0.3s ease;
+  }
+  
+  .dashboard-card:hover {
+    border-color: #333333;
+    transform: translateY(-4px);
+    box-shadow: 0 10px 30px -15px rgba(198, 155, 123, 0.15);
+  }
+  
+  .dashboard-card-featured {
+    background-color: #0f0f0f;
+    border-radius: 1rem;
+    padding: 2rem;
+    border: 2px solid #C69B7B;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+    transition: all 0.3s ease;
+    box-shadow: 0 10px 30px -15px rgba(198, 155, 123, 0.2);
+  }
+  
+  .dashboard-button {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 0.75rem 1rem;
+    border-radius: 0.5rem;
+    font-weight: 600;
+    transition: all 0.2s ease;
+  }
+  
+  .button-outline {
+    color: #ffffff;
+    border: 1px solid #C69B7B;
+  }
+  
+  .button-outline:hover {
+    background-color: #C69B7B;
+    color: #000000;
+  }
+  
+  .button-primary {
+    background-color: #C69B7B;
+    color: #ffffff;
+    box-shadow: 0 4px 14px rgba(198, 155, 123, 0.25);
+  }
+  
+  .button-primary:hover {
+    background-color: #B38A6A;
+  }
+  
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.5rem 1rem;
+    border-radius: 9999px;
+    background-color: rgba(198, 155, 123, 0.1);
+    border: 1px solid rgba(198, 155, 123, 0.2);
+    color: #C69B7B;
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+  }
+  
+  /* Pricing card styles */
+  .pricing-card {
+    background-color: #0f0f0f;
+    border-radius: 1rem;
+    padding: 2rem;
+    border: 1px solid #222222;
+    display: flex;
+    flex-direction: column;
+    transition: all 0.3s ease;
+    height: 100%;
+  }
+  
+  .pricing-card:hover {
+    border-color: #333333;
+    transform: translateY(-4px);
+    box-shadow: 0 10px 30px -15px rgba(198, 155, 123, 0.15);
+  }
+  
+  .pricing-card-featured {
+    background-color: #0f0f0f;
+    border-radius: 1rem;
+    padding: 2rem;
+    border: 2px solid #C69B7B;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+    transition: all 0.3s ease;
+    box-shadow: 0 10px 30px -15px rgba(198, 155, 123, 0.2);
+    height: 100%;
+  }
+  
+  .pricing-button {
+    width: 100%;
+    display: flex;
+    justify-content: center;
+    padding: 0.75rem 1rem;
+    border-radius: 0.5rem;
+    font-weight: 600;
+    transition: all 0.2s ease;
+  }
+  
+  /* Enhanced tool and result card styles */
+  .tool-card {
+    background-color: #0f0f0f;
+    border-radius: 1rem;
+    padding: 2rem;
+    border: 1px solid #222222;
+    transition: all 0.3s ease;
+    display: flex;
+    flex-direction: column;
+  }
+  
+  .tool-card:hover {
+    border-color: #333333;
+    transform: translateY(-4px);
+    box-shadow: 0 10px 30px -15px rgba(198, 155, 123, 0.15);
+  }
+  
+  .tool-card-featured {
+    background-color: #0f0f0f;
+    border-radius: 1rem;
+    padding: 2rem;
+    border: 2px solid #C69B7B;
+    position: relative;
+    transition: all 0.3s ease;
+    box-shadow: 0 10px 30px -15px rgba(198, 155, 123, 0.2);
+    display: flex;
+    flex-direction: column;
+  }
+  
+  .tool-card-featured:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 10px 30px -15px rgba(198, 155, 123, 0.3);
+  }
+  
+  .result-item {
+    background-color: #0a0a0a;
+    border-radius: 0.75rem;
+    padding: 1.25rem;
+    border: 1px solid #222222;
+    transition: all 0.25s ease;
+  }
+  
+  .result-item:hover {
+    border-color: #333333;
+    background-color: #0f0f0f;
+    transform: translateY(-2px);
+    box-shadow: 0 10px 30px -15px rgba(198, 155, 123, 0.15);
+  }
+  
+  .action-button {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    padding: 0.5rem 1rem;
+    border-radius: 0.5rem;
+    font-weight: 500;
+    transition: all 0.2s ease;
+  }
+  
+  .action-button-primary {
+    background-color: #C69B7B;
+    color: #ffffff;
+    box-shadow: 0 2px 8px rgba(198, 155, 123, 0.2);
+  }
+  
+  .action-button-primary:hover:not(:disabled) {
+    background-color: #B38A6A;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(198, 155, 123, 0.3);
+  }
+  
+  .action-button-secondary {
+    background-color: #1a1a1a;
+    color: #ffffff;
+    border: 1px solid #222222;
+  }
+  
+  .action-button-secondary:hover:not(:disabled) {
+    background-color: #222222;
+    border-color: #C69B7B;
+  }
+  
+  .progress-container {
+    background-color: #0a0a0a;
+    border-radius: 0.75rem;
+    border: 1px solid #1a1a1a;
+    padding: 1.25rem;
+    box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.2);
+  }
+  
+  .notification {
+    background-color: rgba(10, 10, 10, 0.8);
+    border-radius: 0.75rem;
+    padding: 1rem 1.25rem;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+    backdrop-filter: blur(8px);
+    border-left: 3px solid #C69B7B;
+    transition: all 0.3s ease;
+  }
+  
+  .notification-success {
+    border-left-color: #10b981;
+  }
+  
+  .notification-error {
+    border-left-color: #ef4444;
+  }
+`;
 
 interface Notification {
   id: string;
@@ -59,7 +292,7 @@ function SpyGlass() {
         return prev.filter(n => now - n.timestamp < 3000);
       });
     }, 1000);
-
+    
     return () => clearInterval(timer);
   }, []);
 
@@ -82,11 +315,16 @@ function SpyGlass() {
       const userInfo = await redditApi.getUserInfo(username);
       const avatarUrl = userInfo?.avatar_url || null;
 
-      // Track the search
-      await supabase.rpc('increment_search_count', {
-        p_username: username,
-        p_avatar_url: avatarUrl
-      });
+      // Track the search with the authenticated user's ID
+      if (user) {
+        await supabase.rpc('increment_search_count', {
+          p_username: username,
+          p_avatar_url: avatarUrl,
+          p_user_id: user.id // Add user ID
+        });
+      } else {
+        console.log('Search not tracked: User not authenticated');
+      }
     } catch (err) {
       console.error('Error tracking search:', err);
     }
@@ -650,9 +888,10 @@ function SpyGlass() {
                   if (rlsPolicyError) {
                     break;
                   }
-                } else {
-                  console.log(`Successfully added batch ${i/BATCH_SIZE + 1}: ${batchData?.length || 0} records`);
-                  successCount += batchData?.length || 0;
+                } else if (batchData) {
+                  // Success case
+                  successCount += batchData.length;
+                  console.log(`Successfully added batch ${i/BATCH_SIZE + 1}: ${batchData.length} records`);
                 }
               } catch (batchError) {
                 console.error(`Exception in batch ${i/BATCH_SIZE + 1}:`, batchError);
@@ -938,52 +1177,161 @@ function SpyGlass() {
     addNotification(message, 'error');
   };
 
+  // Debug helper function
+  const debugProjectSubreddits = async (projectId: string) => {
+    console.log(`Debugging project ID: ${projectId}`);
+    
+    try {
+      // Check if project exists
+      const { data: project, error: projectError } = await supabase
+        .from('projects')
+        .select('*')
+        .eq('id', projectId)
+        .single();
+        
+      if (projectError) {
+        console.error('Project lookup error:', projectError);
+        return;
+      }
+      
+      console.log('Project details:', project);
+      
+      // First get project_subreddits associations
+      console.log('Fetching project-subreddit associations...');
+      const { data: projectSubreddits, error: psError } = await supabase
+        .from('project_subreddits')
+        .select('id, project_id, subreddit_id')
+        .eq('project_id', projectId);
+        
+      if (psError) {
+        console.error('Error fetching project subreddits:', psError);
+        
+        // Check for the specific RLS policy recursion error
+        if (psError.code === '42P17') {
+          console.warn('=============================================');
+          console.warn('DETECTED RLS POLICY RECURSION ERROR');
+          console.warn('This is a Supabase database configuration issue.');
+          console.warn('');
+          console.warn('The issue occurs in policies on the project_members table.');
+          console.warn('It creates an infinite loop during authorization checks.');
+          console.warn('');
+          console.warn('To fix this, go to the Supabase dashboard:');
+          console.warn('1. Navigate to Authentication > Policies');
+          console.warn('2. Find policies for the project_members table');
+          console.warn('3. Look for policies that may be creating circular references');
+          console.warn('4. Update the policies to break the circular dependency');
+          console.warn('=============================================');
+          
+          // Try to get some basic project info as a fallback
+          console.log('Trying to fetch basic project info as a fallback...');
+          return {
+            project,
+            error: 'RLS policy recursion detected',
+            errorCode: psError.code,
+            message: psError.message,
+            timestamp: new Date().toISOString()
+          };
+        }
+        
+        return;
+      }
+      
+      console.log(`Found ${projectSubreddits?.length || 0} project-subreddit associations`);
+      
+      if (!projectSubreddits || projectSubreddits.length === 0) {
+        console.log('No subreddits associated with this project');
+        return;
+      }
+      
+      // Extract subreddit IDs
+      const subredditIds = projectSubreddits.map(ps => ps.subreddit_id);
+      console.log('Associated subreddit IDs:', subredditIds);
+      
+      // Then fetch the actual subreddit data
+      const { data: subreddits, error: subredditsError } = await supabase
+        .from('subreddits')
+        .select('id, name, subscriber_count')
+        .in('id', subredditIds);
+        
+      if (subredditsError) {
+        console.error('Error fetching subreddits:', subredditsError);
+        return;
+      }
+      
+      console.log(`Fetched ${subreddits?.length || 0} out of ${subredditIds.length} subreddits`);
+      console.log('Subreddit details:', subreddits);
+      
+      // Check for missing subreddits
+      const missingIds = subredditIds.filter(id => 
+        !subreddits.some(s => s.id === id)
+      );
+      
+      if (missingIds.length > 0) {
+        console.log(`WARNING: ${missingIds.length} subreddit IDs have associations but no subreddit records`);
+        console.log('Missing IDs:', missingIds);
+      }
+      
+      return {
+        project,
+        associations: projectSubreddits,
+        subreddits
+      };
+    } catch (error) {
+      console.error('Debug function error:', error);
+    }
+  };
+
+  // Assign debug function to window object
+  useEffect(() => {
+    window.debugProjectSubreddits = debugProjectSubreddits;
+    
+    // Cleanup function to remove the property when component unmounts
+    return () => {
+      // Use type assertion to fix TypeScript error
+      (window as any).debugProjectSubreddits = undefined;
+    };
+  }, []);
+
   return (
-    <div className="max-w-[1200px] mx-auto px-4 md:px-8">
-      <div className="mb-8">
-        <h1 className="text-4xl font-bold mb-2">SpyGlass</h1>
-        <p className="text-gray-400">
-          Analyze any Reddit user's posting patterns and discover their most active subreddits
+    <div className="max-w-[1200px] mx-auto px-4 md:px-8 py-12 md:py-20">
+      <div className="flex flex-col mb-8">
+        <h1 className="text-2xl md:text-4xl font-bold leading-tight mb-4">Competitor <span className="text-[#C69B7B]">Intelligence</span></h1>
+        <p className="text-gray-400 max-w-2xl leading-relaxed">
+          Analyze Reddit users to identify their most active subreddits and discover marketing opportunities.
         </p>
       </div>
 
-      <div className="space-y-4">
-        <div className="bg-[#0f0f0f] rounded-lg p-6 mb-8">
-          <form onSubmit={handleAnalyze} className="flex gap-4">
-            <div className="relative flex-1">
+      <style>{customStyles}</style>
+
+      <div className="flex flex-col gap-8 max-w-5xl mx-auto mb-12">
+        {/* Search Form */}
+        <div className="tool-card-featured">
+          <h2 className="text-xl font-semibold mb-6">Analyze Reddit User</h2>
+          <form onSubmit={handleAnalyze} className="space-y-4">
+            <div className="relative">
               <input
                 ref={searchInputRef}
                 type="text"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
                 placeholder="Enter Reddit username (e.g., username, u/username, or profile URL)"
-                className="w-full text-sm md:text-base bg-[#111111] border border-[#222222] rounded-lg pl-3 pr-10 py-3 text-white placeholder-gray-500 focus:ring-2 focus:ring-[#C69B7B] focus:outline-none"
+                className="w-full h-[52px] bg-[#050505] rounded-lg pl-4 pr-[120px] text-white placeholder-gray-500 border-none focus:ring-1 focus:ring-[#C69B7B]"
                 disabled={loading}
               />
-              <Telescope className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
+              <div className="absolute right-2 top-1/2 -translate-y-1/2">
+                <button 
+                  type="submit" 
+                  className="action-button action-button-primary h-10 px-6 rounded-lg text-base font-medium flex items-center gap-2 transition-colors disabled:opacity-50 disabled:hover:bg-[#C69B7B]"
+                  disabled={loading}
+                >
+                  <Telescope size={16} />
+                  {loading ? 'Analyzing...' : 'Analyze'}
+                </button>
+              </div>
             </div>
-            <button 
-              type="submit" 
-              className="primary flex items-center gap-2 whitespace-nowrap text-sm md:text-base"
-              disabled={loading}
-            >
-              <Telescope size={16} />
-              {loading ? 'Analyzing...' : 'Analyze'}
-            </button>
-          </form>
-        </div>
 
-        {/* Frequent Searches */}
-        <FrequentSearches 
-          onUsernameClick={handleFrequentSearchClick}
-        />
-
-        {/* Results Section */}
-        {(progress || frequencies.length > 0) && (
-          <div className="bg-[#0f0f0f] rounded-lg overflow-hidden">
-            {/* Progress Bar */}
             {progress && (
-              <div className="p-4 border-b border-[#222222]">
+              <div className="progress-container">
                 <ProgressBar 
                   progress={progress.progress}
                   status={progress.status}
@@ -992,229 +1340,266 @@ function SpyGlass() {
               </div>
             )}
 
-            {/* Results */}
-            {frequencies.length > 0 && (
-              <>
-                <div className="p-4 border-b border-[#222222] flex items-center justify-between">
-                  <div className="text-sm text-gray-400">
-                    Found {frequencies.length} frequently posted subreddits
-                  </div>
-                  <button
-                    onClick={handleSaveAll}
-                    className="primary flex items-center gap-2 h-9 px-4 text-sm"
-                    disabled={savingAll || !username}
-                  >
-                    {savingAll ? (
-                      <>
-                        <div className="animate-spin text-sm h-4 w-4 border-2 border-white border-t-transparent rounded-full" />
-                        <span>Processing...</span>
-                      </>
-                    ) : (
-                      <>
-                        <FolderPlus size={16} />
-                        <span>Save All to New Project</span>
-                      </>
-                    )}
-                  </button>
-                </div>
+            {error && (
+              <div className="notification notification-error flex items-center gap-2">
+                <AlertTriangle size={20} className="shrink-0" />
+                <p>{error}</p>
+              </div>
+            )}
+          </form>
+        </div>
 
-                <div className="divide-y divide-[#222222]">
-                  {frequencies.map((freq) => (
-                    <div key={freq.name}>
-                      <div 
-                        onClick={() => setExpandedSubreddit(
-                          expandedSubreddit === freq.name ? undefined : freq.name
-                        )}
-                        className="p-4 hover:bg-[#1A1A1A] transition-colors cursor-pointer"
-                      >
-                        <div className="flex items-center justify-between mb-2">
-                          <div className="flex items-center gap-4">
-                            <div className="w-10 h-10 rounded-lg bg-[#1A1A1A] overflow-hidden flex-shrink-0">
-                              <img 
-                                src={getSubredditIcon(freq)}
-                                alt={freq.name}
-                                className="w-full h-full object-cover"
-                                onError={(e) => {
-                                  const target = e.target as HTMLImageElement;
-                                  target.src = `https://api.dicebear.com/7.x/shapes/svg?seed=${freq.name}&backgroundColor=111111&radius=12`;
-                                }}
-                              />
-                            </div>
-                            <div>
-                              <a 
-                                href={`https://reddit.com/r/${freq.name}`}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="font-medium text-[15px] hover:text-[#C69B7B] transition-colors inline-flex items-center gap-2"
-                                onClick={(e) => e.stopPropagation()} // Prevent card expansion when clicking link
-                              >
-                                r/{freq.name}
-                                <ExternalLink size={14} className="text-gray-400" />
-                              </a>
-                              <div className="flex items-center gap-4 text-sm text-gray-400 mt-1">
-                                <div className="flex items-center gap-1">
-                                  <Users size={14} />
-                                  <span>{formatNumber(freq.subscribers)}</span>
-                                </div>
+        {/* Frequent Searches */}
+        <div className="tool-card">
+          <FrequentSearches 
+            onUsernameClick={handleFrequentSearchClick}
+          />
+        </div>
+
+        {/* Results Section */}
+        {frequencies.length > 0 && (
+          <div className="tool-card">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-xl font-semibold">Results</h2>
+              <div className="text-sm text-gray-400">
+                Found {frequencies.length} frequently posted subreddits
+              </div>
+            </div>
+
+            <div className="flex justify-end mb-6">
+              <button
+                onClick={handleSaveAll}
+                className="action-button action-button-primary px-6 py-2 text-sm flex items-center gap-2"
+                disabled={savingAll || !username}
+              >
+                {savingAll ? (
+                  <>
+                    <div className="animate-spin text-sm h-4 w-4 border-2 border-white border-t-transparent rounded-full" />
+                    <span>Processing...</span>
+                  </>
+                ) : (
+                  <>
+                    <FolderPlus size={16} />
+                    <span>Save All to New Project</span>
+                  </>
+                )}
+              </button>
+            </div>
+
+            <div className="divide-y divide-[#222222] bg-[#0a0a0a] rounded-lg overflow-hidden">
+              {frequencies.map((freq) => (
+                <div key={freq.name}>
+                  <div 
+                    onClick={() => setExpandedSubreddit(
+                      expandedSubreddit === freq.name ? undefined : freq.name
+                    )}
+                    className="result-item cursor-pointer"
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-4">
+                        <div className="w-12 h-12 rounded-lg bg-[#1A1A1A] overflow-hidden flex-shrink-0">
+                          <img 
+                            src={getSubredditIcon(freq)}
+                            alt={freq.name}
+                            className="w-full h-full object-cover"
+                            onError={(e) => {
+                              const target = e.target as HTMLImageElement;
+                              target.src = `https://api.dicebear.com/7.x/shapes/svg?seed=${freq.name}&backgroundColor=111111&radius=12`;
+                            }}
+                          />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-1">
+                            <a 
+                              href={`https://reddit.com/r/${freq.name}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="font-medium text-[15px] hover:text-[#C69B7B] transition-colors inline-flex items-center gap-2"
+                              onClick={(e) => e.stopPropagation()} // Prevent card expansion when clicking link
+                            >
+                              r/{freq.name}
+                              <ExternalLink size={14} className="text-gray-400" />
+                            </a>
+                          </div>
+                          <div className="flex items-center gap-3 text-sm">
+                            <div className="flex items-center gap-2.5">
+                              <div className="flex items-center gap-1.5 bg-[#1A1A1A] px-2.5 py-1 rounded-md">
+                                <Users size={14} className="text-gray-400" />
+                                <span className="text-gray-300 font-medium">{formatNumber(freq.subscribers)}</span>
                                 {freq.active_users > 0 && (
                                   <>
-                                    <span className="text-gray-600">•</span>
-                                    <div className="flex items-center gap-1 text-emerald-400">
-                                      <Activity size={14} />
-                                      <span>{formatNumber(freq.active_users)} online</span>
-                                    </div>
+                                    <span className="text-gray-600 mx-1.5">•</span>
+                                    <Activity size={14} className="text-emerald-400" />
+                                    <span className="text-emerald-400 font-medium">{formatNumber(freq.active_users)} online</span>
                                   </>
                                 )}
-                                <span className="text-gray-600">•</span>
-                                <span>{freq.count} posts</span>
                               </div>
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-2" onClick={e => e.stopPropagation()}>
-                            <button
-                              onClick={() => handleSaveSubreddit(freq.name)}
-                              className={`secondary flex items-center gap-2 py-2 px-3 text-sm whitespace-nowrap disabled:opacity-50 ${
-                                saveStatus.subreddits['save_' + freq.name]?.saved ? 'bg-green-900/20 text-green-400 hover:bg-green-900/30' : ''
-                              }`}
-                              title={saveStatus.subreddits['save_' + freq.name]?.saved ? 'Saved to List' : 'Save to List'}
-                              disabled={!user || savingAll || saveStatus.subreddits['save_' + freq.name]?.saving}
-                            >
-                              <div className="w-5 flex justify-center">
-                                {saveStatus.subreddits['save_' + freq.name]?.saving ? (
-                                  <div className="animate-spin text-lg">⚬</div>
-                                ) : saveStatus.subreddits['save_' + freq.name]?.saved ? (
-                                  <Check size={16} className="text-green-400" />
-                                ) : (
-                                  <Bookmark size={16} />
-                                )}
-                              </div>
-                              <span className="text-center">
-                                {saveStatus.subreddits['save_' + freq.name]?.saving 
-                                  ? 'Saving...' 
-                                  : saveStatus.subreddits['save_' + freq.name]?.saved 
-                                    ? 'Saved' 
-                                    : 'Save'}
-                              </span>
-                            </button>
-                            <button
-                              onClick={() => handleAddToProject(freq.name)}
-                              className={`secondary flex items-center gap-2 py-2 px-3 text-sm whitespace-nowrap disabled:opacity-50 ${
-                                saveStatus.subreddits['add_' + freq.name]?.saved ? 'bg-[#2B543A]/20 text-[#4CAF50] hover:bg-[#2B543A]/30' : ''
-                              }`}
-                              title={saveStatus.subreddits['add_' + freq.name]?.saved ? 'Added to Project' : 'Add to Project'}
-                              disabled={!user || savingAll || saveStatus.subreddits['add_' + freq.name]?.saving}
-                            >
-                              <div className="w-5 flex justify-center">
-                                {saveStatus.subreddits['add_' + freq.name]?.saving ? (
-                                  <div className="animate-spin text-lg">⚬</div>
-                                ) : (
-                                  <FolderPlus size={16} className={saveStatus.subreddits['add_' + freq.name]?.saved ? 'text-[#4CAF50]' : ''} />
-                                )}
-                              </div>
-                              <span className="text-center">
-                                {saveStatus.subreddits['add_' + freq.name]?.saving 
-                                  ? 'Adding...' 
-                                  : 'Add to Project'}
-                              </span>
-                            </button>
-                            <div className="text-gray-400 p-2">
-                              {expandedSubreddit === freq.name ? (
-                                <ChevronUp size={20} />
-                              ) : (
-                                <ChevronDown size={20} />
-                              )}
+                              <span className="text-gray-400">{freq.count} posts</span>
                             </div>
                           </div>
                         </div>
                       </div>
+                      <div className="flex items-center gap-2" onClick={e => e.stopPropagation()}>
+                        <button
+                          onClick={() => handleSaveSubreddit(freq.name)}
+                          className={`action-button ${
+                            saveStatus.subreddits['save_' + freq.name]?.saved 
+                              ? 'action-button-primary' 
+                              : 'action-button-secondary'
+                          }`}
+                          title={saveStatus.subreddits['save_' + freq.name]?.saved ? 'Saved to List' : 'Save to List'}
+                          disabled={!user || savingAll || saveStatus.subreddits['save_' + freq.name]?.saving}
+                        >
+                          <div className="w-5 flex justify-center">
+                            {saveStatus.subreddits['save_' + freq.name]?.saving ? (
+                              <div className="animate-spin text-lg">⚬</div>
+                            ) : saveStatus.subreddits['save_' + freq.name]?.saved ? (
+                              <Check size={16} className="text-white" />
+                            ) : (
+                              <Bookmark size={16} />
+                            )}
+                          </div>
+                          <span className="text-center">
+                            {saveStatus.subreddits['save_' + freq.name]?.saving 
+                              ? 'Saving...' 
+                              : saveStatus.subreddits['save_' + freq.name]?.saved 
+                                ? 'Saved' 
+                                : 'Save'}
+                          </span>
+                        </button>
+                        <button
+                          onClick={() => handleAddToProject(freq.name)}
+                          className={`action-button ${
+                            saveStatus.subreddits['add_' + freq.name]?.saved 
+                              ? 'action-button-primary' 
+                              : 'action-button-secondary'
+                          }`}
+                          title={saveStatus.subreddits['add_' + freq.name]?.saved ? 'Added to Project' : 'Add to Project'}
+                          disabled={!user || savingAll || saveStatus.subreddits['add_' + freq.name]?.saving}
+                        >
+                          <div className="w-5 flex justify-center">
+                            {saveStatus.subreddits['add_' + freq.name]?.saving ? (
+                              <div className="animate-spin text-lg">⚬</div>
+                            ) : (
+                              <FolderPlus size={16} className={saveStatus.subreddits['add_' + freq.name]?.saved ? 'text-white' : ''} />
+                            )}
+                          </div>
+                          <span className="text-center">
+                            {saveStatus.subreddits['add_' + freq.name]?.saving 
+                              ? 'Adding...' 
+                              : 'Add to Project'}
+                          </span>
+                        </button>
+                        <div className="text-gray-400 p-2">
+                          {expandedSubreddit === freq.name ? (
+                            <ChevronUp size={20} />
+                          ) : (
+                            <ChevronDown size={20} />
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
 
-                      {expandedSubreddit === freq.name && (
-                        <div className="border-t border-[#222222] bg-[#0A0A0A] divide-y divide-[#222222]">
-                          {freq.lastPosts.map((post) => (
-                            <div key={post.id} className="p-4 hover:bg-[#111111] transition-colors">
-                              <div className="flex items-start gap-4">
-                                {(post.preview_url || post.thumbnail) ? (
-                                  <img 
-                                    src={post.preview_url || post.thumbnail || ''}
-                                    alt=""
-                                    className="w-20 h-20 rounded-md object-cover bg-[#111111]"
-                                    onError={(e) => {
-                                      const target = e.target as HTMLImageElement;
-                                      target.src = getSubredditIcon(freq);
-                                    }}
-                                  />
-                                ) : (
-                                  <div className="w-20 h-20 rounded-md bg-[#111111] flex items-center justify-center">
-                                    <img 
-                                      src={getSubredditIcon(freq)}
-                                      alt=""
-                                      className="w-12 h-12 object-cover"
-                                      onError={(e) => {
-                                        const target = e.target as HTMLImageElement;
-                                        target.src = `https://api.dicebear.com/7.x/shapes/svg?seed=${freq.name}&backgroundColor=111111`;
-                                      }}
-                                    />
-                                  </div>
-                                )}
-                                <div className="flex-1 min-w-0">
-                                  <a
-                                    href={post.url}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="text-[15px] font-medium hover:text-[#C69B7B] transition-colors line-clamp-2 mb-2"
-                                  >
-                                    {post.title}
-                                  </a>
-                                  <div className="flex items-center gap-4 text-sm text-gray-400">
-                                    <div className="flex items-center gap-1">
-                                      <Users size={14} />
-                                      <span>{post.score} points</span>
-                                    </div>
-                                    <div className="flex items-center gap-1">
-                                      <MessageCircle size={14} />
-                                      <span>{post.num_comments} comments</span>
-                                    </div>
-                                    <div className="flex items-center gap-1">
-                                      <Calendar size={14} />
-                                      <span>{formatDate(post.created_utc)}</span>
-                                    </div>
-                                  </div>
+                  {expandedSubreddit === freq.name && (
+                    <div className="border-t border-[#222222] bg-[#0A0A0A] divide-y divide-[#222222]">
+                      {freq.lastPosts.map((post) => (
+                        <div key={post.id} className="p-4 hover:bg-[#111111] transition-colors">
+                          <div className="flex items-start gap-4">
+                            {(post.preview_url || post.thumbnail) ? (
+                              <img 
+                                src={post.preview_url || post.thumbnail || ''}
+                                alt=""
+                                className="w-20 h-20 rounded-md object-cover bg-[#111111]"
+                                onError={(e) => {
+                                  const target = e.target as HTMLImageElement;
+                                  target.src = getSubredditIcon(freq);
+                                }}
+                              />
+                            ) : (
+                              <div className="w-20 h-20 rounded-md bg-[#111111] flex items-center justify-center">
+                                <img 
+                                  src={getSubredditIcon(freq)}
+                                  alt=""
+                                  className="w-12 h-12 object-cover"
+                                  onError={(e) => {
+                                    const target = e.target as HTMLImageElement;
+                                    target.src = `https://api.dicebear.com/7.x/shapes/svg?seed=${freq.name}&backgroundColor=111111`;
+                                  }}
+                                />
+                              </div>
+                            )}
+                            <div className="flex-1 min-w-0">
+                              <a
+                                href={post.url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-[15px] font-medium hover:text-[#C69B7B] transition-colors line-clamp-2 mb-2"
+                              >
+                                {post.title}
+                              </a>
+                              <div className="flex items-center gap-4 text-sm text-gray-400">
+                                <div className="flex items-center gap-1">
+                                  <Users size={14} />
+                                  <span>{post.score} points</span>
+                                </div>
+                                <div className="flex items-center gap-1">
+                                  <MessageCircle size={14} />
+                                  <span>{post.num_comments} comments</span>
+                                </div>
+                                <div className="flex items-center gap-1">
+                                  <Calendar size={14} />
+                                  <span>{formatDate(post.created_utc)}</span>
                                 </div>
                               </div>
                             </div>
-                          ))}
+                          </div>
                         </div>
-                      )}
+                      ))}
                     </div>
-                  ))}
+                  )}
                 </div>
-              </>
-            )}
+              ))}
+            </div>
           </div>
         )}
       </div>
 
-      {error && (
-        <div className="p-4 bg-red-900/30 text-red-400 rounded-lg flex items-center gap-2">
-          <AlertTriangle size={20} className="shrink-0" />
-          <p>{error}</p>
-        </div>
-      )}
-
-      <div className="fixed top-4 right-4 z-50 pointer-events-none">
+      {/* General notifications queue */}
+      <div className="fixed top-4 right-4 z-50 flex flex-col gap-3 max-w-md">
+        {notificationQueue.map(notification => (
+          <div 
+            key={notification.id}
+            className={`notification ${
+              notification.type === 'success' 
+                ? 'notification-success' 
+                : 'notification-error'
+            } flex items-center gap-2 animate-fade-in`}
+          >
+            {notification.type === 'success' ? (
+              <Check size={20} className="shrink-0" />
+            ) : (
+              <AlertTriangle size={20} className="shrink-0" />
+            )}
+            <p>{notification.message}</p>
+          </div>
+        ))}
+        
+        {/* Save status notifications */}
         {Object.entries(saveStatus.subreddits)
-          .filter(([_, status]) => !!status && !status.saving)
-          .slice(0, 1)
-          .map(([key, status]) => {
-            const s = status!; // non-null as filtered
+          .filter(([_, s]) => s?.message && !s?.saving)
+          .map(([key, s]) => {
+            // Skip entries without a type (shouldn't happen, but just to be safe)
+            if (!s?.type) return null;
+            
             return (
               <div 
                 key={key}
-                className={`p-4 ${
+                className={`notification ${
                   s.type === 'success' 
-                    ? 'bg-green-900/30 text-green-400' 
-                    : 'bg-red-900/30 text-red-400'
-                } rounded-lg flex items-center gap-2 backdrop-blur-sm shadow-lg animate-fade-in`}
+                    ? 'notification-success' 
+                    : 'notification-error'
+                } flex items-center gap-2`}
               >
                 {s.type === 'success' ? (
                   <Check size={20} className="shrink-0" />
@@ -1224,7 +1609,7 @@ function SpyGlass() {
                 <p>
                   {key !== 'all' ? (
                     <>
-                      <span className="font-medium">r/{key}:</span>{' '}
+                      <span className="font-medium">r/{key.replace('save_', '').replace('add_', '')}</span>{' '}
                       {s.message}
                     </>
                   ) : (
@@ -1260,115 +1645,3 @@ function SpyGlass() {
 }
 
 export default SpyGlass;
-
-// Debug helper function - can be called from browser console
-// Example usage: window.debugProjectSubreddits('project-id-here')
-window.debugProjectSubreddits = async (projectId: string) => {
-  console.log(`Debugging project ID: ${projectId}`);
-  
-  try {
-    // Check if project exists
-    const { data: project, error: projectError } = await supabase
-      .from('projects')
-      .select('*')
-      .eq('id', projectId)
-      .single();
-      
-    if (projectError) {
-      console.error('Project lookup error:', projectError);
-      return;
-    }
-    
-    console.log('Project details:', project);
-    
-    // First get project_subreddits associations
-    console.log('Fetching project-subreddit associations...');
-    const { data: projectSubreddits, error: psError } = await supabase
-      .from('project_subreddits')
-      .select('id, project_id, subreddit_id')
-      .eq('project_id', projectId);
-      
-    if (psError) {
-      console.error('Error fetching project subreddits:', psError);
-      
-      // Check for the specific RLS policy recursion error
-      if (psError.code === '42P17') {
-        console.warn('=============================================');
-        console.warn('DETECTED RLS POLICY RECURSION ERROR');
-        console.warn('This is a Supabase database configuration issue.');
-        console.warn('');
-        console.warn('The issue occurs in policies on the project_members table.');
-        console.warn('It creates an infinite loop during authorization checks.');
-        console.warn('');
-        console.warn('To fix this, go to the Supabase dashboard:');
-        console.warn('1. Navigate to Authentication > Policies');
-        console.warn('2. Find policies for the project_members table');
-        console.warn('3. Look for policies that may be creating circular references');
-        console.warn('4. Update the policies to break the circular dependency');
-        console.warn('=============================================');
-        
-        // Try to get some basic project info as a fallback
-        console.log('Trying to fetch basic project info as a fallback...');
-        return {
-          project,
-          error: 'RLS policy recursion detected',
-          errorCode: psError.code,
-          message: psError.message,
-          timestamp: new Date().toISOString()
-        };
-      }
-      
-      return;
-    }
-    
-    console.log(`Found ${projectSubreddits?.length || 0} project-subreddit associations`);
-    
-    if (!projectSubreddits || projectSubreddits.length === 0) {
-      console.log('No subreddits associated with this project');
-      return;
-    }
-    
-    // Extract subreddit IDs
-    const subredditIds = projectSubreddits.map(ps => ps.subreddit_id);
-    console.log('Associated subreddit IDs:', subredditIds);
-    
-    // Then fetch the actual subreddit data
-    const { data: subreddits, error: subredditsError } = await supabase
-      .from('subreddits')
-      .select('id, name, subscriber_count')
-      .in('id', subredditIds);
-      
-    if (subredditsError) {
-      console.error('Error fetching subreddits:', subredditsError);
-      return;
-    }
-    
-    console.log(`Fetched ${subreddits?.length || 0} out of ${subredditIds.length} subreddits`);
-    console.log('Subreddit details:', subreddits);
-    
-    // Check for missing subreddits
-    const missingIds = subredditIds.filter(id => 
-      !subreddits.some(s => s.id === id)
-    );
-    
-    if (missingIds.length > 0) {
-      console.log(`WARNING: ${missingIds.length} subreddit IDs have associations but no subreddit records`);
-      console.log('Missing IDs:', missingIds);
-    }
-    
-    return {
-      project,
-      associations: projectSubreddits,
-      subreddits
-    };
-  } catch (error) {
-    console.error('Debug function error:', error);
-  }
-};
-
-// Add to global window type
-declare global {
-  interface Window {
-    debugProjectSubreddits: (projectId: string) => Promise<any>;
-  }
-}

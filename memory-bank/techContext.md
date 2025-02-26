@@ -16,6 +16,10 @@
 ### Backend
 - **Platform**: Supabase
 - **Database**: PostgreSQL
+  - Custom database migrations
+    - User-specific search tracking migration (20230930000000_add_user_id_to_frequent_searches.sql)
+    - Added user_id column to frequent_searches table to track per-user search history
+    - Modified increment_search_count function to associate searches with specific users
 - **Authentication**: 
   - Supabase Auth
   - Email/Password authentication

@@ -194,7 +194,12 @@ function Settings() {
 
   return (
     <div className="max-w-3xl">
-      <h1 className="text-4xl font-bold mb-8">Account Settings</h1>
+      <div className="flex flex-col mb-8">
+        <h1 className="text-2xl md:text-4xl font-bold leading-tight mb-4">Account <span className="text-[#C69B7B]">Settings</span></h1>
+        <p className="text-gray-400 max-w-2xl leading-relaxed">
+          Manage your account preferences, subscription details, and security settings.
+        </p>
+      </div>
 
       {/* Subscription Warning Modal */}
       {showSubscriptionWarning && !isAdmin && !isGiftUser && (

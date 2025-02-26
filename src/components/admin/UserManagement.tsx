@@ -42,26 +42,34 @@ function UserManagement({ onSelectUser }: UserManagementProps) {
       
       if (profilesError) throw profilesError;
       
-      // Fetch all subscriptions
+      // Fetch all subscriptions - using simple query
       const { data: subscriptions, error: subsError } = await supabase
         .from('customer_subscriptions')
         .select('*');
       
       if (subsError) throw subsError;
       
-      // Fetch all prices to get tier names
+      // Fetch all prices separately
       const { data: prices, error: pricesError } = await supabase
         .from('stripe_prices')
         .select('*');
-      
+        
       if (pricesError) throw pricesError;
+      
+      // Fetch all products separately
+      const { data: products, error: productsError } = await supabase
+        .from('stripe_products')
+        .select('*');
+        
+      if (productsError) throw productsError;
       
       // Map subscription data to users
       const userData: UserData[] = profiles.map((profile: any) => {
         // Find subscription for this user
         const userSubscription = subscriptions?.find(
-          (sub: any) => sub.customer_id === profile.id && 
-          new Date(sub.subscription_end_date) > new Date()
+          (sub: any) => sub.user_id === profile.id && 
+          new Date(sub.current_period_end) > new Date() &&
+          sub.status === 'active'
         );
         
         // Get subscription tier name if exists
@@ -70,10 +78,19 @@ function UserManagement({ onSelectUser }: UserManagementProps) {
         let subscriptionId = null;
         
         if (userSubscription) {
-          const price = prices?.find((p: any) => p.id === userSubscription.price_id);
-          subscriptionTier = price?.metadata?.tier || 'Unknown Tier';
-          subscriptionEnd = userSubscription.subscription_end_date;
-          subscriptionId = userSubscription.subscription_id;
+          // Get associated price
+          const priceData = prices?.find(price => price.id === userSubscription.stripe_price_id);
+          
+          // Get associated product
+          const productData = priceData && products?.find(
+            product => product.stripe_product_id === priceData.stripe_product_id
+          );
+          
+          // Get tier from product metadata if available
+          subscriptionTier = productData?.metadata?.tier || 
+                            (productData?.name ? productData.name : 'Unknown Tier');
+          subscriptionEnd = userSubscription.current_period_end;
+          subscriptionId = userSubscription.stripe_subscription_id;
         }
         
         return {
@@ -90,11 +107,10 @@ function UserManagement({ onSelectUser }: UserManagementProps) {
       });
       
       setUsers(userData);
-      
+      setLoading(false);
     } catch (err: any) {
       console.error('Error fetching users:', err);
-      setError('Failed to load users: ' + err.message);
-    } finally {
+      setError(`Failed to load users: ${err.message || 'Unknown error'}`);
       setLoading(false);
     }
   };
@@ -235,7 +251,7 @@ function UserManagement({ onSelectUser }: UserManagementProps) {
             placeholder="Search users..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-10 pr-4 py-2 bg-[#111111] rounded-lg border border-[#333333] focus:outline-none focus:ring-2 focus:ring-purple-500 w-64"
+            className="pl-10 pr-4 py-2 bg-[#111111] rounded-lg border border-[#333333] focus:outline-none focus:ring-2 focus:ring-[#D4B675] w-64"
           />
           <Search className="absolute left-3 top-2.5 text-gray-400" size={16} />
           {searchQuery && (
@@ -261,7 +277,7 @@ function UserManagement({ onSelectUser }: UserManagementProps) {
       
       {loading ? (
         <div className="flex justify-center py-10">
-          <div className="animate-spin rounded-full h-10 w-10 border-2 border-purple-500 border-t-transparent"></div>
+          <div className="animate-spin rounded-full h-10 w-10 border-2 border-[#D4B675] border-t-transparent"></div>
         </div>
       ) : error ? (
         <div className="bg-red-900/20 text-red-400 p-4 rounded-lg mb-4">
@@ -306,7 +322,7 @@ function UserManagement({ onSelectUser }: UserManagementProps) {
                         </div>
                         <button
                           onClick={() => onSelectUser(user.id, user.display_name)}
-                          className="font-medium hover:text-purple-400 truncate max-w-[200px]"
+                          className="font-medium hover:text-[#D4B675] truncate max-w-[200px]"
                         >
                           {user.display_name || 'Unnamed User'}
                         </button>
@@ -330,7 +346,7 @@ function UserManagement({ onSelectUser }: UserManagementProps) {
                           </span>
                         )}
                         {user.subscription_tier && (
-                          <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-purple-900/30 text-purple-400">
+                          <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-[#D4B675]/30 text-[#D4B675]">
                             {user.subscription_tier}
                           </span>
                         )}
@@ -370,20 +386,20 @@ function UserManagement({ onSelectUser }: UserManagementProps) {
                         <div className="absolute right-0 mt-1 w-36 bg-[#111111] border border-[#333333] rounded-md shadow-lg z-10 hidden group-hover:block">
                           <button
                             onClick={() => updateUserRole(user.id, null)}
-                            className={`block w-full text-left px-3 py-2 hover:bg-[#222222] ${!user.role ? 'text-purple-400' : 'text-gray-300'}`}
+                            className={`block w-full text-left px-3 py-2 hover:bg-[#222222] ${!user.role ? 'text-[#D4B675]' : 'text-gray-300'}`}
                           >
                             Regular User
                           </button>
                           <button
                             onClick={() => updateUserRole(user.id, 'gift')}
-                            className={`block w-full text-left px-3 py-2 hover:bg-[#222222] flex items-center ${user.role === 'gift' ? 'text-purple-400' : 'text-gray-300'}`}
+                            className={`block w-full text-left px-3 py-2 hover:bg-[#222222] flex items-center ${user.role === 'gift' ? 'text-[#D4B675]' : 'text-gray-300'}`}
                           >
                             <Gift size={14} className="mr-2 text-yellow-400" />
                             Gift User
                           </button>
                           <button
                             onClick={() => updateUserRole(user.id, 'admin')}
-                            className={`block w-full text-left px-3 py-2 hover:bg-[#222222] flex items-center ${user.role === 'admin' ? 'text-purple-400' : 'text-gray-300'}`}
+                            className={`block w-full text-left px-3 py-2 hover:bg-[#222222] flex items-center ${user.role === 'admin' ? 'text-[#D4B675]' : 'text-gray-300'}`}
                           >
                             <ShieldCheck size={14} className="mr-2 text-red-400" />
                             Admin

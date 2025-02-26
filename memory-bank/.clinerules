@@ -153,4 +153,9 @@
 - Use UUIDs for primary keys when appropriate
 - Implement transaction boundaries for related operations
 - Validate data integrity at both application and database levels
-- Set appropriate NOT NULL constraints on required fields 
+- Set appropriate NOT NULL constraints on required fields
+
+# User Data Privacy
+- User-specific data should be properly filtered to ensure privacy
+- Search history (FrequentSearches component) now filters by user_id to show only the current user's searches
+- Database queries must include appropriate user_id filters when accessing personal data 

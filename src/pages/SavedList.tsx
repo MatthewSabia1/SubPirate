@@ -277,30 +277,31 @@ function SavedList() {
 
   return (
     <div className="max-w-[1200px] mx-auto px-4 md:px-8">
-      <div className="flex items-center justify-between mb-8">
-        <div>
-          <h1 className="text-2xl md:text-4xl font-bold">Saved Subreddits</h1>
-          <p className="text-gray-400 mt-2">Track and manage your saved subreddits</p>
-        </div>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={handleRefreshStats}
-            className="secondary flex items-center gap-2 text-sm md:text-base"
-            disabled={refreshing}
-          >
-            <RefreshCw size={20} className={refreshing ? 'animate-spin' : ''} />
-            <span className="hidden md:inline">Refresh Stats</span>
-            <span className="md:hidden">Refresh</span>
-          </button>
-          <button
-            onClick={handleExportCSV}
-            className="secondary flex items-center gap-2 text-sm md:text-base"
-          >
-            <Download size={20} />
-            <span className="hidden md:inline">Export CSV</span>
-            <span className="md:hidden">Export</span>
-          </button>
-        </div>
+      <div className="flex flex-col mb-8">
+        <h1 className="text-2xl md:text-4xl font-bold leading-tight mb-4">Saved <span className="text-[#C69B7B]">Subreddits</span></h1>
+        <p className="text-gray-400 max-w-2xl leading-relaxed">
+          Build your collection of high-performing subreddits for targeted marketing campaigns that generate consistent results.
+        </p>
+      </div>
+
+      <div className="flex items-center justify-end gap-2 mb-8">
+        <button
+          onClick={handleRefreshStats}
+          disabled={refreshing}
+          className="secondary flex items-center gap-2 text-sm md:text-base"
+        >
+          <RefreshCw size={20} className={refreshing ? 'animate-spin' : ''} />
+          <span className="hidden md:inline">Refresh Stats</span>
+          <span className="md:hidden">Refresh</span>
+        </button>
+        <button
+          onClick={handleExportCSV}
+          className="secondary flex items-center gap-2 text-sm md:text-base"
+        >
+          <Download size={20} />
+          <span className="hidden md:inline">Export CSV</span>
+          <span className="md:hidden">Export</span>
+        </button>
       </div>
 
       {error && (

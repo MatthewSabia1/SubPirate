@@ -1454,3 +1454,13 @@ flowchart TD
     AdminTabs -->|Tools| ShowTools[Show Admin Tools]
     ShowUsers -->|Select User| ShowUserDetails[Show User Details]
 ```
+
+## User-Specific Data Management
+
+### User-Specific Search History
+- Search history is now tracked and filtered by user_id to ensure privacy and relevance
+- The frequent_searches table includes a user_id column that references auth.users(id)
+- The increment_search_count function accepts a user_id parameter to associate searches with specific users
+- The FrequentSearches component filters searches by the current authenticated user
+- This pattern ensures users only see their own search history and prevents data leakage
+- The component handles both authenticated and unauthenticated user states appropriately

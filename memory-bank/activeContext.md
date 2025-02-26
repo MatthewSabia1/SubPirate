@@ -1,6 +1,9 @@
 # Active Context
 
 ## Current Focus
+- Fixed FrequentSearches component to only show the current user's searches instead of all users' searches
+- Added user_id column to frequent_searches table to properly track searches per user
+- Updated increment_search_count function to track which user made each search
 - Implementing comprehensive admin panel for application management
 - Admin panel metrics display for user growth, revenue, and usage statistics
 - User management interface for role assignment and user administration

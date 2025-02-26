@@ -31,7 +31,7 @@ function Admin() {
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-full">
-        <div className="animate-spin rounded-full h-10 w-10 border-2 border-purple-500 border-t-transparent"></div>
+        <div className="animate-spin rounded-full h-10 w-10 border-2 border-[#D4B675] border-t-transparent"></div>
       </div>
     );
   }
@@ -50,7 +50,7 @@ function Admin() {
             onClick={() => setActiveTab('metrics')}
             className={`px-4 py-2 rounded-lg flex items-center ${
               activeTab === 'metrics'
-                ? 'bg-purple-500 text-white'
+                ? 'bg-[#D4B675] text-white'
                 : 'bg-[#111111] hover:bg-[#222222]'
             }`}
           >
@@ -62,7 +62,7 @@ function Admin() {
             onClick={() => setActiveTab('users')}
             className={`px-4 py-2 rounded-lg flex items-center ${
               activeTab === 'users'
-                ? 'bg-purple-500 text-white'
+                ? 'bg-[#D4B675] text-white'
                 : 'bg-[#111111] hover:bg-[#222222]'
             }`}
           >
@@ -74,7 +74,7 @@ function Admin() {
             onClick={() => setActiveTab('tools')}
             className={`px-4 py-2 rounded-lg flex items-center ${
               activeTab === 'tools'
-                ? 'bg-purple-500 text-white'
+                ? 'bg-[#D4B675] text-white'
                 : 'bg-[#111111] hover:bg-[#222222]'
             }`}
           >

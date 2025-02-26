@@ -137,8 +137,14 @@ function Projects() {
 
   return (
     <div className="max-w-[1200px] mx-auto px-4 md:px-8">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
-        <h1 className="text-2xl md:text-4xl font-bold truncate">Projects</h1>
+      <div className="flex flex-col mb-8">
+        <h1 className="text-2xl md:text-4xl font-bold leading-tight mb-4">Projects <span className="text-[#C69B7B]">Management</span></h1>
+        <p className="text-gray-400 max-w-2xl leading-relaxed">
+          Organize your subreddit targets into strategic marketing campaigns for better tracking and collaboration.
+        </p>
+      </div>
+
+      <div className="flex items-center justify-end mb-8">
         <button 
           onClick={() => setIsCreateModalOpen(true)}
           className="primary flex items-center justify-center gap-2 text-sm md:text-base h-10 md:h-11">
