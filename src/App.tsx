@@ -53,20 +53,89 @@ function PrivateRoute({ children }: { children: React.ReactNode }) {
       if (!user) return;
       
       try {
+        console.log(`Checking subscription for user ${user.id}...`);
         setSubscriptionLoading(true);
-        // Check if user has an active subscription
-        const { data, error } = await supabase
+        
+        // Check both subscription tables
+        let hasActiveSubscription = false;
+        
+        // 1. Check the subscriptions table
+        const { data: subscriptionData, error: subscriptionError } = await supabase
           .from('subscriptions')
           .select('*')
           .eq('user_id', user.id)
           .eq('status', 'active')
           .single();
 
-        if (error && error.code !== 'PGRST116') {
-          console.error('Error checking subscription status:', error);
+        if (subscriptionError) {
+          if (subscriptionError.code === 'PGRST116') {
+            console.log('No active subscription found in subscriptions table');
+          } else {
+            console.error('Error checking subscriptions table:', subscriptionError);
+          }
+        }
+        
+        if (subscriptionData) {
+          console.log('Found active subscription in subscriptions table:', subscriptionData);
+          hasActiveSubscription = true;
+        } else {
+          // 2. Check the customer_subscriptions table if no subscription found in the first table
+          console.log('Checking customer_subscriptions table...');
+          
+          // First try with OR condition
+          let { data: customerSubscriptionData, error: customerSubscriptionError } = await supabase
+            .from('customer_subscriptions')
+            .select('*')
+            .eq('user_id', user.id)
+            .or('status.eq.active,status.eq.trialing')
+            .single();
+  
+          if (customerSubscriptionError) {
+            if (customerSubscriptionError.code === 'PGRST116') {
+              console.log('No subscription found with OR condition, trying individual queries');
+              
+              // Try active status
+              const { data: activeData, error: activeError } = await supabase
+                .from('customer_subscriptions')
+                .select('*')
+                .eq('user_id', user.id)
+                .eq('status', 'active')
+                .single();
+                
+              if (!activeError && activeData) {
+                console.log('Found active subscription in customer_subscriptions table:', activeData);
+                customerSubscriptionData = activeData;
+                customerSubscriptionError = null;
+              } else {
+                // Try trialing status
+                const { data: trialingData, error: trialingError } = await supabase
+                  .from('customer_subscriptions')
+                  .select('*')
+                  .eq('user_id', user.id)
+                  .eq('status', 'trialing')
+                  .single();
+                  
+                if (!trialingError && trialingData) {
+                  console.log('Found trialing subscription in customer_subscriptions table:', trialingData);
+                  customerSubscriptionData = trialingData;
+                  customerSubscriptionError = null;
+                }
+              }
+            } else {
+              console.error('Error checking customer_subscriptions table:', customerSubscriptionError);
+            }
+          }
+          
+          if (customerSubscriptionData) {
+            console.log('Found subscription in customer_subscriptions table:', customerSubscriptionData);
+            hasActiveSubscription = true;
+          } else {
+            console.log('No active subscription found in any table for user', user.id);
+          }
         }
 
-        setHasSubscription(!!data);
+        console.log('Setting hasSubscription to:', hasActiveSubscription);
+        setHasSubscription(hasActiveSubscription);
       } catch (error) {
         console.error('Exception checking subscription:', error);
       } finally {
@@ -90,8 +159,20 @@ function PrivateRoute({ children }: { children: React.ReactNode }) {
 
   // If subscription check is complete and user doesn't have a subscription, redirect them
   useEffect(() => {
-    if (user && !subscriptionLoading && !hasSubscription && window.location.pathname !== '/subscription') {
-      navigate('/subscription', { replace: true });
+    const currentPath = window.location.pathname;
+    console.log('PrivateRoute: Checking redirect conditions:', { 
+      user: !!user, 
+      loading: subscriptionLoading, 
+      hasSubscription, 
+      path: currentPath 
+    });
+    
+    if (user && !subscriptionLoading && !hasSubscription && currentPath !== '/subscription') {
+      console.log('PrivateRoute: Redirecting to subscription page from', currentPath);
+      navigate('/subscription', { 
+        replace: true,
+        state: { newUser: false } // Explicitly mark as not a new user
+      });
     }
   }, [user, subscriptionLoading, hasSubscription, navigate]);
 
@@ -105,7 +186,8 @@ function PrivateRoute({ children }: { children: React.ReactNode }) {
 
   // Allow the subscription page to be accessed even without a subscription
   if (!hasSubscription && window.location.pathname !== '/subscription') {
-    return <Navigate to="/subscription" />;
+    console.log('PrivateRoute: Final check redirect to subscription page');
+    return <Navigate to="/subscription" state={{ newUser: false }} replace />;
   }
 
   return (
@@ -228,11 +310,7 @@ function App() {
                       <RedditAccounts />
                     </PrivateRoute>
                   } />
-                  <Route path="/subscription" element={
-                    <PrivateRoute>
-                      <SubscriptionPage />
-                    </PrivateRoute>
-                  } />
+                  <Route path="/subscription" element={<SubscriptionPage />} />
                 </Routes>
               </RedditAccountProvider>
             </Router>

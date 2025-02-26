@@ -11,24 +11,86 @@ const RETRY_DELAY = 1000; // 1 second
 // Helper function to check if a user has an active subscription
 async function checkUserSubscription(userId: string): Promise<boolean> {
   try {
-    // Check if user has any active subscription in the subscriptions table
-    const { data, error } = await supabase
+    console.log(`AuthCallback: Checking subscription for user ${userId}...`);
+    
+    // 1. Check if user has any active subscription in the subscriptions table
+    const { data: subscriptionData, error: subscriptionError } = await supabase
       .from('subscriptions')
       .select('*')
       .eq('user_id', userId)
       .eq('status', 'active')
       .single();
 
-    if (error && error.code !== 'PGRST116') { // PGRST116 is the "no rows returned" error code
-      console.error('Error checking subscription status:', error);
-      // If there's an error, default to letting them continue for better UX
+    if (subscriptionError) {
+      if (subscriptionError.code === 'PGRST116') {
+        console.log('AuthCallback: No active subscription found in subscriptions table');
+      } else {
+        console.error('AuthCallback: Error checking subscriptions table:', subscriptionError);
+      }
+    }
+    
+    // If we found an active subscription in the first table, return true
+    if (subscriptionData) {
+      console.log('AuthCallback: Found active subscription in subscriptions table:', subscriptionData);
       return true;
     }
+    
+    // 2. Check if user has any active subscription in the customer_subscriptions table
+    console.log('AuthCallback: Checking customer_subscriptions table...');
+    
+    // First try with OR condition
+    let { data: customerSubscriptionData, error: customerSubscriptionError } = await supabase
+      .from('customer_subscriptions')
+      .select('*')
+      .eq('user_id', userId)
+      .or('status.eq.active,status.eq.trialing')
+      .single();
 
-    // Return true if user has an active subscription
-    return !!data;
+    if (customerSubscriptionError) {
+      if (customerSubscriptionError.code === 'PGRST116') {
+        console.log('AuthCallback: No subscription found with OR condition, trying individual queries');
+        
+        // Try active status
+        const { data: activeData, error: activeError } = await supabase
+          .from('customer_subscriptions')
+          .select('*')
+          .eq('user_id', userId)
+          .eq('status', 'active')
+          .single();
+          
+        if (!activeError && activeData) {
+          console.log('AuthCallback: Found active subscription in customer_subscriptions table:', activeData);
+          customerSubscriptionData = activeData;
+        } else {
+          // Try trialing status
+          const { data: trialingData, error: trialingError } = await supabase
+            .from('customer_subscriptions')
+            .select('*')
+            .eq('user_id', userId)
+            .eq('status', 'trialing')
+            .single();
+            
+          if (!trialingError && trialingData) {
+            console.log('AuthCallback: Found trialing subscription in customer_subscriptions table:', trialingData);
+            customerSubscriptionData = trialingData;
+          }
+        }
+      } else {
+        console.error('AuthCallback: Error checking customer_subscriptions table:', customerSubscriptionError);
+      }
+    }
+    
+    // If we found an active subscription in the second table, return true
+    if (customerSubscriptionData) {
+      console.log('AuthCallback: Found subscription in customer_subscriptions table:', customerSubscriptionData);
+      return true;
+    }
+    
+    // No active subscription found in either table
+    console.log('AuthCallback: No active subscription found in any table for user', userId);
+    return false;
   } catch (error) {
-    console.error('Exception checking subscription status:', error);
+    console.error('AuthCallback: Exception checking subscription status:', error);
     // If there's an exception, default to letting them continue for better UX
     return true;
   }
@@ -55,22 +117,30 @@ export default function AuthCallback() {
         if (user) {
           console.log('User already authenticated:', user.id);
           
-          // Check if the user has an active subscription
-          const hasSubscription = await checkUserSubscription(user.id);
-          
-          if (!hasSubscription) {
-            console.log('User has no active subscription, redirecting to subscription page');
-            navigate('/subscription', { 
-              replace: true,
-              state: { newUser: true }
-            });
+          try {
+            // Check if the user has an active subscription
+            const hasSubscription = await checkUserSubscription(user.id);
+            
+            if (!hasSubscription) {
+              console.log('User has no active subscription, redirecting to subscription page');
+              navigate('/subscription', { 
+                replace: true,
+                state: { newUser: true }
+              });
+              return;
+            }
+            
+            // User has a subscription, redirect to dashboard
+            setLoading(false);
+            navigate('/dashboard', { replace: true });
+            return;
+          } catch (error) {
+            console.error('Error during subscription check in AuthCallback:', error);
+            // In case of error, let users through to dashboard
+            setLoading(false);
+            navigate('/dashboard', { replace: true });
             return;
           }
-          
-          // User has a subscription, redirect to dashboard
-          setLoading(false);
-          navigate('/dashboard', { replace: true });
-          return;
         }
 
         // Check if there are any URL parameters indicating authentication
@@ -96,21 +166,29 @@ export default function AuthCallback() {
           
           if (user) {
             // Check if the user has an active subscription
-            const hasSubscription = await checkUserSubscription(user.id);
-            
-            if (!hasSubscription) {
-              console.log('User has no active subscription, redirecting to subscription page');
-              navigate('/subscription', { 
-                replace: true,
-                state: { newUser: true }
-              });
+            try {
+              const hasSubscription = await checkUserSubscription(user.id);
+              
+              if (!hasSubscription) {
+                console.log('User has no active subscription, redirecting to subscription page');
+                navigate('/subscription', { 
+                  replace: true,
+                  state: { newUser: true }
+                });
+                return;
+              }
+              
+              // User has a subscription, redirect to dashboard
+              setLoading(false);
+              navigate('/dashboard', { replace: true });
+              return;
+            } catch (error) {
+              console.error('Error during subscription check in AuthCallback (URL params):', error);
+              // In case of error, let users through to dashboard
+              setLoading(false);
+              navigate('/dashboard', { replace: true });
               return;
             }
-            
-            // User has a subscription, redirect to dashboard
-            setLoading(false);
-            navigate('/dashboard', { replace: true });
-            return;
           }
         }
 
@@ -138,21 +216,29 @@ export default function AuthCallback() {
             
             if (user) {
               // Check if the user has an active subscription
-              const hasSubscription = await checkUserSubscription(user.id);
-              
-              if (!hasSubscription) {
-                console.log('User has no active subscription, redirecting to subscription page');
-                navigate('/subscription', { 
-                  replace: true,
-                  state: { newUser: true }
-                });
+              try {
+                const hasSubscription = await checkUserSubscription(user.id);
+                
+                if (!hasSubscription) {
+                  console.log('User has no active subscription, redirecting to subscription page');
+                  navigate('/subscription', { 
+                    replace: true,
+                    state: { newUser: true }
+                  });
+                  return;
+                }
+                
+                // User has a subscription, redirect to dashboard
+                setLoading(false);
+                navigate('/dashboard', { replace: true });
+                return;
+              } catch (error) {
+                console.error('Error during subscription check in AuthCallback (hash):', error);
+                // In case of error, let users through to dashboard
+                setLoading(false);
+                navigate('/dashboard', { replace: true });
                 return;
               }
-              
-              // User has a subscription, redirect to dashboard
-              setLoading(false);
-              navigate('/dashboard', { replace: true });
-              return;
             }
           }
         }

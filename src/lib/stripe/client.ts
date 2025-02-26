@@ -74,7 +74,36 @@ async function getOrCreateCustomerForUser(userId: string): Promise<string> {
     
     if (profile?.stripe_customer_id) {
       console.log(`Found existing Stripe customer for user ${userId}: ${profile.stripe_customer_id}`);
-      return profile.stripe_customer_id;
+      
+      try {
+        // Verify the customer exists in the current environment
+        await stripe.customers.retrieve(profile.stripe_customer_id);
+        return profile.stripe_customer_id;
+      } catch (customerError: any) {
+        // If there's an environment mismatch or the customer doesn't exist
+        if (customerError.message && 
+           (customerError.message.includes('live mode') || 
+            customerError.message.includes('test mode') ||
+            customerError.message.includes('No such customer'))) {
+          
+          console.warn(`Customer ID ${profile.stripe_customer_id} exists in a different environment. Creating a new one.`);
+          
+          // Clear the invalid customer ID from the database
+          const { error: clearError } = await supabase
+            .from('profiles')
+            .update({ stripe_customer_id: null })
+            .eq('id', userId);
+            
+          if (clearError) {
+            console.warn('Failed to clear invalid customer ID from database:', clearError);
+          }
+          
+          // Continue to create a new customer below
+        } else {
+          // Re-throw unexpected errors
+          throw customerError;
+        }
+      }
     }
     
     // If no customer ID, fetch user details to create one
@@ -203,7 +232,7 @@ export async function createCheckoutSession({ priceId, successUrl, cancelUrl, us
     },
   };
 
-  // Add metadata to customer if userId is provided
+  // Add customer parameter for subscription mode
   if (userId) {
     // Add metadata directly to the session
     sessionParams.metadata = {
@@ -220,11 +249,28 @@ export async function createCheckoutSession({ priceId, successUrl, cancelUrl, us
     
     try {
       // Add customer parameter for subscription mode
-      sessionParams.customer = await getOrCreateCustomerForUser(userId);
-    } catch (customerError) {
+      const customerId = await getOrCreateCustomerForUser(userId);
+      if (customerId) {
+        sessionParams.customer = customerId;
+      } else {
+        // If no customer ID was returned, don't include the customer_update parameter
+        delete sessionParams.customer_update;
+      }
+    } catch (customerError: any) {
       console.error('Failed to get or create customer:', customerError);
+      
+      // If we get a test/live mode mismatch error, don't use customer_update
+      if (customerError.message && 
+         (customerError.message.includes('live mode') || 
+          customerError.message.includes('test mode'))) {
+        console.warn('Detected test/live mode mismatch. Continuing without customer_update.');
+        delete sessionParams.customer_update;
+      }
       // Continue without customer ID - Stripe will create a new one
     }
+  } else {
+    // If no userId provided, don't use customer_update
+    delete sessionParams.customer_update;
   }
 
   try {

@@ -85,12 +85,23 @@ export default function SubscriptionPage() {
   const [error, setError] = useState<Error | null>(null);
   const [isTestMode, setIsTestMode] = useState(false);
 
-  // If not a new user, redirect to dashboard
+  // If not a new user, redirect to dashboard - but only if specifically marked as a new user
   useEffect(() => {
     const state = location.state as { newUser?: boolean } | null;
     
-    if (!state?.newUser && user) {
+    // Only redirect to dashboard if:
+    // 1. The user is authenticated AND
+    // 2. This is not explicitly marked as a new user flow (via state)
+    // 3. We're not coming from an external redirect (like a checkout success)
+    if (user && !state?.newUser && !location.search.includes('checkout=')) {
+      console.log('SubscriptionPage: User is authenticated but not marked as new user, redirecting to dashboard');
       navigate('/dashboard', { replace: true });
+    } else {
+      console.log('SubscriptionPage: User needs to see subscription options', { 
+        isNewUser: state?.newUser, 
+        hasSearch: !!location.search,
+        user: !!user
+      });
     }
   }, [location, navigate, user]);
 
@@ -279,7 +290,8 @@ export default function SubscriptionPage() {
       const { url } = await createCheckoutSession({
         priceId,
         successUrl: `${window.location.origin}/dashboard?checkout=success`,
-        cancelUrl: `${window.location.origin}/subscription?checkout=canceled`
+        cancelUrl: `${window.location.origin}/subscription?checkout=canceled`,
+        userId: user.id
       });
       
       if (url) {
@@ -288,8 +300,34 @@ export default function SubscriptionPage() {
       } else {
         throw new Error('Could not create checkout session');
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error creating checkout session:', error);
+      
+      // Check for the specific error about test/live mode mismatch
+      if (error.message && error.message.includes('similar object exists in live mode, but a test mode key was used')) {
+        // Special handling for test/live mode mismatch
+        try {
+          // Create a checkout session without the customer ID
+          // This will create a new customer in the current mode
+          const { url } = await createCheckoutSession({
+            priceId,
+            successUrl: `${window.location.origin}/dashboard?checkout=success`,
+            cancelUrl: `${window.location.origin}/subscription?checkout=canceled`,
+            // Don't pass userId to avoid using the mismatched customer
+          });
+          
+          if (url) {
+            window.location.href = url;
+            return;
+          }
+        } catch (retryError) {
+          console.error('Second attempt at creating checkout session failed:', retryError);
+          alert('Failed to create checkout session. Please try again later or contact support.');
+          return;
+        }
+      }
+      
+      // General error handling
       alert('Failed to create checkout session. Please try again.');
     }
   }
@@ -297,64 +335,76 @@ export default function SubscriptionPage() {
   // CSS styles for consistent appearance with Pricing.tsx
   const styles = `
     .badge {
-      display: inline-block;
-      padding: 0.25rem 0.75rem;
-      background: linear-gradient(90deg, rgba(198, 155, 123, 0.2) 0%, rgba(198, 155, 123, 0.1) 100%);
-      border: 1px solid rgba(198, 155, 123, 0.3);
+      display: inline-flex;
+      align-items: center;
+      padding: 0.5rem 1rem;
       border-radius: 9999px;
+      background-color: rgba(198, 155, 123, 0.1);
+      border: 1px solid rgba(198, 155, 123, 0.2);
       color: #C69B7B;
       font-size: 0.75rem;
-      font-weight: 500;
-      text-transform: uppercase;
+      font-weight: 600;
       letter-spacing: 0.05em;
+      text-transform: uppercase;
     }
     
     .pricing-card {
       background-color: #0f0f0f;
-      border-radius: 0.5rem;
-      padding: 1.5rem;
+      border-radius: 1rem;
+      padding: 2rem;
+      border: 1px solid #222222;
       display: flex;
       flex-direction: column;
-      height: 100%;
-      border: 1px solid #222;
       transition: all 0.3s ease;
+      height: 100%;
     }
     
     .pricing-card:hover {
-      border-color: #C69B7B;
-      transform: translateY(-5px);
-      box-shadow: 0 10px 25px -5px rgba(198, 155, 123, 0.1);
+      border-color: #333333;
+      transform: translateY(-4px);
+    }
+    
+    .pricing-card-featured {
+      background-color: #0f0f0f;
+      border-radius: 1rem;
+      padding: 2rem;
+      border: 2px solid #C69B7B;
+      display: flex;
+      flex-direction: column;
+      position: relative;
+      transition: all 0.3s ease;
+      height: 100%;
+      box-shadow: 0 10px 30px -15px rgba(198, 155, 123, 0.2);
     }
     
     .pricing-button {
-      display: block;
       width: 100%;
+      display: flex;
+      justify-content: center;
       padding: 0.75rem 1rem;
-      border-radius: 0.375rem;
-      font-weight: 500;
+      border-radius: 0.5rem;
+      font-weight: 600;
       transition: all 0.2s ease;
-      text-align: center;
-    }
-    
-    .button-primary {
-      background: linear-gradient(90deg, #C69B7B 0%, #B38A6A 100%);
-      color: #000;
-    }
-    
-    .button-primary:hover {
-      background: linear-gradient(90deg, #B38A6A 0%, #A37959 100%);
-      transform: translateY(-2px);
     }
     
     .button-outline {
-      background: transparent;
-      border: 1px solid #C69B7B;
       color: #C69B7B;
+      border: 1px solid #C69B7B;
     }
     
     .button-outline:hover {
-      background: rgba(198, 155, 123, 0.1);
-      transform: translateY(-2px);
+      background-color: #C69B7B;
+      color: #000000;
+    }
+    
+    .button-primary {
+      background-color: #C69B7B;
+      color: #000000;
+      box-shadow: 0 4px 14px rgba(198, 155, 123, 0.25);
+    }
+    
+    .button-primary:hover {
+      background-color: #B38A6A;
     }
   `;
 
@@ -369,7 +419,7 @@ export default function SubscriptionPage() {
 
         {isTestMode && <TestModeIndicator />}
         
-        <div className="text-center mb-12">
+        <div className="text-center mb-16">
           <div className="badge mx-auto mb-3">SUBSCRIPTION REQUIRED</div>
           <h2 className="text-3xl md:text-4xl font-bold mb-4">
             Choose Your <span className="text-[#C69B7B]">Plan</span>
@@ -379,7 +429,7 @@ export default function SubscriptionPage() {
           </p>
         </div>
 
-        <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8 max-w-6xl mx-auto">
+        <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8 max-w-5xl mx-auto">
           {/* Starter Plan */}
           <div className="pricing-card">
             <h3 className="text-xl font-semibold mb-2">Starter</h3>
@@ -404,11 +454,9 @@ export default function SubscriptionPage() {
           </div>
 
           {/* Creator Plan */}
-          <div className="pricing-card relative">
-            <div className="absolute -top-4 left-0 right-0 text-center">
-              <span className="bg-[#C69B7B] text-black text-xs font-bold px-3 py-1 rounded-full">
-                POPULAR
-              </span>
+          <div className="pricing-card-featured">
+            <div className="absolute top-0 right-0 bg-[#C69B7B] text-black text-xs font-bold px-3 py-1 rounded-bl-lg rounded-tr-lg">
+              MOST POPULAR
             </div>
             <h3 className="text-xl font-semibold mb-2">Creator</h3>
             <div className="text-[#C69B7B] text-4xl font-bold mb-2">{getFormattedPrice('Creator')}<span className="text-lg text-gray-400">/mo</span></div>
