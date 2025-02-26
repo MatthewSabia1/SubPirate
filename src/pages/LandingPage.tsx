@@ -30,10 +30,10 @@ import type { Stripe } from 'stripe';
 
 // Map of plan names to their corresponding product IDs
 const PRODUCT_ID_MAP = {
-  Starter: 'prod_RpekF2EAu1npzb',
-  Creator: 'prod_RpekhttqS8GKpE',
-  Pro: 'prod_RpekrPRCVGOqJM',
-  Agency: 'prod_Rpek1uw0yBJmLG'
+  Starter: 'prod_RpeI6jwcgu6H8w',
+  Creator: 'prod_RpeDP1ClkYl7nH',
+  Pro: 'prod_RpeErBzCSyArMr',
+  Agency: 'prod_RpeE3bsaw2nQ7N'
 };
 
 // Fallback feature lists for landing page if database features can't be loaded

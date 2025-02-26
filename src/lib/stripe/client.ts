@@ -18,9 +18,12 @@ const isDevelopmentHost = typeof window !== 'undefined' &&
 // Only use production mode on the actual production domain AND in a production build
 const isProduction = isProductionBuild && !isDevelopmentHost;
 
-// TEMPORARY OVERRIDE - REMOVE BEFORE DEPLOYMENT
-// Uncomment the line below to force production mode for testing
-// const isProduction = true;
+// IMPORTANT: Force production mode for subpirate.com domain
+// This ensures we always use production keys on the actual production site
+if (typeof window !== 'undefined' && window.location.hostname === 'subpirate.com') {
+  console.log('On production domain subpirate.com - forcing PRODUCTION mode');
+  const isProduction = true;
+}
 
 const useTestMode = !isProduction;
 

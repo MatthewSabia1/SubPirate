@@ -11,10 +11,10 @@ import { useAuth } from '../contexts/AuthContext';
 
 // Map of plan names to their corresponding product IDs - same as in LandingPage.tsx
 const PRODUCT_ID_MAP = {
-  Starter: 'prod_RpekF2EAu1npzb',
-  Creator: 'prod_RpekhttqS8GKpE',
-  Pro: 'prod_RpekrPRCVGOqJM',
-  Agency: 'prod_Rpek1uw0yBJmLG'
+  Starter: 'prod_RpeI6jwcgu6H8w',
+  Creator: 'prod_RpeDP1ClkYl7nH',
+  Pro: 'prod_RpeErBzCSyArMr',
+  Agency: 'prod_RpeE3bsaw2nQ7N'
 };
 
 // Fallback features for each plan - used if database features can't be loaded
@@ -223,10 +223,10 @@ export default function Pricing() {
 
   // Fallback price IDs if the real ones can't be found
   const priceFallbacks = {
-    Starter: 'price_1QvzQXCtsTY6FiiZniXOiFkM',
-    Creator: 'price_1QvzQlCtsTY6FiiZdZlSfPJc',
-    Pro: 'price_1QvzQyCtsTY6FiiZD1DOaPJi',
-    Agency: 'price_1QvzRBCtsTY6FiiZEtKt3SYA'
+    Starter: 'price_1Qvz1UCtsTY6FiiZTyGPNs1F',
+    Creator: 'price_1Qvz3GCtsTY6FiiZtiU2XiAq',
+    Pro: 'price_1Qvz2WCtsTY6FiiZ4uiEB7sk',
+    Agency: 'price_1Qvz27CtsTY6FiiZYbT6acEB'
   };
 
   // Function to get price for a specific product
