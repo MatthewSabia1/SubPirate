@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { FeatureAccessProvider } from './contexts/FeatureAccessContext';
@@ -19,10 +19,12 @@ import RedditAccounts from './pages/RedditAccounts';
 import RedditOAuthCallback from './pages/RedditOAuthCallback';
 import AuthCallback from './pages/AuthCallback';
 import Pricing from './pages/Pricing';
+import SubscriptionPage from './pages/SubscriptionPage';
 import LandingPage from './pages/LandingPage';
 import { Menu } from 'lucide-react';
 import { useRedirectHandler } from './lib/useRedirectHandler';
 import { ErrorBoundary } from 'react-error-boundary';
+import { supabase } from './lib/supabase';
 
 // Create a client
 const queryClient = new QueryClient({
@@ -41,6 +43,41 @@ function PrivateRoute({ children }: { children: React.ReactNode }) {
   const { refreshAccountStatus, isLoading: redditAccountsLoading } = useRedditAccounts();
   // Track if we've already checked the account status for this component instance
   const [hasCheckedAccounts, setHasCheckedAccounts] = useState(false);
+  const [subscriptionLoading, setSubscriptionLoading] = useState(true);
+  const [hasSubscription, setHasSubscription] = useState(false);
+  const navigate = useNavigate();
+  
+  // Check if user has a subscription
+  useEffect(() => {
+    async function checkSubscription() {
+      if (!user) return;
+      
+      try {
+        setSubscriptionLoading(true);
+        // Check if user has an active subscription
+        const { data, error } = await supabase
+          .from('subscriptions')
+          .select('*')
+          .eq('user_id', user.id)
+          .eq('status', 'active')
+          .single();
+
+        if (error && error.code !== 'PGRST116') {
+          console.error('Error checking subscription status:', error);
+        }
+
+        setHasSubscription(!!data);
+      } catch (error) {
+        console.error('Exception checking subscription:', error);
+      } finally {
+        setSubscriptionLoading(false);
+      }
+    }
+
+    if (user) {
+      checkSubscription();
+    }
+  }, [user]);
   
   // Use an effect to check for Reddit accounts when this component mounts, but only once
   useEffect(() => {
@@ -51,12 +88,24 @@ function PrivateRoute({ children }: { children: React.ReactNode }) {
     }
   }, [user, redditAccountsLoading, refreshAccountStatus, hasCheckedAccounts]);
 
-  if (loading) {
+  // If subscription check is complete and user doesn't have a subscription, redirect them
+  useEffect(() => {
+    if (user && !subscriptionLoading && !hasSubscription && window.location.pathname !== '/subscription') {
+      navigate('/subscription', { replace: true });
+    }
+  }, [user, subscriptionLoading, hasSubscription, navigate]);
+
+  if (loading || subscriptionLoading) {
     return <div>Loading...</div>;
   }
 
   if (!user) {
     return <Navigate to="/login" />;
+  }
+
+  // Allow the subscription page to be accessed even without a subscription
+  if (!hasSubscription && window.location.pathname !== '/subscription') {
+    return <Navigate to="/subscription" />;
   }
 
   return (
@@ -177,6 +226,11 @@ function App() {
                   <Route path="/accounts" element={
                     <PrivateRoute>
                       <RedditAccounts />
+                    </PrivateRoute>
+                  } />
+                  <Route path="/subscription" element={
+                    <PrivateRoute>
+                      <SubscriptionPage />
                     </PrivateRoute>
                   } />
                 </Routes>

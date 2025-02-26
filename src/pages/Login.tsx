@@ -36,9 +36,18 @@ function Login() {
         await signIn(email, password);
         navigate('/dashboard', { replace: true });
       } else {
-        await signUp(email, password);
-        setError('Account created successfully! You can now sign in.');
-        setIsLogin(true);
+        const result = await signUp(email, password);
+        if (result.user) {
+          // Redirect to subscription page for new users
+          navigate('/subscription', { 
+            replace: true,
+            state: { newUser: true, email: email }
+          });
+        } else {
+          // If user is null, it likely means confirmation email was sent
+          setError('Account created! Please check your email to confirm your account, then you can sign in.');
+          setIsLogin(true);
+        }
       }
     } catch (err) {
       console.error('Auth error:', err);

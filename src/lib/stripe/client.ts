@@ -320,6 +320,9 @@ export async function getProductFeatures(productId: string) {
       return [];
     }
     
+    // For debugging - log feature count and name
+    console.log(`Found ${productFeatures.length} features for product ${productId}`);
+    
     // Format the features for frontend display
     return productFeatures.map(feature => {
       // Access subscription feature data safely
@@ -331,7 +334,7 @@ export async function getProductFeatures(productId: string) {
       return {
         id: feature.id,
         key: feature.feature_key,
-        name: featureData?.name || 'Unknown Feature',
+        name: featureData?.name || feature.feature_key.replace(/_/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase()),
         description: featureData?.description || '',
         enabled: feature.enabled
       };

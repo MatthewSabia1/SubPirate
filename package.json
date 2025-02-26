@@ -17,7 +17,9 @@
     "webhook": "node webhook-server.js",
     "dev:webhook": "cross-env NODE_ENV=development STRIPE_TEST_MODE=true concurrently \"npm run dev\" \"npm run webhook\" \"stripe listen --forward-to http://localhost:4242/api/stripe/webhook\"",
     "stripe:test-env": "node scripts/test-stripe-environment.js",
-    "stripe:migrate": "node scripts/migrate-stripe-to-production.js"
+    "stripe:migrate": "node scripts/migrate-stripe-to-production.js",
+    "stripe:register-webhooks": "chmod +x scripts/register-product-price-webhooks.sh && ./scripts/register-product-price-webhooks.sh",
+    "stripe:migrate-products": "ts-node scripts/migrate-products-to-stripe.ts"
   },
   "dependencies": {
     "@clerk/backend": "^1.24.2",

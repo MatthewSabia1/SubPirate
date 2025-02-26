@@ -184,6 +184,12 @@ interface ProductFeature {
   enabled: boolean;
 }
 
+// Add a new interface for product data mapping
+interface ProductMapping {
+  id: string;
+  name: string;
+}
+
 // Create a TestModeIndicator component
 const TestModeIndicator = () => (
   <div className="bg-amber-900/20 border border-amber-800 text-amber-200 px-4 py-2 rounded-md text-sm mb-6 max-w-3xl mx-auto text-center">
@@ -200,6 +206,8 @@ const LandingPage = () => {
   const [pricingLoaded, setPricingLoaded] = React.useState(false);
   const [productFeatures, setProductFeatures] = React.useState<Record<string, ProductFeature[]>>({});
   const [isTestMode, setIsTestMode] = React.useState(false);
+  // Add a new state for product mappings
+  const [productNameToId, setProductNameToId] = React.useState<Record<string, string>>({});
 
   // Add the styles to the document head
   React.useEffect(() => {
@@ -225,14 +233,31 @@ const LandingPage = () => {
         setPrices(pricesData);
         
         // Check if we're in test mode
-        const testMode = pricesData.some(price => 
-          price.livemode === false
-        );
+        const testMode = 
+          window.location.hostname === 'localhost' || 
+          window.location.hostname.includes('staging') ||
+          pricesData.some(price => price.livemode === false);
+        
         setIsTestMode(testMode);
         
+        // Create a mapping of product names to IDs dynamically from the Stripe data
+        const productMapping: Record<string, string> = {};
+        productsData.forEach(product => {
+          // Use the name as a key (removing any non-alphanumeric characters)
+          const normalizedName = product.name?.replace(/[^a-zA-Z0-9]/g, '') || '';
+          productMapping[product.name || ''] = product.id;
+        });
+        
+        // Use this mapping or fall back to hardcoded values if no products found
+        const effectiveMapping = Object.keys(productMapping).length > 0 
+          ? productMapping 
+          : PRODUCT_ID_MAP;
+        
+        setProductNameToId(effectiveMapping);
+        
         // After setting products, fetch features for each product
-        const featuresPromises = Object.values(PRODUCT_ID_MAP).map(productId => 
-          getProductFeatures(productId).then(features => ({ productId, features }))
+        const featuresPromises = productsData.map(product => 
+          getProductFeatures(product.id).then(features => ({ productId: product.id, features }))
         );
         
         const featuresResults = await Promise.all(featuresPromises);
@@ -245,8 +270,8 @@ const LandingPage = () => {
         
         setProductFeatures(featuresMap);
         setPricingLoaded(true);
-      } catch (err) {
-        console.error('Failed to fetch pricing data:', err);
+      } catch (error) {
+        console.error('Error fetching pricing data:', error);
         // Still set pricing loaded to true to show fallback data
         setPricingLoaded(true);
       }
@@ -265,7 +290,9 @@ const LandingPage = () => {
 
   // Function to get a formatted price with fallback
   const getFormattedPrice = (planName: string): string => {
-    const productId = PRODUCT_ID_MAP[planName as keyof typeof PRODUCT_ID_MAP];
+    // Find the product with matching name from the actual products array
+    const product = products.find(p => p.name === planName);
+    const productId = product?.id || PRODUCT_ID_MAP[planName as keyof typeof PRODUCT_ID_MAP];
     
     if (!productId || !pricingLoaded) {
       // Fallback prices if Stripe data isn't loaded
@@ -288,19 +315,24 @@ const LandingPage = () => {
 
   // Function to get product description with fallback
   const getProductDescription = (planName: string): string => {
-    const productId = PRODUCT_ID_MAP[planName as keyof typeof PRODUCT_ID_MAP];
+    // Find the product with matching name
+    const product = products.find(p => p.name === planName);
+    const productId = product?.id;
+    
     if (!productId || !pricingLoaded) {
       return DEFAULT_DESCRIPTIONS[planName as keyof typeof DEFAULT_DESCRIPTIONS] || '';
     }
     
-    const product = products.find(p => p.id === productId);
     return product?.description || 
       DEFAULT_DESCRIPTIONS[planName as keyof typeof DEFAULT_DESCRIPTIONS] || '';
   };
 
   // Get features for a plan from the database or use fallbacks
   const getFeatures = (planName: string): string[] => {
-    const productId = PRODUCT_ID_MAP[planName as keyof typeof PRODUCT_ID_MAP];
+    // Find the product with matching name
+    const product = products.find(p => p.name === planName);
+    const productId = product?.id || PRODUCT_ID_MAP[planName as keyof typeof PRODUCT_ID_MAP];
+    
     const features = productFeatures[productId];
     
     if (!features || features.length === 0) {

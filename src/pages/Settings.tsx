@@ -17,6 +17,7 @@ function Settings() {
   const [passwordError, setPasswordError] = useState<string | null>(null);
   const [passwordSuccess, setPasswordSuccess] = useState<string | null>(null);
   const [isEmailProvider, setIsEmailProvider] = useState(false);
+  const [showSubscriptionWarning, setShowSubscriptionWarning] = useState(false);
 
   useEffect(() => {
     if (user) {
@@ -143,21 +144,32 @@ function Settings() {
   };
 
   const handleManageSubscription = async () => {
-    setPortalLoading(true);
     try {
-      if (!subscription) {
-        window.location.href = '/pricing';
+      setPortalLoading(true);
+      if (!user) {
+        throw new Error('User not authenticated');
+      }
+
+      // If the user is trying to cancel and already has a required subscription,
+      // show the warning modal instead of redirecting to the billing portal
+      if (subscription?.status === 'active' && !subscription?.cancel_at_period_end) {
+        setShowSubscriptionWarning(true);
+        setPortalLoading(false);
         return;
       }
 
-      const session = await createBillingPortalSession({
-        customerId: subscription.stripe_customer_id,
+      const { url } = await createBillingPortalSession({
+        customerId: subscription?.stripe_customer_id,
         returnUrl: window.location.href,
       });
-      
-      window.location.href = session.url;
+      if (url) {
+        window.location.href = url;
+      } else {
+        throw new Error('Failed to get billing portal URL');
+      }
     } catch (error) {
       console.error('Error opening billing portal:', error);
+      alert('Could not open billing portal. Please try again later.');
     } finally {
       setPortalLoading(false);
     }
@@ -166,6 +178,39 @@ function Settings() {
   return (
     <div className="max-w-3xl">
       <h1 className="text-4xl font-bold mb-8">Account Settings</h1>
+
+      {/* Subscription Warning Modal */}
+      {showSubscriptionWarning && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-[#1c1c1c] p-6 rounded-lg max-w-md w-full">
+            <h3 className="text-xl font-bold mb-4">Subscription Required</h3>
+            <p className="mb-6">
+              A subscription is required to use SubPirate. Canceling your subscription will limit your access to the application's features.
+            </p>
+            <div className="flex justify-end space-x-3">
+              <button 
+                className="secondary" 
+                onClick={() => setShowSubscriptionWarning(false)}
+              >
+                Keep My Subscription
+              </button>
+              <button 
+                className="danger" 
+                onClick={async () => {
+                  setShowSubscriptionWarning(false);
+                  const { url } = await createBillingPortalSession({
+                    customerId: subscription?.stripe_customer_id,
+                    returnUrl: window.location.href,
+                  });
+                  if (url) window.location.href = url;
+                }}
+              >
+                Continue to Billing Portal
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="space-y-6">
         {/* Subscription Section */}

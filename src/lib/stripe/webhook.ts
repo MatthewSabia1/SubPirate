@@ -99,14 +99,56 @@ async function handleInvoicePaymentFailed(invoice: any) {
   }
 }
 
+// New helper function to extract features from product metadata
+function extractFeaturesFromMetadata(metadata: Record<string, any>): Array<{key: string, enabled: boolean, limit?: number | null}> {
+  if (!metadata) return [];
+  
+  // First look for feature_* keys that indicate enabled features
+  const featureKeys = Object.keys(metadata)
+    .filter(key => key.startsWith('feature_'))
+    .map(key => ({
+      key: key.replace('feature_', ''),
+      enabled: metadata[key] === 'true' || metadata[key] === true,
+      limit: null as number | null
+    }));
+  
+  // Then look for feature_limit_* keys that indicate feature limits
+  Object.keys(metadata)
+    .filter(key => key.startsWith('feature_limit_'))
+    .forEach(key => {
+      const featureKey = key.replace('feature_limit_', '');
+      const limit = parseInt(metadata[key], 10);
+      
+      // Find if we already have this feature from the enabled flags
+      const existingFeature = featureKeys.find(f => f.key === featureKey);
+      if (existingFeature) {
+        existingFeature.limit = isNaN(limit) ? null : limit;
+      } else {
+        // If not found, add it as a new feature with default enabled=true
+        featureKeys.push({
+          key: featureKey,
+          enabled: true,
+          limit: isNaN(limit) ? null : limit
+        });
+      }
+    });
+  
+  return featureKeys;
+}
+
 // Helper function to sync product data
 async function syncProductData(product: any) {
   try {
+    console.log(`Syncing product data for product ${product.id}`);
+    
     const { data: existingProduct } = await supabase
       .from('stripe_products')
       .select('*')
       .eq('stripe_product_id', product.id)
       .single();
+
+    // Extract features from metadata
+    const featureKeys = extractFeaturesFromMetadata(product.metadata || {});
 
     if (existingProduct) {
       await supabase
@@ -116,6 +158,7 @@ async function syncProductData(product: any) {
           description: product.description,
           active: product.active,
           metadata: product.metadata,
+          updated_at: new Date().toISOString()
         })
         .eq('stripe_product_id', product.id);
     } else {
@@ -125,10 +168,108 @@ async function syncProductData(product: any) {
         description: product.description,
         active: product.active,
         metadata: product.metadata,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
       });
     }
+    
+    // Update product features if metadata contains feature information
+    if (featureKeys.length > 0) {
+      await syncProductFeatures(product.id, featureKeys);
+    } else {
+      console.log(`No features found in metadata for product ${product.id}`);
+    }
+    
+    console.log(`Successfully synced product ${product.id}`);
   } catch (error) {
     console.error('Error syncing product data:', error);
+    throw error;
+  }
+}
+
+// Update helper function to sync product features with limit support
+async function syncProductFeatures(
+  productId: string, 
+  features: Array<{key: string, enabled: boolean, limit?: number | null}>
+) {
+  try {
+    console.log(`Syncing features for product ${productId}: ${features.map(f => f.key).join(', ')}`);
+    
+    // Get existing features for this product
+    const { data: existingFeatures } = await supabase
+      .from('product_features')
+      .select('*')
+      .eq('stripe_product_id', productId);
+    
+    // Create a lookup map of existing features for quick access
+    const existingFeatureMap = new Map();
+    if (existingFeatures) {
+      existingFeatures.forEach(feature => {
+        existingFeatureMap.set(feature.feature_key, feature);
+      });
+    }
+    
+    // Process each feature from metadata
+    for (const feature of features) {
+      // Store limit in metadata if provided
+      const featureMetadata = feature.limit !== undefined && feature.limit !== null
+        ? { limit: feature.limit }
+        : null;
+        
+      if (existingFeatureMap.has(feature.key)) {
+        // Update existing feature
+        await supabase
+          .from('product_features')
+          .update({
+            enabled: feature.enabled,
+            metadata: featureMetadata
+          })
+          .eq('stripe_product_id', productId)
+          .eq('feature_key', feature.key);
+      } else {
+        // Check if the feature exists in the subscription_features table
+        const { data: featureExists } = await supabase
+          .from('subscription_features')
+          .select('feature_key')
+          .eq('feature_key', feature.key)
+          .single();
+        
+        // If the feature doesn't exist in the subscription_features table, create it
+        if (!featureExists) {
+          // Create a formatted name and description from the key
+          const featureName = feature.key
+            .replace(/_/g, ' ')
+            .replace(/\b\w/g, (l: string) => l.toUpperCase());
+          
+          await supabase
+            .from('subscription_features')
+            .insert({
+              feature_key: feature.key,
+              name: featureName,
+              description: feature.limit !== undefined && feature.limit !== null
+                ? `${featureName} (Limit: ${feature.limit})`
+                : featureName,
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString()
+            });
+        }
+        
+        // Create new product feature mapping
+        await supabase
+          .from('product_features')
+          .insert({
+            stripe_product_id: productId,
+            feature_key: feature.key,
+            enabled: feature.enabled,
+            metadata: featureMetadata,
+            created_at: new Date().toISOString()
+          });
+      }
+    }
+    
+    console.log(`Successfully synced features for product ${productId}`);
+  } catch (error) {
+    console.error('Error syncing product features:', error);
     throw error;
   }
 }
@@ -238,24 +379,37 @@ async function handleCheckoutSessionCompleted(session: any) {
       };
       
       if (existingSubscription) {
-        console.log(`Updating existing subscription for user ${userId}`);
+        console.log(`Updating existing subscription for customer ${customerId}`);
         // Update existing subscription
         await supabase
           .from('customer_subscriptions')
           .update(subscriptionData)
-          .eq('user_id', userId);
+          .eq('stripe_customer_id', customerId);
       } else {
-        console.log(`Creating new subscription for user ${userId}`);
+        console.log(`Creating new subscription for customer ${customerId}`);
+        
+        // Try to get customer info from Stripe
+        const stripeCustomer = await stripe.customers.retrieve(customerId) as any;
+        
+        // Extract user_id from metadata
+        const user_id = stripeCustomer.metadata?.user_id;
+        
+        if (!user_id) {
+          console.error(`No user_id found for customer ${customerId}`);
+          return;
+        }
+        
         // Create new subscription
-        await supabase
-          .from('customer_subscriptions')
-          .insert(subscriptionData);
+        await supabase.from('customer_subscriptions').insert({
+          ...subscriptionData,
+          user_id,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        });
       }
-      
-      console.log(`Subscription ${subscription.id} saved for user ${userId}`);
     }
   } catch (error) {
-    console.error('Error handling checkout session completion:', error);
+    console.error('Error handling checkout session completed:', error);
     throw error;
   }
 }
@@ -348,19 +502,28 @@ export async function handleWebhookEvent(
 
       case 'product.created':
       case 'product.updated':
+        console.log(`Processing ${stripeEvent.type} event`);
+        // Check if this is a metadata update
+        if (stripeEvent.data.previous_attributes && 
+            stripeEvent.data.previous_attributes.metadata) {
+          console.log('Detected metadata changes, syncing product features');
+        }
         await syncProductData(stripeEvent.data.object);
         break;
         
       case 'product.deleted':
+        console.log(`Processing ${stripeEvent.type} event`);
         await handleProductDeleted(stripeEvent.data.object);
         break;
 
       case 'price.created':
       case 'price.updated':
+        console.log(`Processing ${stripeEvent.type} event`);
         await syncPriceData(stripeEvent.data.object);
         break;
         
       case 'price.deleted':
+        console.log(`Processing ${stripeEvent.type} event`);
         await handlePriceDeleted(stripeEvent.data.object);
         break;
 
@@ -373,4 +536,4 @@ export async function handleWebhookEvent(
     console.error('❌ Error handling webhook:', error);
     throw error;
   }
-} 
+}
