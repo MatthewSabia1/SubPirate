@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { FeatureAccessProvider } from './contexts/FeatureAccessContext';
+import { RedditAccountProvider, useRedditAccounts } from './contexts/RedditAccountContext';
 import Sidebar from './components/Sidebar';
 import Dashboard from './pages/Dashboard';
 import Login from './pages/Login';
@@ -36,6 +37,19 @@ const queryClient = new QueryClient({
 function PrivateRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  // Force a refresh of account status when loading a private route
+  const { refreshAccountStatus, isLoading: redditAccountsLoading } = useRedditAccounts();
+  // Track if we've already checked the account status for this component instance
+  const [hasCheckedAccounts, setHasCheckedAccounts] = useState(false);
+  
+  // Use an effect to check for Reddit accounts when this component mounts, but only once
+  useEffect(() => {
+    if (user && !redditAccountsLoading && !hasCheckedAccounts) {
+      console.log('PrivateRoute: Initial Reddit account status check');
+      refreshAccountStatus();
+      setHasCheckedAccounts(true);
+    }
+  }, [user, redditAccountsLoading, refreshAccountStatus, hasCheckedAccounts]);
 
   if (loading) {
     return <div>Loading...</div>;
@@ -104,67 +118,69 @@ function App() {
         <FeatureAccessProvider>
           <QueryClientProvider client={queryClient}>
             <Router>
-              <Routes>
-                <Route path="/" element={<LandingPage />} />
-                <Route path="/login" element={<Login />} />
-                <Route path="/pricing" element={<Pricing />} />
-                <Route path="/auth/callback" element={<AuthCallback />} />
-                <Route path="/auth/reddit/callback" element={
-                  <PrivateRoute>
-                    <RedditOAuthCallback />
-                  </PrivateRoute>
-                } />
-                <Route path="/dashboard" element={
-                  <PrivateRoute>
-                    <Dashboard />
-                  </PrivateRoute>
-                } />
-                <Route path="/saved" element={
-                  <PrivateRoute>
-                    <SavedList />
-                  </PrivateRoute>
-                } />
-                <Route path="/settings" element={
-                  <PrivateRoute>
-                    <Settings />
-                  </PrivateRoute>
-                } />
-                <Route path="/analytics" element={
-                  <PrivateRoute>
-                    <Analytics />
-                  </PrivateRoute>
-                } />
-                <Route path="/analysis/:subreddit" element={
-                  <PrivateRoute>
-                    <SubredditAnalysis />
-                  </PrivateRoute>
-                } />
-                <Route path="/projects" element={
-                  <PrivateRoute>
-                    <Projects />
-                  </PrivateRoute>
-                } />
-                <Route path="/projects/:projectId" element={
-                  <PrivateRoute>
-                    <ProjectView />
-                  </PrivateRoute>
-                } />
-                <Route path="/calendar" element={
-                  <PrivateRoute>
-                    <Calendar />
-                  </PrivateRoute>
-                } />
-                <Route path="/spyglass" element={
-                  <PrivateRoute>
-                    <SpyGlass />
-                  </PrivateRoute>
-                } />
-                <Route path="/accounts" element={
-                  <PrivateRoute>
-                    <RedditAccounts />
-                  </PrivateRoute>
-                } />
-              </Routes>
+              <RedditAccountProvider>
+                <Routes>
+                  <Route path="/" element={<LandingPage />} />
+                  <Route path="/login" element={<Login />} />
+                  <Route path="/pricing" element={<Pricing />} />
+                  <Route path="/auth/callback" element={<AuthCallback />} />
+                  <Route path="/auth/reddit/callback" element={
+                    <PrivateRoute>
+                      <RedditOAuthCallback />
+                    </PrivateRoute>
+                  } />
+                  <Route path="/dashboard" element={
+                    <PrivateRoute>
+                      <Dashboard />
+                    </PrivateRoute>
+                  } />
+                  <Route path="/saved" element={
+                    <PrivateRoute>
+                      <SavedList />
+                    </PrivateRoute>
+                  } />
+                  <Route path="/settings" element={
+                    <PrivateRoute>
+                      <Settings />
+                    </PrivateRoute>
+                  } />
+                  <Route path="/analytics" element={
+                    <PrivateRoute>
+                      <Analytics />
+                    </PrivateRoute>
+                  } />
+                  <Route path="/analysis/:subreddit" element={
+                    <PrivateRoute>
+                      <SubredditAnalysis />
+                    </PrivateRoute>
+                  } />
+                  <Route path="/projects" element={
+                    <PrivateRoute>
+                      <Projects />
+                    </PrivateRoute>
+                  } />
+                  <Route path="/projects/:projectId" element={
+                    <PrivateRoute>
+                      <ProjectView />
+                    </PrivateRoute>
+                  } />
+                  <Route path="/calendar" element={
+                    <PrivateRoute>
+                      <Calendar />
+                    </PrivateRoute>
+                  } />
+                  <Route path="/spyglass" element={
+                    <PrivateRoute>
+                      <SpyGlass />
+                    </PrivateRoute>
+                  } />
+                  <Route path="/accounts" element={
+                    <PrivateRoute>
+                      <RedditAccounts />
+                    </PrivateRoute>
+                  } />
+                </Routes>
+              </RedditAccountProvider>
             </Router>
           </QueryClientProvider>
         </FeatureAccessProvider>

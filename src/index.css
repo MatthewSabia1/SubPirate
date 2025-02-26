@@ -112,6 +112,27 @@ select {
   animation: gradient 2s linear infinite;
 }
 
+/* Pulsing animation for attention-grabbing elements */
+@keyframes pulse-attention {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.05);
+    opacity: 0.9;
+  }
+}
+
+.pulse-attention {
+  animation: pulse-attention 2s ease-in-out infinite;
+}
+
+/* Background size for gradient animations */
+.bg-size-200 {
+  background-size: 200% 200%;
+}
+
 /* React DatePicker Customization */
 .react-datepicker {
   @apply bg-[#111111] border border-[#333333] rounded-lg !important;
