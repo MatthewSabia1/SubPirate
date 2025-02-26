@@ -17,10 +17,17 @@ const isDevelopmentHost = typeof window !== 'undefined' &&
 // Use test mode on localhost even in production builds
 // Only use production mode on the actual production domain AND in a production build
 const isProduction = isProductionBuild && !isDevelopmentHost;
+
+// TEMPORARY OVERRIDE - REMOVE BEFORE DEPLOYMENT
+// Uncomment the line below to force production mode for testing
+// const isProduction = true;
+
 const useTestMode = !isProduction;
 
 if (useTestMode) {
   console.log('Stripe client running in TEST MODE');
+  console.log(`Host: ${typeof window !== 'undefined' ? window.location.hostname : 'server'}`);
+  console.log(`Production build: ${isProductionBuild}`);
 } else {
   console.log('Stripe client running in PRODUCTION MODE');
 }
