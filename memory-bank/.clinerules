@@ -38,6 +38,17 @@
 
 ## User Experience Patterns
 
+### UI Component Restoration
+- When restoring missing UI components, maintain consistent styling with existing elements
+- Properly implement event handlers to prevent event propagation issues
+- Position restored components in the correct layout position
+- Ensure state management functions properly connect to existing modals/functionality
+- Verify that all required props and event handlers are properly passed down
+- Test interaction with other components to ensure proper integration
+- Use consistent naming conventions for handlers (e.g., handle* prefix for event handlers)
+- Add appropriate accessibility attributes like title for tooltips
+- Maintain consistent icon sizes across similar action buttons
+
 ### Error Handling
 - Use specific error types for better error handling
 - Include context in error messages for clarity

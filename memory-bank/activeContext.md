@@ -34,6 +34,13 @@
 - Implementing Google Authentication for enhanced login options
 
 ## Recent Changes
+- Restored the "Add to Project" button in the SavedList component:
+  - Added back the missing button that allows users to add subreddits to their projects
+  - Ensured proper integration with the existing AddToProjectModal component
+  - Maintained consistent UI styling with other action buttons
+  - Implemented proper event handling to prevent event propagation issues
+  - Fixed the functionality to set selectedSubreddit state when clicked
+  - Positioned the button in the actions section with proper spacing
 - Renamed `postingGuidelines` to `postingLimits` across the application for consistency
 - Updated OpenRouter API schema to match frontend data structure
 - Enhanced validation checks in AnalysisCard component

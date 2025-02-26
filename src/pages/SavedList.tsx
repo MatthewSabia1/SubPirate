@@ -447,6 +447,19 @@ function SavedList() {
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
+                          setSelectedSubreddit({
+                            id: saved.subreddit_id,
+                            name: saved.name,
+                          });
+                        }}
+                        className="p-2 hover:bg-[#222222] rounded-md transition-colors"
+                        title="Add to Project"
+                      >
+                        <FolderPlus className="w-4 h-4 text-gray-400" />
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
                           window.open(`https://reddit.com/r/${saved.name}`, '_blank');
                         }}
                         className="p-2 hover:bg-[#222222] rounded-md transition-colors"
