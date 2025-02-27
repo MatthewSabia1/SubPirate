@@ -67,14 +67,10 @@ export const RedditAccountProvider: React.FC<{ children: React.ReactNode }> = ({
         .select('*')
         .eq('user_id', user.id)
         .eq('status', 'active')
-        .single();
+        .maybeSingle();
 
       if (subscriptionError) {
-        if (subscriptionError.code === 'PGRST116') {
-          console.log('RedditAccountContext: No active subscription found in subscriptions table');
-        } else {
-          console.error('RedditAccountContext: Error checking subscriptions table:', subscriptionError);
-        }
+        console.error('RedditAccountContext: Error checking subscriptions table:', subscriptionError);
       }
       
       if (subscriptionData) {
@@ -89,41 +85,46 @@ export const RedditAccountProvider: React.FC<{ children: React.ReactNode }> = ({
           .select('*')
           .eq('user_id', user.id)
           .or('status.eq.active,status.eq.trialing')
-          .single();
+          .maybeSingle();
 
         if (customerSubscriptionError) {
-          if (customerSubscriptionError.code === 'PGRST116') {
-            console.log('RedditAccountContext: No subscription found with OR condition, trying individual queries');
+          console.error('RedditAccountContext: Error checking customer_subscriptions table:', customerSubscriptionError);
+          console.log('RedditAccountContext: No subscription found with OR condition, trying individual queries');
             
-            // Try active status
-            const { data: activeData, error: activeError } = await supabase
+          // Try active status
+          const { data: activeData, error: activeError } = await supabase
+            .from('customer_subscriptions')
+            .select('*')
+            .eq('user_id', user.id)
+            .eq('status', 'active')
+            .maybeSingle();
+              
+          if (activeError) {
+            console.error('RedditAccountContext: Error checking active subscriptions:', activeError);
+          }
+            
+          if (activeData) {
+            console.log('RedditAccountContext: Found active subscription in customer_subscriptions table');
+            customerSubscriptionData = activeData;
+            customerSubscriptionError = null;
+          } else {
+            // Try trialing status
+            const { data: trialingData, error: trialingError } = await supabase
               .from('customer_subscriptions')
               .select('*')
               .eq('user_id', user.id)
-              .eq('status', 'active')
-              .single();
-              
-            if (!activeError && activeData) {
-              console.log('RedditAccountContext: Found active subscription in customer_subscriptions table');
-              customerSubscriptionData = activeData;
-              customerSubscriptionError = null;
-            } else {
-              // Try trialing status
-              const { data: trialingData, error: trialingError } = await supabase
-                .from('customer_subscriptions')
-                .select('*')
-                .eq('user_id', user.id)
-                .eq('status', 'trialing')
-                .single();
+              .eq('status', 'trialing')
+              .maybeSingle();
                 
-              if (!trialingError && trialingData) {
-                console.log('RedditAccountContext: Found trialing subscription in customer_subscriptions table');
-                customerSubscriptionData = trialingData;
-                customerSubscriptionError = null;
-              }
+            if (trialingError) {
+              console.error('RedditAccountContext: Error checking trialing subscriptions:', trialingError);
             }
-          } else {
-            console.error('RedditAccountContext: Error checking customer_subscriptions table:', customerSubscriptionError);
+              
+            if (trialingData) {
+              console.log('RedditAccountContext: Found trialing subscription in customer_subscriptions table');
+              customerSubscriptionData = trialingData;
+              customerSubscriptionError = null;
+            }
           }
         }
         

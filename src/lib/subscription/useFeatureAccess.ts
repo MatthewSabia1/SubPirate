@@ -20,7 +20,7 @@ export function useFeatureAccess() {
             stripe_product_id
           )
         `)
-        .single()
+        .maybeSingle()
 
       if (subscriptionError || !subscription) {
         console.error('Error fetching subscription:', subscriptionError)
@@ -32,13 +32,23 @@ export function useFeatureAccess() {
         return false
       }
 
+      // Safely access the product ID, handle potential type issues
+      let stripeProductId: string
+      try {
+        // Handle potential type issues with the response structure
+        stripeProductId = (subscription.stripe_prices as any).stripe_product_id
+      } catch (err) {
+        console.error('Error accessing stripe_product_id:', err)
+        return false
+      }
+
       // Check if the feature is enabled for the product
       const { data: feature, error: featureError } = await supabase
         .from('product_features')
         .select('enabled')
-        .eq('stripe_product_id', subscription.stripe_prices.stripe_product_id)
+        .eq('stripe_product_id', stripeProductId)
         .eq('feature_key', featureKey)
-        .single()
+        .maybeSingle()
 
       if (featureError || !feature) {
         console.error('Error fetching feature access:', featureError)

@@ -19,14 +19,10 @@ async function checkUserSubscription(userId: string): Promise<boolean> {
       .select('*')
       .eq('user_id', userId)
       .eq('status', 'active')
-      .single();
+      .maybeSingle();
 
     if (subscriptionError) {
-      if (subscriptionError.code === 'PGRST116') {
-        console.log('AuthCallback: No active subscription found in subscriptions table');
-      } else {
-        console.error('AuthCallback: Error checking subscriptions table:', subscriptionError);
-      }
+      console.error('AuthCallback: Error checking subscriptions table:', subscriptionError);
     }
     
     // If we found an active subscription in the first table, return true
@@ -38,51 +34,38 @@ async function checkUserSubscription(userId: string): Promise<boolean> {
     // 2. Check if user has any active subscription in the customer_subscriptions table
     console.log('AuthCallback: Checking customer_subscriptions table...');
     
-    // First try with OR condition
-    let { data: customerSubscriptionData, error: customerSubscriptionError } = await supabase
+    // Try with individual queries to avoid OR condition that might be causing issues
+    // First try active status
+    const { data: activeData, error: activeError } = await supabase
       .from('customer_subscriptions')
       .select('*')
       .eq('user_id', userId)
-      .or('status.eq.active,status.eq.trialing')
-      .single();
-
-    if (customerSubscriptionError) {
-      if (customerSubscriptionError.code === 'PGRST116') {
-        console.log('AuthCallback: No subscription found with OR condition, trying individual queries');
-        
-        // Try active status
-        const { data: activeData, error: activeError } = await supabase
-          .from('customer_subscriptions')
-          .select('*')
-          .eq('user_id', userId)
-          .eq('status', 'active')
-          .single();
-          
-        if (!activeError && activeData) {
-          console.log('AuthCallback: Found active subscription in customer_subscriptions table:', activeData);
-          customerSubscriptionData = activeData;
-        } else {
-          // Try trialing status
-          const { data: trialingData, error: trialingError } = await supabase
-            .from('customer_subscriptions')
-            .select('*')
-            .eq('user_id', userId)
-            .eq('status', 'trialing')
-            .single();
-            
-          if (!trialingError && trialingData) {
-            console.log('AuthCallback: Found trialing subscription in customer_subscriptions table:', trialingData);
-            customerSubscriptionData = trialingData;
-          }
-        }
-      } else {
-        console.error('AuthCallback: Error checking customer_subscriptions table:', customerSubscriptionError);
-      }
+      .eq('status', 'active')
+      .maybeSingle();
+      
+    if (activeError) {
+      console.error('AuthCallback: Error checking active subscriptions:', activeError);
     }
     
-    // If we found an active subscription in the second table, return true
-    if (customerSubscriptionData) {
-      console.log('AuthCallback: Found subscription in customer_subscriptions table:', customerSubscriptionData);
+    if (activeData) {
+      console.log('AuthCallback: Found active subscription in customer_subscriptions table:', activeData);
+      return true;
+    }
+    
+    // Try trialing status
+    const { data: trialingData, error: trialingError } = await supabase
+      .from('customer_subscriptions')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('status', 'trialing')
+      .maybeSingle();
+      
+    if (trialingError) {
+      console.error('AuthCallback: Error checking trialing subscriptions:', trialingError);
+    }
+    
+    if (trialingData) {
+      console.log('AuthCallback: Found trialing subscription in customer_subscriptions table:', trialingData);
       return true;
     }
     
@@ -93,6 +76,57 @@ async function checkUserSubscription(userId: string): Promise<boolean> {
     console.error('AuthCallback: Exception checking subscription status:', error);
     // If there's an exception, default to letting them continue for better UX
     return true;
+  }
+}
+
+// Handle Stripe checkout success
+async function handleStripeCheckoutSuccess(userId: string): Promise<boolean> {
+  try {
+    console.log('AuthCallback: Processing Stripe checkout success for user', userId);
+    
+    // After Stripe checkout success, we'll make a direct check for the subscription
+    // but we may need to wait a moment for the webhook to process the subscription
+    let attempts = 0;
+    const maxAttempts = 3;
+    
+    while (attempts < maxAttempts) {
+      // Check both subscription tables directly
+      const { data: subscriptions, error: subscriptionsError } = await supabase
+        .from('subscriptions')
+        .select('*')
+        .eq('user_id', userId);
+        
+      if (!subscriptionsError && subscriptions && subscriptions.length > 0) {
+        console.log('AuthCallback: Found subscription after checkout:', subscriptions[0]);
+        return true;
+      }
+      
+      const { data: customerSubscriptions, error: customerSubscriptionsError } = await supabase
+        .from('customer_subscriptions')
+        .select('*')
+        .eq('user_id', userId);
+        
+      if (!customerSubscriptionsError && customerSubscriptions && customerSubscriptions.length > 0) {
+        console.log('AuthCallback: Found customer subscription after checkout:', customerSubscriptions[0]);
+        return true;
+      }
+      
+      console.log(`AuthCallback: No subscription found after checkout, attempt ${attempts + 1}/${maxAttempts}`);
+      attempts++;
+      
+      // Wait before trying again
+      if (attempts < maxAttempts) {
+        console.log('AuthCallback: Waiting before retrying subscription check...');
+        await new Promise(resolve => setTimeout(resolve, 2000));
+      }
+    }
+    
+    // If we've tried several times and still no subscription, force a page refresh
+    console.log('AuthCallback: Unable to detect subscription after checkout, forcing navigation to dashboard');
+    return true; // Return true to allow user to proceed to dashboard
+  } catch (error) {
+    console.error('AuthCallback: Error handling Stripe checkout success:', error);
+    return true; // In case of error, let the user proceed
   }
 }
 
@@ -111,6 +145,22 @@ export default function AuthCallback() {
           setError('Failed to authenticate after multiple attempts. Please try logging in again.');
           setLoading(false);
           return;
+        }
+
+        // Check if this is a Stripe checkout success callback
+        const searchParams = new URLSearchParams(window.location.search);
+        const isCheckoutSuccess = searchParams.get('checkout') === 'success';
+        
+        if (isCheckoutSuccess && user) {
+          console.log('AuthCallback: Processing Stripe checkout success callback');
+          const hasSubscription = await handleStripeCheckoutSuccess(user.id);
+          
+          if (hasSubscription) {
+            console.log('AuthCallback: Checkout success processed, redirecting to dashboard');
+            setLoading(false);
+            navigate('/dashboard', { replace: true });
+            return;
+          }
         }
 
         // If we already have a user, check their subscription status

@@ -83,7 +83,7 @@ export async function hasActiveSubscription(userId: string): Promise<boolean> {
       .select('status')
       .eq('user_id', userId)
       .eq('status', 'active')
-      .single();
+      .maybeSingle();
 
     if (error) {
       console.error('Error checking subscription status:', error.message);
@@ -130,7 +130,7 @@ export async function getUserSubscription(userId: string): Promise<SubscriptionD
       .eq('user_id', userId)
       .order('created_at', { ascending: false })
       .limit(1)
-      .single();
+      .maybeSingle();
 
     if (error || !data) {
       console.log(`No subscription found for user ${userId}`);
@@ -270,7 +270,7 @@ export async function getSubscriptionByCustomerId(customerId: string) {
       .from('customer_subscriptions')
       .select('*')
       .eq('stripe_customer_id', customerId)
-      .single();
+      .maybeSingle();
 
     if (error) {
       console.error('Error fetching subscription by customer ID:', error);
@@ -290,7 +290,7 @@ export async function getSubscriptionBySubscriptionId(subscriptionId: string) {
       .from('customer_subscriptions')
       .select('*')
       .eq('stripe_subscription_id', subscriptionId)
-      .single();
+      .maybeSingle();
 
     if (error) {
       console.error('Error fetching subscription by subscription ID:', error);
