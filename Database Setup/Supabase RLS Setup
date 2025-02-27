@@ -1,0 +1,20 @@
+CREATE POLICY "Authenticated users can create subreddits" ON subreddits FOR INSERT TO authenticated USING ( true ) WITH CHECK ( true );
+CREATE POLICY "Authenticated users can update subreddits" ON subreddits FOR UPDATE TO authenticated USING ( true ) WITH CHECK ( true );
+CREATE POLICY "Authenticated users can view subreddits" ON subreddits FOR SELECT TO authenticated USING ( true );
+
+CREATE POLICY "Users can create projects" ON projects FOR INSERT TO authenticated USING ( (select auth.uid()) = user_id ) WITH CHECK ( (select auth.uid()) = user_id );
+CREATE POLICY "Users can create reddit accounts" ON reddit_accounts FOR INSERT TO authenticated USING ( (user_id = auth.uid()) ) WITH CHECK ( (user_id = auth.uid()) );
+CREATE POLICY "Users can create reddit posts" ON reddit_posts FOR INSERT TO authenticated USING ( (EXISTS ( SELECT 1 FROM reddit_accounts WHERE ((reddit_accounts.id = reddit_posts.reddit_account_id) AND (reddit_accounts.user_id = auth.uid())))) ) ) WITH CHECK ( (EXISTS ( SELECT 1 FROM reddit_accounts WHERE ((reddit_accounts.id = reddit_posts.reddit_account_id) AND (reddit_accounts.user_id = auth.uid())))) );
+CREATE POLICY "Users can create subreddit posts" ON subreddit_posts FOR INSERT TO authenticated USING ( (EXISTS ( SELECT 1 FROM reddit_accounts WHERE ((reddit_accounts.id = subreddit_posts.reddit_account_id) AND (reddit_accounts.user_id = auth.uid())))) ) ) WITH CHECK ( (EXISTS ( SELECT 1 FROM reddit_accounts WHERE ((reddit_accounts.id = subreddit_posts.reddit_account_id) AND (reddit_accounts.user_id = auth.uid())))) );
+
+CREATE POLICY "Users can delete own projects" ON projects FOR DELETE TO authenticated USING ( (auth.uid() = user_id) ) WITH CHECK ( (auth.uid() = user_id) );
+CREATE POLICY "Users can delete own reddit accounts" ON reddit_accounts FOR DELETE TO authenticated USING ( (user_id = auth.uid()) ) WITH CHECK ( (user_id = auth.uid()) );
+CREATE POLICY "Users can delete own reddit posts" ON reddit_posts FOR DELETE TO authenticated USING ( (EXISTS ( SELECT 1 FROM reddit_accounts WHERE ((reddit_accounts.id = reddit_posts.reddit_account_id) AND (reddit_accounts.user_id = auth.uid())))) ) ) WITH CHECK ( (EXISTS ( SELECT 1 FROM reddit_accounts WHERE ((reddit_accounts.id = reddit_posts.reddit_account_id) AND (reddit_accounts.user_id = auth.uid())))) );
+CREATE POLICY "Users can remove saved subreddits" ON saved_subreddits FOR DELETE TO authenticated USING ( (user_id = auth.uid()) ) WITH CHECK ( (user_id = auth.uid()) );
+
+CREATE POLICY "Users can save subreddits" ON saved_subreddits FOR INSERT TO authenticated USING ( (user_id = auth.uid()) ) WITH CHECK ( (user_id = auth.uid()) );
+
+CREATE POLICY "Users can update own profile" ON profiles FOR UPDATE TO authenticated USING ( (auth.uid() = id) ) WITH CHECK ( (auth.uid() = id) );
+CREATE POLICY "Users can update own projects" ON projects FOR UPDATE TO authenticated USING ( (auth.uid() = user_id) ) WITH CHECK ( (auth.uid() = user_id) );
+CREATE POLICY "Users can update own reddit accounts" ON reddit_accounts FOR UPDATE TO authenticated USING ( (user_id = auth.uid()) ) WITH CHECK ( (user_id = auth.uid()) );
+CREATE POLICY "Users can update own reddit posts" ON reddit_posts FOR UPDATE TO authenticated USING ( (EXISTS ( SELECT

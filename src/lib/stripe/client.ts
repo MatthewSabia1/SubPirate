@@ -20,12 +20,12 @@ const isProduction = isProductionBuild && !isDevelopmentHost;
 
 // IMPORTANT: Force production mode for subpirate.com domain
 // This ensures we always use production keys on the actual production site
+let useTestMode = !isProduction;
+
 if (typeof window !== 'undefined' && window.location.hostname === 'subpirate.com') {
   console.log('On production domain subpirate.com - forcing PRODUCTION mode');
-  const isProduction = true;
+  useTestMode = false;
 }
-
-const useTestMode = !isProduction;
 
 if (useTestMode) {
   console.log('Stripe client running in TEST MODE');
@@ -37,18 +37,85 @@ if (useTestMode) {
 
 // Use the appropriate API key based on the environment
 const stripeSecretKey = useTestMode 
-  ? import.meta.env.VITE_STRIPE_TEST_SECRET_KEY || import.meta.env.VITE_STRIPE_SECRET_KEY || ''
+  ? import.meta.env.VITE_STRIPE_TEST_SECRET_KEY || ''
   : import.meta.env.VITE_STRIPE_SECRET_KEY || '';
 
-export const stripe = new Stripe(stripeSecretKey, {
-  apiVersion: '2025-02-24.acacia',
-  typescript: true,
-  telemetry: false,
-  maxNetworkRetries: 2,
-});
+if (!stripeSecretKey) {
+  console.error('No Stripe secret key found! Check your environment variables.');
+}
 
-// Display which key we're using (partial for security)
-console.log(`Using Stripe key: ${stripeSecretKey ? stripeSecretKey.substring(0, 8) + '...' : 'No key found!'}`);
+// Enhanced debugging function that checks test mode consistency
+export function checkStripeModeConsistency() {
+  try {
+    // Print the current environment information
+    console.log('=== STRIPE ENVIRONMENT CHECK ===');
+    console.log(`isProductionBuild: ${isProductionBuild}`);
+    console.log(`isDevelopmentHost: ${isDevelopmentHost}`);
+    console.log(`isProduction: ${isProduction}`);
+    console.log(`useTestMode: ${useTestMode}`);
+    
+    // Log the Stripe API key prefix (first 3 characters)
+    // This lets us determine if it's a test key (starts with 'sk_test_') 
+    // or a live key (starts with 'sk_live_') without exposing the full key
+    const keyPrefix = stripeSecretKey.substring(0, 8);
+    console.log(`Stripe Key Prefix: ${keyPrefix}`);
+    
+    // Detect mode mismatch
+    const isTestKey = keyPrefix.startsWith('sk_test_');
+    const isLiveKey = keyPrefix.startsWith('sk_live_');
+    
+    if (isTestKey && !useTestMode) {
+      console.warn('⚠️ MODE MISMATCH: Using a test key in production mode!');
+    }
+    
+    if (isLiveKey && useTestMode) {
+      console.warn('⚠️ MODE MISMATCH: Using a live key in test mode!');
+    }
+    
+    console.log('================================');
+    
+    return {
+      isTestKey,
+      isLiveKey,
+      useTestMode,
+      isProduction,
+      hasMismatch: (isTestKey && !useTestMode) || (isLiveKey && useTestMode)
+    };
+  } catch (error) {
+    console.error('Error checking Stripe mode consistency:', error);
+    return { hasMismatch: false };
+  }
+}
+
+// Call this on initialization to log environment details
+checkStripeModeConsistency();
+
+// Initialize Stripe with retry logic on error
+function initializeStripe() {
+  try {
+    return new Stripe(stripeSecretKey, {
+      apiVersion: '2025-02-24.acacia',
+      typescript: true,
+      telemetry: false,
+      maxNetworkRetries: 2,
+    });
+  } catch (error) {
+    console.error('Failed to initialize Stripe client:', error);
+    console.error('This might be due to an invalid API key or connectivity issue.');
+    // Return a minimal implementation that will throw errors on calls
+    return {
+      checkout: { sessions: { create: () => { throw new Error('Stripe not properly initialized'); } } },
+      customers: { create: () => { throw new Error('Stripe not properly initialized'); } },
+      prices: { list: () => { throw new Error('Stripe not properly initialized'); } },
+      products: { list: () => { throw new Error('Stripe not properly initialized'); } }
+    } as any;
+  }
+}
+
+export const stripe = initializeStripe();
+
+// Log a masked version of the key being used
+console.log(`Using Stripe key: ${stripeSecretKey.substring(0, 7)}...${stripeSecretKey.substring(stripeSecretKey.length - 4)}`);
 console.log(`Running on domain: ${typeof window !== 'undefined' ? window.location.hostname : 'server'}`);
 
 // Helper type for Stripe Product with expanded price data
@@ -277,6 +344,18 @@ export async function createCheckoutSession({ priceId, successUrl, cancelUrl, us
     console.log('Creating Stripe checkout session with parameters:', JSON.stringify(sessionParams, null, 2));
     console.log('Using price ID:', priceId);
     
+    try {
+      // Validate price exists before creating checkout session
+      const price = await stripe.prices.retrieve(priceId);
+      if (!price || !price.active) {
+        throw new Error(`Price ${priceId} is not active or does not exist`);
+      }
+      console.log(`Verified price ${priceId} exists and is active`);
+    } catch (priceError: any) {
+      console.error('Error validating price:', priceError.message);
+      throw new Error(`Invalid price ID: ${priceError.message}`);
+    }
+    
     const session = await stripe.checkout.sessions.create(sessionParams);
     
     if (!session.url) {
@@ -295,9 +374,15 @@ export async function createCheckoutSession({ priceId, successUrl, cancelUrl, us
       console.error('Stripe error param:', error.param);
     }
     
+    // Test for the most common errors
+    if (error.message && error.message.includes('test mode') && error.message.includes('live mode')) {
+      console.error('Test/Live mode mismatch detected');
+      throw new Error('Test/Live mode mismatch: You are using a test API key with live mode price IDs or vice versa.');
+    }
+    
     // If error is related to tax ID collection, try without it
-    if (error.message && error.message.includes('tax_id_collection') || 
-        error.message && error.message.includes('Tax ID collection')) {
+    if (error.message && (error.message.includes('tax_id_collection') || 
+        error.message.includes('Tax ID collection'))) {
       console.log('Retrying checkout session creation without tax ID collection...');
       
       // Remove tax ID collection and try again

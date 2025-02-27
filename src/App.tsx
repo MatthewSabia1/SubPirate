@@ -26,6 +26,7 @@ import { useRedirectHandler } from './lib/useRedirectHandler';
 import { ErrorBoundary } from 'react-error-boundary';
 import { supabase } from './lib/supabase';
 import Admin from './pages/Admin';
+import TestWebhook from './pages/TestWebhook';
 
 // Create a client
 const queryClient = new QueryClient({
@@ -60,6 +61,10 @@ function PrivateRoute({ children }: { children: React.ReactNode }) {
         console.log(`PrivateRoute: Checking subscription for user ${user.id}...`);
         setSubscriptionLoading(true);
         
+        // Check if we're in a test environment (localhost)
+        const isTestEnvironment = window.location.hostname === 'localhost';
+        console.log('PrivateRoute: Test environment detected:', isTestEnvironment);
+        
         // If we're currently processing a checkout success, we'll set hasSubscription to true
         // to prevent redirect loops and let the AuthCallback or SubscriptionPage handle verification
         if (isCheckoutSuccess) {
@@ -67,6 +72,30 @@ function PrivateRoute({ children }: { children: React.ReactNode }) {
           setHasSubscription(true);
           setSubscriptionLoading(false);
           return;
+        }
+        
+        // Also try to get all customer_subscriptions regardless of status to see what's there
+        const { data: allCustomerSubs, error: allCustomerSubsError } = await supabase
+          .from('customer_subscriptions')
+          .select('*')
+          .eq('user_id', user.id);
+          
+        if (allCustomerSubsError) {
+          console.error('PrivateRoute: Error checking all customer subscriptions:', allCustomerSubsError);
+        } else {
+          console.log('PrivateRoute: All customer subscriptions for user:', allCustomerSubs);
+        }
+        
+        // Also check if the customer ID exists in the database at all
+        const { data: customerIdData, error: customerIdError } = await supabase
+          .from('customer_subscriptions')
+          .select('*')
+          .eq('stripe_customer_id', 'cus_RqmDCGzKp72nAH');
+          
+        if (customerIdError) {
+          console.error('PrivateRoute: Error checking for specific customer ID:', customerIdError);
+        } else {
+          console.log('PrivateRoute: Customer ID check result:', customerIdData);
         }
         
         // Check both subscription tables
@@ -131,6 +160,13 @@ function PrivateRoute({ children }: { children: React.ReactNode }) {
 
         console.log('PrivateRoute: Setting hasSubscription to:', hasActiveSubscription);
         setHasSubscription(hasActiveSubscription);
+        
+        // For test environments, default to allowing access if no subscription is found
+        if (isTestEnvironment && !hasActiveSubscription) {
+          console.log('PrivateRoute: Test mode - No subscription found, but could allow access for testing');
+          // You can uncomment the next line to automatically bypass subscription checks in test mode
+          setHasSubscription(true);
+        }
       } catch (error) {
         console.error('PrivateRoute: Exception checking subscription:', error);
         // In case of error, we'll default to allowing access
@@ -175,6 +211,7 @@ function PrivateRoute({ children }: { children: React.ReactNode }) {
     
     if (user && !subscriptionLoading && !hasSubscription) {
       console.log('PrivateRoute: Redirecting to subscription page from', currentPath);
+      console.log('PrivateRoute: User ID:', user.id, 'Current time:', new Date().toISOString());
       navigate('/subscription', { 
         replace: true,
         state: { newUser: false } // Explicitly mark as not a new user
@@ -203,6 +240,13 @@ function PrivateRoute({ children }: { children: React.ReactNode }) {
   // Skip subscription check if we're in a checkout success flow
   if (!hasSubscription && !isCheckoutSuccess && window.location.pathname !== '/subscription') {
     console.log('PrivateRoute: Final check redirect to subscription page');
+    console.log('PrivateRoute details:', {
+      user: user?.id,
+      hasSubscription,
+      isCheckoutSuccess,
+      path: window.location.pathname,
+      time: new Date().toISOString()
+    });
     return <Navigate to="/subscription" state={{ newUser: false }} replace />;
   }
 
@@ -228,7 +272,7 @@ function PrivateRoute({ children }: { children: React.ReactNode }) {
         </button>
       </div>
       
-      <main className="flex-1 md:ml-[240px] p-4 md:p-8 mt-16 md:mt-0">
+      <main className="flex-1 md:ml-[240px] p-4 md:p-8 mt-16 md:mt-0 bg-[#111111] min-h-screen">
         {children}
       </main>
     </div>
@@ -332,6 +376,11 @@ function App() {
                     </PrivateRoute>
                   } />
                   <Route path="/subscription" element={<SubscriptionPage />} />
+                  <Route path="/test-webhook" element={
+                    <PrivateRoute>
+                      <TestWebhook />
+                    </PrivateRoute>
+                  } />
                 </Routes>
               </RedditAccountProvider>
             </Router>

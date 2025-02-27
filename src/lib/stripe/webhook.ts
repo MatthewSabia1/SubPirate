@@ -9,64 +9,131 @@ const supabase = createClient<Database>(
 );
 
 // Helper function to update subscription status in database
-async function updateSubscriptionStatus(subscription: any) {
-  const { id: stripe_subscription_id, status, customer: stripe_customer_id } = subscription;
-  
+export async function updateSubscriptionStatus(subscription: Stripe.Subscription): Promise<void> {
   try {
-    console.log(`Processing subscription update: ${stripe_subscription_id} for customer ${stripe_customer_id}`);
+    const customer = subscription.customer as string;
     
-    // Get subscription data from database
-    const { data: existingSubscription } = await supabase
-      .from('customer_subscriptions')
-      .select('*')
-      .eq('stripe_customer_id', stripe_customer_id)
-      .single();
+    if (!customer) {
+      console.error('No customer ID found in subscription data', JSON.stringify(subscription));
+      return;
+    }
+    
+    console.log(`Updating subscription status for customer: ${customer}`);
+    console.log(`Subscription data:`, JSON.stringify({
+      id: subscription.id,
+      status: subscription.status,
+      current_period_end: subscription.current_period_end,
+      cancel_at_period_end: subscription.cancel_at_period_end
+    }, null, 2));
+
+    // Attempt to get customer details to find user_id
+    let userId: string | undefined;
+    
+    try {
+      const stripeCustomer = await stripe.customers.retrieve(customer);
+      if ('metadata' in stripeCustomer && stripeCustomer.metadata?.user_id) {
+        userId = stripeCustomer.metadata.user_id;
+        console.log(`Found user_id in customer metadata: ${userId}`);
+      } else {
+        console.log('No user_id found in customer metadata');
+      }
+    } catch (customerErr) {
+      console.error(`Error retrieving customer ${customer}:`, customerErr);
+    }
+
+    // Find existing subscription in our database
+    let existingSubscription;
+    
+    try {
+      // First try to find by stripe_subscription_id
+      const { data: subData, error: subError } = await supabase
+        .from('customer_subscriptions')
+        .select('*')
+        .eq('stripe_subscription_id', subscription.id)
+        .maybeSingle();
+      
+      if (!subError && subData) {
+        existingSubscription = subData;
+        console.log(`Found existing subscription by ID: ${subscription.id}`);
+        
+        // Use user_id from existing subscription if we couldn't get it from customer metadata
+        if (!userId && existingSubscription.user_id) {
+          userId = existingSubscription.user_id;
+          console.log(`Using user_id from existing subscription: ${userId}`);
+        }
+      } else if (!userId) {
+        // If we still don't have a user_id, try to find by customer ID
+        const { data: customerSubData, error: customerSubError } = await supabase
+          .from('customer_subscriptions')
+          .select('*')
+          .eq('stripe_customer_id', customer)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        
+        if (!customerSubError && customerSubData) {
+          existingSubscription = customerSubData;
+          console.log(`Found existing subscription by customer ID: ${customer}`);
+          
+          if (customerSubData.user_id) {
+            userId = customerSubData.user_id;
+            console.log(`Using user_id from customer's subscription: ${userId}`);
+          }
+        }
+      }
+    } catch (findErr) {
+      console.error('Error finding existing subscription:', findErr);
+    }
+
+    if (!userId) {
+      console.error('Unable to determine user_id for subscription', subscription.id);
+      return;
+    }
 
     // Prepare subscription data
     const subscriptionData = {
-      stripe_subscription_id,
-      stripe_customer_id,
-      status,
-      current_period_start: new Date(subscription.current_period_start * 1000),
-      current_period_end: new Date(subscription.current_period_end * 1000),
+      stripe_subscription_id: subscription.id,
+      stripe_customer_id: customer,
+      user_id: userId,
+      status: subscription.status, // This will include 'trialing' status
+      stripe_price_id: subscription.items.data[0]?.price.id,
+      quantity: subscription.items.data[0]?.quantity || 1,
       cancel_at_period_end: subscription.cancel_at_period_end,
-      trial_start: subscription.trial_start ? new Date(subscription.trial_start * 1000) : null,
-      trial_end: subscription.trial_end ? new Date(subscription.trial_end * 1000) : null,
-      canceled_at: subscription.canceled_at ? new Date(subscription.canceled_at * 1000) : null,
+      cancel_at: subscription.cancel_at ? new Date(subscription.cancel_at * 1000).toISOString() : null,
+      canceled_at: subscription.canceled_at ? new Date(subscription.canceled_at * 1000).toISOString() : null,
+      current_period_start: new Date(subscription.current_period_start * 1000).toISOString(),
+      current_period_end: new Date(subscription.current_period_end * 1000).toISOString(),
+      created_at: new Date(subscription.created * 1000).toISOString(),
+      ended_at: subscription.ended_at ? new Date(subscription.ended_at * 1000).toISOString() : null,
+      trial_start: subscription.trial_start ? new Date(subscription.trial_start * 1000).toISOString() : null,
+      trial_end: subscription.trial_end ? new Date(subscription.trial_end * 1000).toISOString() : null
     };
 
+    // Update existing or create new subscription record
     if (existingSubscription) {
-      console.log(`Updating existing subscription for customer ${stripe_customer_id}`);
-      // Update existing subscription
-      await supabase
+      const { error: updateError } = await supabase
         .from('customer_subscriptions')
         .update(subscriptionData)
-        .eq('stripe_customer_id', stripe_customer_id);
-    } else {
-      console.log(`Creating new subscription for customer ${stripe_customer_id}`);
-      
-      // Try to get customer info from Stripe
-      const stripeCustomer = await stripe.customers.retrieve(stripe_customer_id) as any;
-      
-      // Extract user_id from metadata
-      const user_id = stripeCustomer.metadata?.user_id;
-      
-      if (!user_id) {
-        console.error(`No user_id found for customer ${stripe_customer_id}`);
-        return;
+        .eq('id', existingSubscription.id);
+
+      if (updateError) {
+        console.error('Error updating subscription:', updateError);
+      } else {
+        console.log(`Updated subscription for user ${userId}`);
       }
-      
-      // Create new subscription
-      await supabase.from('customer_subscriptions').insert({
-        ...subscriptionData,
-        user_id,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      });
+    } else {
+      const { error: insertError } = await supabase
+        .from('customer_subscriptions')
+        .insert([subscriptionData]);
+
+      if (insertError) {
+        console.error('Error creating subscription:', insertError);
+      } else {
+        console.log(`Created new subscription for user ${userId}`);
+      }
     }
   } catch (error) {
-    console.error('Error updating subscription status:', error);
-    throw error;
+    console.error('Error in updateSubscriptionStatus:', error);
   }
 }
 
@@ -283,30 +350,27 @@ async function syncPriceData(price: any) {
       .eq('id', price.id)
       .single();
 
+    // Make sure we have the stripe_product_id field set correctly
+    const productParams = {
+      id: price.id,
+      currency: price.currency,
+      unit_amount: price.unit_amount,
+      recurring_interval: price.recurring?.interval,
+      type: price.type,
+      active: price.active,
+      stripe_product_id: price.product, // Use consistent field name
+      updated_at: new Date().toISOString(),
+    };
+
     if (existingPrice) {
       await supabase
         .from('stripe_prices')
-        .update({
-          currency: price.currency,
-          unit_amount: price.unit_amount,
-          recurring_interval: price.recurring?.interval,
-          type: price.type,
-          active: price.active,
-          product_id: price.product,
-          updated_at: new Date().toISOString(),
-        })
+        .update(productParams)
         .eq('id', price.id);
     } else {
       await supabase.from('stripe_prices').insert({
-        id: price.id,
-        product_id: price.product,
-        currency: price.currency,
-        unit_amount: price.unit_amount,
-        recurring_interval: price.recurring?.interval,
-        type: price.type,
-        active: price.active,
+        ...productParams,
         created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
       });
     }
   } catch (error) {
@@ -319,10 +383,20 @@ async function syncPriceData(price: any) {
 async function handleCheckoutSessionCompleted(session: any) {
   try {
     console.log('Processing checkout.session.completed event', session.id);
+    console.log('Session metadata:', JSON.stringify(session.metadata || {}, null, 2));
+    console.log('Client reference ID:', session.client_reference_id);
     
     if (session.subscription) {
       // Get subscription details
       const subscription = await stripe.subscriptions.retrieve(session.subscription);
+      
+      console.log('DEBUG - Checkout session completed webhook data:');
+      console.log('Subscription details:', JSON.stringify(subscription, null, 2));
+      console.log('Subscription metadata:', JSON.stringify(subscription.metadata || {}, null, 2));
+      console.log('Subscription status:', subscription.status);
+      console.log('Subscription cancel_at_period_end:', subscription.cancel_at_period_end);
+      console.log('Subscription cancel_at:', subscription.cancel_at);
+      console.log('Subscription canceled_at:', subscription.canceled_at);
       
       // Get price details
       const priceId = subscription.items.data[0].price.id;
@@ -332,20 +406,47 @@ async function handleCheckoutSessionCompleted(session: any) {
       const customerId = session.customer;
       const customer = await stripe.customers.retrieve(customerId) as any;
       
-      const userId = customer.metadata?.user_id;
+      console.log('Customer details:', JSON.stringify({
+        id: customer.id,
+        email: customer.email,
+        metadata: customer.metadata || {}
+      }, null, 2));
+      
+      // First try to get user_id from customer metadata (most reliable)
+      let userId = customer.metadata?.user_id;
+      
+      // If not found, try session metadata
+      if (!userId && session.metadata?.user_id) {
+        userId = session.metadata.user_id;
+        console.log(`Found user_id ${userId} in session metadata`);
+      }
+      
+      // If still not found, try client_reference_id
+      if (!userId && session.client_reference_id) {
+        userId = session.client_reference_id;
+        console.log(`Using client_reference_id ${userId} as user_id`);
+      }
       
       if (!userId) {
-        console.error(`No user_id found in customer metadata for ${customerId}`);
+        console.error(`No user_id found for customer ${customerId}`);
         return;
       }
 
-      console.log(`Found user_id ${userId} for customer ${customerId}`);
+      console.log(`Using user_id ${userId} for customer ${customerId}`);
       
       // Check if subscription record already exists
       const { data: existingSubscription } = await supabase
         .from('customer_subscriptions')
         .select('*')
         .eq('user_id', userId)
+        .order('created_at', { ascending: false })
+        .maybeSingle();
+      
+      // Also check if there's an existing subscription with the same customer ID
+      const { data: existingCustomerSubscription } = await supabase
+        .from('customer_subscriptions')
+        .select('*')
+        .eq('stripe_customer_id', customerId)
         .maybeSingle();
       
       // Check if price exists in our database
@@ -378,31 +479,26 @@ async function handleCheckoutSessionCompleted(session: any) {
         updated_at: new Date().toISOString(),
       };
       
-      if (existingSubscription) {
-        console.log(`Updating existing subscription for customer ${customerId}`);
-        // Update existing subscription
+      if (existingCustomerSubscription) {
+        console.log(`Updating existing customer subscription for ${customerId}`);
+        // Update existing subscription by customer ID
         await supabase
           .from('customer_subscriptions')
           .update(subscriptionData)
           .eq('stripe_customer_id', customerId);
+      } else if (existingSubscription) {
+        console.log(`Updating existing user subscription for user ${userId}`);
+        // Update existing subscription by user ID
+        await supabase
+          .from('customer_subscriptions')
+          .update(subscriptionData)
+          .eq('id', existingSubscription.id);
       } else {
-        console.log(`Creating new subscription for customer ${customerId}`);
-        
-        // Try to get customer info from Stripe
-        const stripeCustomer = await stripe.customers.retrieve(customerId) as any;
-        
-        // Extract user_id from metadata
-        const user_id = stripeCustomer.metadata?.user_id;
-        
-        if (!user_id) {
-          console.error(`No user_id found for customer ${customerId}`);
-          return;
-        }
+        console.log(`Creating new subscription for customer ${customerId} and user ${userId}`);
         
         // Create new subscription
         await supabase.from('customer_subscriptions').insert({
           ...subscriptionData,
-          user_id,
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
         });
@@ -479,60 +575,72 @@ export async function handleWebhookEvent(
     console.log(`✓ Webhook verified! Event type: ${stripeEvent.type}`);
 
     // Handle different event types
-    switch (stripeEvent.type) {
-      case 'checkout.session.completed':
-        console.log('Processing checkout.session.completed event');
-        await handleCheckoutSessionCompleted(stripeEvent.data.object);
-        break;
-        
-      case 'customer.subscription.created':
-      case 'customer.subscription.updated':
-      case 'customer.subscription.deleted':
-        console.log(`Processing ${stripeEvent.type} event`);
-        await updateSubscriptionStatus(stripeEvent.data.object);
-        break;
-        
-      case 'invoice.payment_succeeded':
-        await handleInvoicePaymentSucceeded(stripeEvent.data.object);
-        break;
+    try {
+      switch (stripeEvent.type) {
+        case 'checkout.session.completed':
+          console.log('Processing checkout.session.completed event');
+          await handleCheckoutSessionCompleted(stripeEvent.data.object);
+          break;
+          
+        case 'customer.subscription.created':
+        case 'customer.subscription.updated':
+        case 'customer.subscription.deleted':
+          console.log(`Processing ${stripeEvent.type} event`);
+          await updateSubscriptionStatus(stripeEvent.data.object);
+          break;
+          
+        case 'invoice.payment_succeeded':
+          await handleInvoicePaymentSucceeded(stripeEvent.data.object);
+          break;
 
-      case 'invoice.payment_failed':
-        await handleInvoicePaymentFailed(stripeEvent.data.object);
-        break;
+        case 'invoice.payment_failed':
+          await handleInvoicePaymentFailed(stripeEvent.data.object);
+          break;
 
-      case 'product.created':
-      case 'product.updated':
-        console.log(`Processing ${stripeEvent.type} event`);
-        // Check if this is a metadata update
-        if (stripeEvent.data.previous_attributes && 
-            stripeEvent.data.previous_attributes.metadata) {
-          console.log('Detected metadata changes, syncing product features');
-        }
-        await syncProductData(stripeEvent.data.object);
-        break;
-        
-      case 'product.deleted':
-        console.log(`Processing ${stripeEvent.type} event`);
-        await handleProductDeleted(stripeEvent.data.object);
-        break;
+        case 'product.created':
+        case 'product.updated':
+          console.log(`Processing ${stripeEvent.type} event`);
+          // Check if this is a metadata update
+          if (stripeEvent.data.previous_attributes && 
+              stripeEvent.data.previous_attributes.metadata) {
+            console.log('Detected metadata changes, syncing product features');
+          }
+          await syncProductData(stripeEvent.data.object);
+          break;
+          
+        case 'product.deleted':
+          console.log(`Processing ${stripeEvent.type} event`);
+          await handleProductDeleted(stripeEvent.data.object);
+          break;
 
-      case 'price.created':
-      case 'price.updated':
-        console.log(`Processing ${stripeEvent.type} event`);
-        await syncPriceData(stripeEvent.data.object);
-        break;
-        
-      case 'price.deleted':
-        console.log(`Processing ${stripeEvent.type} event`);
-        await handlePriceDeleted(stripeEvent.data.object);
-        break;
+        case 'price.created':
+        case 'price.updated':
+          console.log(`Processing ${stripeEvent.type} event`);
+          await syncPriceData(stripeEvent.data.object);
+          break;
+          
+        case 'price.deleted':
+          console.log(`Processing ${stripeEvent.type} event`);
+          await handlePriceDeleted(stripeEvent.data.object);
+          break;
 
-      default:
-        console.log(`Unhandled event type: ${stripeEvent.type}`);
+        default:
+          console.log(`Unhandled event type: ${stripeEvent.type}`);
+      }
+    } catch (handlerError: any) {
+      console.error(`Error processing ${stripeEvent.type} event:`, handlerError);
+      console.error('Event data:', JSON.stringify(stripeEvent.data.object, null, 2));
+      
+      // Report the error but don't throw, so Stripe won't retry
+      // This avoids duplicated or stuck webhooks
+      return { 
+        success: false, 
+        error: `Error processing ${stripeEvent.type} event: ${handlerError.message}` 
+      };
     }
 
     return { success: true };
-  } catch (error) {
+  } catch (error: any) {
     console.error('❌ Error handling webhook:', error);
     throw error;
   }

@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SubPirate Authentication</title>
+  <style>
+    body {
+      font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, system-ui, Roboto, Helvetica, Arial, sans-serif;
+      background-color: #050505;
+      color: #ffffff;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      margin: 0;
+      padding: 16px;
+      text-align: center;
+    }
+    
+    .container {
+      max-width: 500px;
+      padding: 40px;
+      background-color: #0f0f0f;
+      border-radius: 8px;
+      border: 1px solid #222222;
+      box-shadow: 0 10px 30px -15px rgba(198, 155, 123, 0.15);
+    }
+    
+    .logo {
+      width: 80px;
+      margin-bottom: 20px;
+    }
+    
+    h1 {
+      font-size: 24px;
+      margin-bottom: 16px;
+    }
+    
+    #status-message {
+      color: #999;
+      line-height: 1.5;
+      margin-bottom: 24px;
+      text-align: left;
+      overflow-wrap: break-word;
+      word-break: break-word;
+      max-height: 300px;
+      overflow-y: auto;
+      padding: 10px;
+      border-radius: 8px;
+      background-color: #0a0a0a;
+      border: 1px solid #222;
+    }
+    
+    .spinner {
+      width: 30px;
+      height: 30px;
+      border: 3px solid rgba(198, 155, 123, 0.2);
+      border-top: 3px solid #C69B7B;
+      border-radius: 50%;
+      margin: 20px auto;
+      animation: spin 1s linear infinite;
+    }
+    
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+    
+    .success {
+      color: #2ecc71;
+    }
+    
+    .error {
+      color: #e74c3c;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <img src="images/logo.svg" alt="SubPirate Logo" class="logo">
+    <h1>Authentication in Progress</h1>
+    <div id="status-message">Completing your authentication. Please wait...</div>
+    <div class="spinner" id="spinner"></div>
+  </div>
+
+  <script src="supabase.js"></script>
+  <script>
+    const SUPABASE_URL = 'https://dkhkjdedoztwzkqloiaz.supabase.co';
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRraGtqZGVkb3p0d3prcWxvaWF6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE2OTM0MDk5NzUsImV4cCI6MjAwODk4NTk3NX0.H0-bFwUPUwDvKdKb6RmDGH7cGHb0lxWYQu9Iji4kPw0';
+    
+    // Create Supabase client if available
+    let supabase;
+    try {
+      supabase = window.supabase?.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+      console.log('Supabase client initialized in auth-callback');
+    } catch (e) {
+      console.error('Failed to initialize Supabase client:', e);
+    }
+    
+    const statusMessage = document.getElementById('status-message');
+    const spinner = document.getElementById('spinner');
+    
+    // Function to show status messages
+    function showStatus(message, type = '') {
+      console.log('Status update:', message, type);
+      statusMessage.innerHTML = message;
+      if (type) statusMessage.className = type;
+      
+      if (type === 'success' || type === 'error') {
+        spinner.style.display = 'none';
+      }
+    }
+    
+    // Function to save auth data to Chrome storage
+    async function saveAuthToStorage(token, user) {
+      return new Promise((resolve) => {
+        chrome.storage.local.set({ token, user }, () => {
+          console.log('Auth data saved to Chrome storage');
+          resolve();
+        });
+      });
+    }
+    
+    // Function to handle auth success
+    async function handleAuthSuccess(access_token, user) {
+      try {
+        console.log('Handling auth success with token and user:', !!access_token, !!user);
+        
+        if (!user || !user.email) {
+          showStatus('Authentication error: User data is incomplete', 'error');
+          return;
+        }
+        
+        // Save to local storage
+        await saveAuthToStorage(access_token, user);
+        
+        // Send success message to extension
+        chrome.runtime.sendMessage({
+          type: 'AUTH_SUCCESS',
+          token: access_token,
+          user: user
+        }, (response) => {
+          console.log('Background script response:', response);
+          
+          showStatus(`Authentication successful! You are now logged in as ${user.email}. This tab will close shortly.`, 'success');
+          
+          // Close tab after a short delay
+          setTimeout(() => {
+            window.close();
+          }, 3000);
+        });
+      } catch (err) {
+        console.error('Error saving auth data:', err);
+        showStatus('Authentication successful, but there was an error saving your session. Please try again.', 'error');
+      }
+    }
+    
+    // When the page loads, handle the auth callback
+    window.addEventListener('load', async () => {
+      console.log('Auth callback page loaded');
+      console.log('Full URL:', window.location.href);
+      
+      try {
+        // Show debug info on the page
+        showStatus('Processing authentication response...', '');
+        
+        // First check URL query parameters (for web app redirect)
+        const urlParams = new URLSearchParams(window.location.search);
+        const tokenFromQuery = urlParams.get('token') || urlParams.get('access_token');
+        const userDataFromQuery = urlParams.get('userData') || urlParams.get('user');
+        
+        // Then check URL hash (for direct Supabase OAuth)
+        const hashParams = new URLSearchParams(window.location.hash.substring(1));
+        const access_token = hashParams.get('access_token') || tokenFromQuery;
+        const hashError = hashParams.get('error');
+        const error_description = hashParams.get('error_description');
+        
+        console.log('URL parameters found:', !!tokenFromQuery, !!userDataFromQuery);
+        console.log('Hash parameters found:', !!access_token, !!hashError);
+        
+        // Debug information for auth troubleshooting 
+        showStatus(`URL params: ${JSON.stringify(Object.fromEntries(urlParams))}<br>
+                   Hash params: ${JSON.stringify(Object.fromEntries(hashParams))}<br>
+                   Processing...`, '');
+        
+        // Handle errors
+        if (hashError) {
+          console.error('Auth error:', hashError, error_description);
+          showStatus(`Authentication error: ${error_description || hashError}`, 'error');
+          return;
+        }
+        
+        // If we have user data directly from the query (web app flow)
+        if (tokenFromQuery && userDataFromQuery) {
+          try {
+            const userData = JSON.parse(decodeURIComponent(userDataFromQuery));
+            await handleAuthSuccess(tokenFromQuery, userData);
+            return;
+          } catch (err) {
+            console.error('Error parsing user data from query:', err);
+            showStatus(`Error parsing user data: ${err.message}`, 'error');
+            // Continue with other methods
+          }
+        }
+        
+        // If we have an access token directly in URL hash or query
+        if (access_token) {
+          console.log('Found access token, getting user info');
+          showStatus('Found access token, getting user info...', '');
+          
+          try {
+            if (!supabase) {
+              throw new Error('Supabase client not available');
+            }
+            
+            const { data: { user }, error } = await supabase.auth.getUser(access_token);
+            
+            if (error) {
+              console.error('Error getting user:', error);
+              showStatus(`Error getting user: ${error.message}`, 'error');
+              return;
+            }
+            
+            if (!user) {
+              showStatus('Invalid authentication token. User data not found.', 'error');
+              return;
+            }
+            
+            console.log('Got user data:', user);
+            showStatus(`Got user data for ${user.email}`, '');
+            
+            // Valid token and user, save it
+            await handleAuthSuccess(access_token, user);
+            return;
+          } catch (err) {
+            console.error('Error verifying token:', err);
+            showStatus(`Error verifying token: ${err.message}. Will attempt to use token directly.`, 'error');
+            
+            // If we couldn't verify with Supabase, try to just use the token directly
+            // This is a fallback for when the Supabase client fails
+            try {
+              // Make a request to the SubPirate API to get user info
+              const response = await fetch('https://api.subpirate.app/api/auth/user', {
+                headers: {
+                  'Authorization': `Bearer ${access_token}`
+                }
+              });
+              
+              if (!response.ok) {
+                throw new Error(`API returned ${response.status}`);
+              }
+              
+              const userData = await response.json();
+              
+              if (!userData || !userData.email) {
+                throw new Error('Invalid user data returned');
+              }
+              
+              await handleAuthSuccess(access_token, userData);
+              return;
+            } catch (apiErr) {
+              console.error('API fallback failed:', apiErr);
+              showStatus(`API fallback failed: ${apiErr.message}`, 'error');
+            }
+          }
+        }
+        
+        // If no token in URL, try to get existing session
+        if (supabase) {
+          console.log('No token in URL, checking for existing session');
+          showStatus('No token in URL, checking for existing session...', '');
+          
+          try {
+            const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+            
+            if (sessionError) {
+              console.error('Error getting session:', sessionError);
+              showStatus(`Error retrieving authentication session: ${sessionError.message}`, 'error');
+              return;
+            }
+            
+            if (session && session.access_token && session.user) {
+              // We have a valid session
+              console.log('Found valid session:', session);
+              showStatus(`Found valid session for ${session.user.email}`, '');
+              
+              await handleAuthSuccess(session.access_token, session.user);
+              return;
+            }
+          } catch (err) {
+            console.error('Session check failed:', err);
+            showStatus(`Session check failed: ${err.message}`, 'error');
+          }
+        }
+        
+        // If we get here, no auth data was found
+        console.log('No authentication data found');
+        showStatus('No authentication data found. Please try signing in again.', 'error');
+        
+      } catch (err) {
+        console.error('Unexpected error in auth callback:', err);
+        showStatus(`An unexpected error occurred during authentication: ${err.message}`, 'error');
+      }
+    });
+  </script>
+</body>
+</html> 

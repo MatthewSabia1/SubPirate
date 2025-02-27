@@ -58,11 +58,11 @@ const FREE_SUBSCRIPTION: SubscriptionData = {
  */
 interface SubscriptionQueryResult {
   status: string;
-  price_id: string;
+  stripe_price_id: string;
   current_period_end: number | null;
   cancel_at_period_end: boolean;
   stripe_prices: {
-    product_id: string;
+    stripe_product_id: string;
   } | null;
 }
 
@@ -82,7 +82,7 @@ export async function hasActiveSubscription(userId: string): Promise<boolean> {
       .from('customer_subscriptions')
       .select('status')
       .eq('user_id', userId)
-      .eq('status', 'active')
+      .in('status', ['active', 'trialing']) // Consider both active and trialing as valid
       .maybeSingle();
 
     if (error) {
@@ -122,10 +122,10 @@ export async function getUserSubscription(userId: string): Promise<SubscriptionD
       .from('customer_subscriptions')
       .select(`
         status,
-        price_id,
+        stripe_price_id,
         current_period_end,
         cancel_at_period_end,
-        stripe_prices(product_id)
+        stripe_prices:stripe_price_id(stripe_product_id)
       `)
       .eq('user_id', userId)
       .order('created_at', { ascending: false })
@@ -143,7 +143,7 @@ export async function getUserSubscription(userId: string): Promise<SubscriptionD
     // Extract the product ID safely
     let productId: string | null = null;
     if (subscription.stripe_prices) {
-      productId = subscription.stripe_prices.product_id;
+      productId = subscription.stripe_prices.stripe_product_id;
     }
     
     let features: string[] = ['basic_access']; // Always include basic access
@@ -151,14 +151,14 @@ export async function getUserSubscription(userId: string): Promise<SubscriptionD
     if (productId) {
       const { data: productFeatures, error: featuresError } = await supabase
         .from('product_features')
-        .select('feature_id')
-        .eq('product_id', productId);
+        .select('feature_key')
+        .eq('stripe_product_id', productId);
 
       if (!featuresError && productFeatures && productFeatures.length > 0) {
-        // Add the feature IDs to our list
+        // Add the feature keys to our list
         features = [
           ...features,
-          ...productFeatures.map(pf => pf.feature_id)
+          ...productFeatures.map(pf => pf.feature_key)
         ];
       }
     }
@@ -168,7 +168,7 @@ export async function getUserSubscription(userId: string): Promise<SubscriptionD
     
     return {
       status,
-      planId: subscription.price_id,
+      planId: subscription.stripe_price_id,
       currentPeriodEnd: subscription.current_period_end,
       cancelAtPeriodEnd: subscription.cancel_at_period_end || false,
       features
@@ -218,48 +218,23 @@ export async function getSubscriptionStatus() {
       return null;
     }
 
-    console.log(`Looking up subscription for user ${user.id}`);
-
-    // Use maybeSingle to avoid errors when no record is found
-    const { data: subscription, error } = await supabase
+    const { data, error } = await supabase
       .from('customer_subscriptions')
-      .select('*')
+      .select('status, stripe_price_id, current_period_end, cancel_at_period_end')
       .eq('user_id', user.id)
+      .in('status', ['active', 'trialing']) // Consider both active and trialing as valid
+      .order('created_at', { ascending: false })
+      .limit(1)
       .maybeSingle();
 
     if (error) {
-      console.error('Error fetching subscription:', error);
+      console.error('Error fetching subscription status:', error);
       return null;
     }
 
-    if (!subscription) {
-      console.log(`No subscription found for user ${user.id}`);
-      return null;
-    }
-
-    console.log(`Found subscription for user ${user.id}:`, subscription);
-    
-    // If we need price details, fetch them separately
-    if (subscription.stripe_price_id) {
-      try {
-        const { data: priceData, error: priceError } = await supabase
-          .from('stripe_prices')
-          .select('*')
-          .eq('id', subscription.stripe_price_id)
-          .maybeSingle();
-        
-        if (!priceError && priceData) {
-          subscription.price = priceData;
-        }
-      } catch (priceErr) {
-        console.error('Error fetching price details:', priceErr);
-        // Continue with subscription without price data
-      }
-    }
-
-    return subscription;
+    return data;
   } catch (error) {
-    console.error('Error in getSubscriptionStatus:', error);
+    console.error('Exception checking subscription status:', error);
     return null;
   }
 }

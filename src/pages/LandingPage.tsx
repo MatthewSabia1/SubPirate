@@ -45,30 +45,41 @@ const FALLBACK_FEATURES = {
     '<span class="font-bold text-white">1</span> Reddit account protection',
     '<span class="font-bold text-white">2</span> marketing campaigns',
   ],
+  Creator: [
+    '<span class="font-bold text-white">25</span> subreddit analyses monthly',
+    '<span class="font-bold text-white">Advanced</span> competitor intelligence',
+    '<span class="font-bold text-white">100</span> opportunity finder subreddits',
+    '<span class="font-bold text-white">3</span> Reddit account protection',
+    '<span class="font-bold text-white">5</span> marketing campaigns',
+    '<span class="font-bold text-white">Basic</span> optimal posting scheduler',
+  ],
   Pro: [
-    '<span class="font-bold text-white">50</span> subreddit analyses monthly',
-    '<span class="font-bold text-white">Advanced</span> competitor intelligence dashboard',
-    '<span class="font-bold text-white">Unlimited</span> opportunity finder subreddits',
-    '<span class="font-bold text-white">5</span> Reddit account protection system',
-    '<span class="font-bold text-white">10</span> marketing campaigns with team access',
-    '<span class="font-bold text-white">AI-powered</span> optimal posting scheduler',
+    '<span class="font-bold text-white">Unlimited</span> subreddit analyses',
+    '<span class="font-bold text-white">Advanced</span> competitor intelligence',
+    '<span class="font-bold text-white">200</span> opportunity finder subreddits',
+    '<span class="font-bold text-white">5</span> Reddit account protection',
+    '<span class="font-bold text-white">10</span> marketing campaigns',
+    '<span class="font-bold text-white">Advanced</span> optimal posting scheduler',
+    '<span class="font-bold text-white">Priority</span> support',
   ],
   Agency: [
-    '<span class="font-bold text-white">Unlimited</span> subreddit analysis',
-    '<span class="font-bold text-white">Premium</span> content strategy AI assistant',
-    '<span class="font-bold text-white">Unlimited</span> subreddit targeting',
-    '<span class="font-bold text-white">Unlimited</span> Reddit account management',
-    '<span class="font-bold text-white">Unlimited</span> campaigns & team members',
-    '<span class="font-bold text-white">Priority</span> upgrades & dedicated strategist',
+    '<span class="font-bold text-white">Unlimited</span> subreddit analyses',
+    '<span class="font-bold text-white">Premium</span> AI content strategy assistant',
+    '<span class="font-bold text-white">Unlimited</span> opportunity finder subreddits',
+    '<span class="font-bold text-white">10</span> Reddit account protection',
+    '<span class="font-bold text-white">25</span> marketing campaigns',
+    '<span class="font-bold text-white">Advanced</span> optimal posting scheduler',
+    '<span class="font-bold text-white">Dedicated</span> account manager',
+    '<span class="font-bold text-white">Custom</span> API integrations',
   ]
 };
 
 // Default descriptions - matching those in Pricing.tsx
 const DEFAULT_DESCRIPTIONS = {
-  Starter: 'Generate substantial Reddit traffic quickly and efficiently.',
-  Creator: 'Ideal for individual creators and small businesses.',
-  Pro: 'Scale your Reddit presence for significant traffic growth.',
-  Agency: 'Comprehensive solution for agencies and power users.'
+  Starter: 'Essential features for getting started with Reddit marketing',
+  Creator: 'Perfect for content creators and growing brands',
+  Pro: 'Advanced features for professional marketers',
+  Agency: 'Comprehensive solution for agencies and power users'
 };
 
 // CSS for the animated background gradients
@@ -566,7 +577,7 @@ const LandingPage = () => {
 
           {isTestMode && <TestModeIndicator />}
 
-          <div className="grid md:grid-cols-3 gap-8 max-w-5xl mx-auto">
+          <div className="grid md:grid-cols-3 gap-8 max-w-5xl mx-auto mb-8">
             {/* Starter Plan */}
             <div className="pricing-card">
               <h3 className="text-xl font-semibold mb-2">Starter</h3>
@@ -587,17 +598,17 @@ const LandingPage = () => {
               </Link>
             </div>
 
-            {/* Pro Plan */}
+            {/* Creator Plan - most popular */}
             <div className="pricing-card-featured relative">
               <div className="absolute top-0 right-0 bg-[#C69B7B] text-black text-xs font-bold px-3 py-1 rounded-bl-lg rounded-tr-lg">
                 MOST POPULAR
               </div>
-              <h3 className="text-xl font-semibold mb-2">Professional</h3>
-              <div className="text-[#C69B7B] text-4xl font-bold mb-2">{getFormattedPrice('Pro')}<span className="text-lg text-gray-400">/mo</span></div>
-              <p className="text-gray-400 mb-6">{getProductDescription('Pro')}</p>
+              <h3 className="text-xl font-semibold mb-2">Creator</h3>
+              <div className="text-[#C69B7B] text-4xl font-bold mb-2">{getFormattedPrice('Creator')}<span className="text-lg text-gray-400">/mo</span></div>
+              <p className="text-gray-400 mb-6">{getProductDescription('Creator')}</p>
               
               <ul className="space-y-3 mb-8 flex-grow">
-                {getFeatures('Pro').map((feature, index) => (
+                {getFeatures('Creator').map((feature, index) => (
                   <li key={index} className="flex items-start gap-2">
                     <Check size={18} className="text-[#C69B7B] shrink-0 mt-0.5" />
                     <span dangerouslySetInnerHTML={{ __html: feature }}></span>
@@ -610,14 +621,14 @@ const LandingPage = () => {
               </Link>
             </div>
 
-            {/* Agency Plan */}
+            {/* Pro Plan */}
             <div className="pricing-card">
-              <h3 className="text-xl font-semibold mb-2">Agency</h3>
-              <div className="text-[#C69B7B] text-4xl font-bold mb-2">{getFormattedPrice('Agency')}<span className="text-lg text-gray-400">/mo</span></div>
-              <p className="text-gray-400 mb-6">{getProductDescription('Agency')}</p>
+              <h3 className="text-xl font-semibold mb-2">Pro</h3>
+              <div className="text-[#C69B7B] text-4xl font-bold mb-2">{getFormattedPrice('Pro')}<span className="text-lg text-gray-400">/mo</span></div>
+              <p className="text-gray-400 mb-6">{getProductDescription('Pro')}</p>
               
               <ul className="space-y-3 mb-8 flex-grow">
-                {getFeatures('Agency').map((feature, index) => (
+                {getFeatures('Pro').map((feature, index) => (
                   <li key={index} className="flex items-start gap-2">
                     <Check size={18} className="text-[#C69B7B] shrink-0 mt-0.5" />
                     <span dangerouslySetInnerHTML={{ __html: feature }}></span>
@@ -628,6 +639,42 @@ const LandingPage = () => {
               <Link to="/login" className="pricing-button button-outline">
                 Get Started
               </Link>
+            </div>
+          </div>
+
+          {/* Agency Plan - Wide box at the bottom */}
+          <div className="max-w-5xl mx-auto mb-12">
+            <div className="pricing-card border border-gray-800 rounded-lg bg-gray-900/50">
+              <div className="grid md:grid-cols-2 gap-8">
+                <div>
+                  <h3 className="text-xl font-semibold mb-2">Agency</h3>
+                  <div className="text-[#C69B7B] text-4xl font-bold mb-2">{getFormattedPrice('Agency')}<span className="text-lg text-gray-400">/mo</span></div>
+                  <p className="text-gray-400 mb-6">{getProductDescription('Agency')}</p>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <ul className="space-y-3">
+                    {getFeatures('Agency').slice(0, Math.ceil(getFeatures('Agency').length / 2)).map((feature, index) => (
+                      <li key={index} className="flex items-start gap-2">
+                        <Check size={18} className="text-[#C69B7B] shrink-0 mt-0.5" />
+                        <span dangerouslySetInnerHTML={{ __html: feature }}></span>
+                      </li>
+                    ))}
+                  </ul>
+                  <ul className="space-y-3">
+                    {getFeatures('Agency').slice(Math.ceil(getFeatures('Agency').length / 2)).map((feature, index) => (
+                      <li key={index} className="flex items-start gap-2">
+                        <Check size={18} className="text-[#C69B7B] shrink-0 mt-0.5" />
+                        <span dangerouslySetInnerHTML={{ __html: feature }}></span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+              <div className="mt-6 flex justify-center">
+                <Link to="/login" className="pricing-button button-outline max-w-xs">
+                  Get Started
+                </Link>
+              </div>
             </div>
           </div>
         </div>

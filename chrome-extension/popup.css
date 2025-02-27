@@ -1,0 +1,321 @@
+/* Main styles for SubPirate extension popup */
+:root {
+  --primary-color: #C69B7B;
+  --primary-hover: #B38A6A;
+  --background-color: #050505;
+  --card-background: #0f0f0f;
+  --border-color: #222222;
+  --border-hover: #333333;
+  --text-color: #ffffff;
+  --text-secondary: #999;
+  --danger-color: #e74c3c;
+  --success-color: #2ecc71;
+  --border-radius: 8px;
+  --box-shadow: 0 10px 30px -15px rgba(198, 155, 123, 0.15);
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, system-ui, Roboto, Helvetica, Arial, sans-serif;
+  font-size: 14px;
+  color: var(--text-color);
+  width: 340px;
+  max-height: 500px;
+  overflow-x: hidden;
+  background-color: var(--background-color);
+}
+
+.container {
+  padding: 16px;
+}
+
+/* Header styles */
+.header {
+  display: flex;
+  align-items: center;
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.logo {
+  width: 32px;
+  height: 32px;
+  margin-right: 10px;
+}
+
+h1 {
+  font-size: 20px;
+  font-weight: 600;
+}
+
+/* View management */
+.view {
+  display: block;
+}
+
+.hidden {
+  display: none;
+}
+
+/* Button styles */
+.btn {
+  display: inline-block;
+  padding: 10px 16px;
+  background-color: var(--card-background);
+  color: var(--text-color);
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius);
+  cursor: pointer;
+  font-weight: 500;
+  text-align: center;
+  transition: all 0.2s ease;
+  width: 100%;
+  margin-bottom: 8px;
+}
+
+.btn:hover {
+  border-color: var(--border-hover);
+  transform: translateY(-2px);
+}
+
+.btn.primary {
+  background-color: var(--primary-color);
+  color: #000000;
+  border-color: var(--primary-color);
+  box-shadow: 0 4px 14px rgba(198, 155, 123, 0.25);
+}
+
+.btn.primary:hover {
+  background-color: var(--primary-hover);
+}
+
+.btn.saved {
+  background-color: var(--primary-color);
+  color: #000000;
+  border-color: var(--primary-color);
+}
+
+.btn.saved:hover {
+  background-color: var(--primary-hover);
+}
+
+.btn.small {
+  padding: 6px 10px;
+  font-size: 12px;
+}
+
+.btn-google {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background-color: #ffffff;
+  color: #000000;
+  border: none;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.12);
+}
+
+.btn-google:hover {
+  background-color: #f5f5f5;
+}
+
+.btn-google img {
+  width: 18px;
+  height: 18px;
+}
+
+/* Loading spinner */
+.spinner {
+  width: 30px;
+  height: 30px;
+  border: 3px solid rgba(198, 155, 123, 0.2);
+  border-top: 3px solid var(--primary-color);
+  border-radius: 50%;
+  margin: 20px auto;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.loading-text {
+  text-align: center;
+  margin-bottom: 16px;
+  color: var(--text-secondary);
+}
+
+/* Login view */
+#login-view {
+  text-align: center;
+  padding: 20px 0;
+}
+
+#login-view p {
+  margin-bottom: 20px;
+  color: var(--text-secondary);
+}
+
+/* No subreddit view */
+#no-subreddit-view p {
+  text-align: center;
+  padding: 20px 0;
+  color: var(--text-secondary);
+}
+
+/* Card styles */
+.card {
+  background-color: var(--card-background);
+  border-radius: var(--border-radius);
+  padding: 16px;
+  border: 1px solid var(--border-color);
+  margin-bottom: 16px;
+  transition: all 0.3s ease;
+}
+
+.card:hover {
+  border-color: var(--border-hover);
+  transform: translateY(-4px);
+  box-shadow: var(--box-shadow);
+}
+
+/* Main view */
+.subreddit-info {
+  margin-bottom: 16px;
+}
+
+.subreddit-info p {
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin-bottom: 4px;
+}
+
+.subreddit-info h2 {
+  font-size: 20px;
+  font-weight: 600;
+}
+
+.actions {
+  margin-bottom: 16px;
+}
+
+.project-selector {
+  margin-top: 12px;
+  margin-bottom: 12px;
+}
+
+select {
+  width: 100%;
+  padding: 10px;
+  border-radius: var(--border-radius);
+  border: 1px solid var(--border-color);
+  background-color: var(--card-background);
+  color: var(--text-color);
+  margin-bottom: 8px;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23C69B7B' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  padding-right: 30px;
+}
+
+select:focus {
+  outline: none;
+  border-color: var(--primary-color);
+}
+
+.status {
+  padding: 10px;
+  border-radius: var(--border-radius);
+  background-color: var(--card-background);
+  font-size: 13px;
+  margin-top: 10px;
+}
+
+.status.success {
+  background-color: rgba(46, 204, 113, 0.2);
+  color: var(--success-color);
+  border: 1px solid rgba(46, 204, 113, 0.3);
+}
+
+.status.error {
+  background-color: rgba(231, 76, 60, 0.2);
+  color: var(--danger-color);
+  border: 1px solid rgba(231, 76, 60, 0.3);
+}
+
+/* User section */
+.user-section {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border-color);
+}
+
+.user-info {
+  display: flex;
+  align-items: center;
+}
+
+.avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  margin-right: 8px;
+  background-color: var(--border-color);
+  overflow: hidden;
+}
+
+#user-email {
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+/* Badge styles */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 8px;
+  border-radius: 99px;
+  background-color: rgba(198, 155, 123, 0.1);
+  border: 1px solid rgba(198, 155, 123, 0.2);
+  color: var(--primary-color);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  margin-right: 8px;
+}
+
+/* Divider */
+.divider {
+  display: flex;
+  align-items: center;
+  margin: 20px 0;
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.divider::before,
+.divider::after {
+  content: "";
+  flex: 1;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.divider::before {
+  margin-right: 10px;
+}
+
+.divider::after {
+  margin-left: 10px;
+} 

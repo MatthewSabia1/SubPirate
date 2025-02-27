@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SubPirate Extension</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <img src="images/logo.svg" alt="SubPirate Logo" class="logo">
+      <h1>SubPirate</h1>
+    </div>
+
+    <!-- Login UI - shown when user is not authenticated -->
+    <div id="login-view" class="view hidden">
+      <div class="card">
+        <p>Sign in to access your SubPirate account</p>
+        <button id="google-login-btn" class="btn btn-google">
+          <img src="images/google-icon.svg" alt="Google"> 
+          Sign in with Google
+        </button>
+        <div class="divider">or</div>
+        <button id="login-btn" class="btn primary">Sign in to Existing Account</button>
+      </div>
+    </div>
+
+    <!-- Loading state -->
+    <div id="loading-view" class="view hidden">
+      <div class="spinner"></div>
+      <p class="loading-text">Loading your SubPirate data...</p>
+    </div>
+
+    <!-- No subreddit view - shown when not on a subreddit page -->
+    <div id="no-subreddit-view" class="view hidden">
+      <div class="card">
+        <p>Please navigate to a subreddit to use this extension</p>
+        <button id="open-dashboard-btn" class="btn primary">Open SubPirate Dashboard</button>
+      </div>
+    </div>
+
+    <!-- Main UI - shown when user is authenticated and on a subreddit page -->
+    <div id="main-view" class="view">
+      <div class="card">
+        <div class="subreddit-info">
+          <p>Current subreddit:</p>
+          <h2 id="subreddit-name">r/subreddit</h2>
+        </div>
+
+        <div class="actions">
+          <button id="save-btn" class="btn">
+            <span id="save-btn-text">Save to Saved List</span>
+          </button>
+          <button id="analyze-btn" class="btn primary">Analyze Subreddit</button>
+          
+          <div class="project-selector">
+            <select id="project-select">
+              <option value="">Select a project</option>
+              <!-- Projects will be populated here -->
+            </select>
+            <button id="add-to-project-btn" class="btn">Add to Project</button>
+          </div>
+        </div>
+
+        <div id="status-message" class="status"></div>
+      </div>
+    </div>
+
+    <!-- User info and logout -->
+    <div id="user-section" class="user-section hidden">
+      <div class="user-info">
+        <img id="user-avatar" src="images/default-avatar.svg" alt="User avatar" class="avatar">
+        <span id="user-email">user@example.com</span>
+      </div>
+      <button id="logout-btn" class="btn small">Logout</button>
+    </div>
+  </div>
+
+  <script src="supabase.js"></script>
+  <script src="popup.js"></script>
+</body>
+</html> 

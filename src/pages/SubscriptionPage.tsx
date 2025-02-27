@@ -10,6 +10,8 @@ import {
 } from '../lib/stripe/client';
 import type { Stripe } from 'stripe';
 import Logo from '../components/Logo';
+import LoadingSpinner from '../components/LoadingSpinner';
+import { supabase } from '../lib/supabase';
 
 // Types from Pricing.tsx
 interface ProductFeature {
@@ -75,35 +77,186 @@ const DEFAULT_DESCRIPTIONS = {
 };
 
 export default function SubscriptionPage() {
-  const { user } = useAuth();
-  const navigate = useNavigate();
-  const location = useLocation();
+  const { user, loading: authLoading } = useAuth();
   const [products, setProducts] = useState<Stripe.Product[]>([]);
   const [prices, setPrices] = useState<Stripe.Price[]>([]);
   const [productFeatures, setProductFeatures] = useState<Record<string, ProductFeature[]>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
   const [isTestMode, setIsTestMode] = useState(false);
+  const [hasSubscription, setHasSubscription] = useState<boolean | null>(null);
+  const [isProcessingCheckout, setIsProcessingCheckout] = useState(false);
+  const location = useLocation();
+  const navigate = useNavigate();
 
-  // If not a new user, redirect to dashboard - but only if specifically marked as a new user
+  // Check if user coming from successful checkout
+  const isCheckoutSuccess = new URLSearchParams(window.location.search).get('checkout') === 'success';
+
+  // Get state passed from navigation
+  const state = location.state as { newUser?: boolean } | null;
+  const isNewUser = state?.newUser === true;
+
   useEffect(() => {
-    const state = location.state as { newUser?: boolean } | null;
+    console.log("SubscriptionPage: Component mounted");
+    console.log("SubscriptionPage: isNewUser =", isNewUser);
+    console.log("SubscriptionPage: isCheckoutSuccess =", isCheckoutSuccess);
     
-    // Only redirect to dashboard if:
-    // 1. The user is authenticated AND
-    // 2. This is not explicitly marked as a new user flow (via state)
-    // 3. We're not coming from an external redirect (like a checkout success)
-    if (user && !state?.newUser && !location.search.includes('checkout=')) {
-      console.log('SubscriptionPage: User is authenticated but not marked as new user, redirecting to dashboard');
-      navigate('/dashboard', { replace: true });
-    } else {
-      console.log('SubscriptionPage: User needs to see subscription options', { 
-        isNewUser: state?.newUser, 
-        hasSearch: !!location.search,
-        user: !!user
-      });
+    const checkSubscriptionStatus = async () => {
+      if (!user) {
+        console.log("SubscriptionPage: No user, waiting for auth");
+        return;
+      }
+
+      console.log("SubscriptionPage: Checking subscription status for user", user.id);
+      
+      try {
+        // If checkout=success is in URL, we're coming from a successful checkout
+        if (isCheckoutSuccess) {
+          console.log("SubscriptionPage: Processing checkout success");
+          setIsProcessingCheckout(true);
+          
+          // Try several times to find the subscription, as webhook processing might be delayed
+          let foundSubscription = false;
+          let attempts = 0;
+          const maxAttempts = 3;
+          
+          while (!foundSubscription && attempts < maxAttempts) {
+            // Check subscriptions table
+            const { data: subscriptionData, error: subscriptionError } = await supabase
+              .from('subscriptions')
+              .select('*')
+              .eq('user_id', user.id);
+              
+            if (!subscriptionError && subscriptionData && subscriptionData.length > 0) {
+              console.log("SubscriptionPage: Found subscription after checkout", subscriptionData);
+              foundSubscription = true;
+              setHasSubscription(true);
+              break;
+            }
+            
+            // Check customer_subscriptions table
+            const { data: customerData, error: customerError } = await supabase
+              .from('customer_subscriptions')
+              .select('*')
+              .eq('user_id', user.id);
+              
+            if (!customerError && customerData && customerData.length > 0) {
+              console.log("SubscriptionPage: Found customer subscription after checkout", customerData);
+              foundSubscription = true;
+              setHasSubscription(true);
+              break;
+            }
+            
+            console.log(`SubscriptionPage: Subscription not found yet, attempt ${attempts + 1}/${maxAttempts}`);
+            attempts++;
+            
+            if (attempts < maxAttempts) {
+              await new Promise(resolve => setTimeout(resolve, 2000));
+            }
+          }
+          
+          if (foundSubscription) {
+            console.log("SubscriptionPage: Subscription confirmed after checkout, redirecting to dashboard");
+            setLoading(false);
+            navigate('/dashboard', { replace: true });
+            return;
+          } else {
+            console.log("SubscriptionPage: Could not confirm subscription after checkout");
+            // Continue to subscription page as fallback
+            setIsProcessingCheckout(false);
+          }
+        }
+        
+        // Check subscriptions table for active subscriptions
+        const { data: subscriptionData, error: subscriptionError } = await supabase
+          .from('subscriptions')
+          .select('*')
+          .eq('user_id', user.id)
+          .eq('status', 'active')
+          .maybeSingle();
+
+        if (subscriptionError) {
+          console.error("SubscriptionPage: Error checking subscriptions table:", subscriptionError);
+        } else {
+          console.log("SubscriptionPage: Subscription table result:", subscriptionData);
+        }
+
+        // Check customer_subscriptions table for active or trialing subscriptions
+        const { data: activeData, error: activeError } = await supabase
+          .from('customer_subscriptions')
+          .select('*')
+          .eq('user_id', user.id)
+          .eq('status', 'active')
+          .maybeSingle();
+          
+        if (activeError) {
+          console.error("SubscriptionPage: Error checking active subscriptions:", activeError);
+        } else {
+          console.log("SubscriptionPage: Customer subscriptions (active) result:", activeData);
+        }
+        
+        const { data: trialingData, error: trialingError } = await supabase
+          .from('customer_subscriptions')
+          .select('*')
+          .eq('user_id', user.id)
+          .eq('status', 'trialing')
+          .maybeSingle();
+          
+        if (trialingError) {
+          console.error("SubscriptionPage: Error checking trialing subscriptions:", trialingError);
+        } else {
+          console.log("SubscriptionPage: Customer subscriptions (trialing) result:", trialingData);
+        }
+
+        // Also try to get all customer_subscriptions regardless of status to see what's there
+        const { data: allCustomerSubs, error: allCustomerSubsError } = await supabase
+          .from('customer_subscriptions')
+          .select('*')
+          .eq('user_id', user.id);
+          
+        if (allCustomerSubsError) {
+          console.error("SubscriptionPage: Error checking all customer subscriptions:", allCustomerSubsError);
+        } else {
+          console.log("SubscriptionPage: All customer subscriptions for user:", allCustomerSubs);
+        }
+
+        // If user has an active subscription, redirect to dashboard
+        const hasActiveSubscription = !!(subscriptionData || activeData || trialingData);
+        setHasSubscription(hasActiveSubscription);
+        
+        // Only redirect if user has subscription AND this is not a new user flow
+        if (hasActiveSubscription && !isNewUser) {
+          console.log("SubscriptionPage: User has active subscription and is not marked as new user, redirecting to dashboard");
+          navigate('/dashboard', { replace: true });
+          return;
+        } else if (!hasActiveSubscription) {
+          console.log("SubscriptionPage: User has no active subscription, staying on subscription page");
+          // Stay on subscription page and show subscription options
+        } else {
+          console.log("SubscriptionPage: New user flow, staying on subscription page");
+          // Stay on subscription page for new user flow
+        }
+        
+        console.log("SubscriptionPage: User needs to select a subscription or is in new user flow");
+        setLoading(false);
+      } catch (error) {
+        console.error("SubscriptionPage: Error checking subscription status:", error);
+        setLoading(false);
+      }
+    };
+
+    if (!authLoading) {
+      checkSubscriptionStatus();
     }
-  }, [location, navigate, user]);
+  }, [user, authLoading, navigate, isNewUser, isCheckoutSuccess]);
+
+  // Guard: redirect unauthenticated users to login
+  useEffect(() => {
+    if (!authLoading && !user) {
+      console.log("SubscriptionPage: No authenticated user, redirecting to login");
+      navigate('/login', { replace: true });
+    }
+  }, [user, authLoading, navigate]);
 
   // Fetch products and prices
   useEffect(() => {
@@ -146,9 +299,16 @@ export default function SubscriptionPage() {
   }, []);
 
   if (loading) {
-    return <div className="min-h-screen bg-black flex items-center justify-center">
-      <div className="text-white text-xl">Loading subscription options...</div>
-    </div>;
+    return (
+      <div className="min-h-screen bg-black flex items-center justify-center">
+        <div className="text-center">
+          <h1 className="text-2xl font-bold text-white mb-4">
+            {isProcessingCheckout ? 'Processing your subscription...' : 'Loading subscription options...'}
+          </h1>
+          <LoadingSpinner size={10} />
+        </div>
+      </div>
+    );
   }
 
   if (error) {

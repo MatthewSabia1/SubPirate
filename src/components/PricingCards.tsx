@@ -32,6 +32,20 @@ const pricingStyles = `
     box-shadow: 0 10px 30px -15px rgba(198, 155, 123, 0.2);
     height: 100%;
   }
+
+  .pricing-card-wide {
+    background-color: #0f0f0f;
+    border-radius: 1rem;
+    padding: 2rem;
+    border: 1px solid #222222;
+    transition: all 0.3s ease;
+  }
+  
+  .pricing-card-wide:hover {
+    border-color: #333333;
+    transform: translateY(-4px);
+    box-shadow: 0 10px 30px -15px rgba(198, 155, 123, 0.15);
+  }
   
   .pricing-button {
     width: 100%;
@@ -76,29 +90,62 @@ const PricingCards: React.FC<PricingCardsProps> = ({ onSelectPlan }) => {
     }
   };
 
+  // Define features for plans
+  const starterFeatures = [
+    '10 subreddit analyses per month',
+    'Unlimited competitor intelligence',
+    '50 opportunity finder subreddits',
+    '1 Reddit account protection',
+    '2 marketing campaigns'
+  ];
+
+  const creatorFeatures = [
+    '25 subreddit analyses monthly',
+    'Advanced competitor intelligence',
+    '100 opportunity finder subreddits',
+    '3 Reddit account protection',
+    '5 marketing campaigns',
+    'Basic optimal posting scheduler'
+  ];
+
+  const proFeatures = [
+    'Unlimited subreddit analyses',
+    'Advanced competitor intelligence',
+    '200 opportunity finder subreddits',
+    '5 Reddit account protection',
+    '10 marketing campaigns',
+    'Advanced optimal posting scheduler',
+    'Priority support'
+  ];
+
+  const agencyFeatures = [
+    '3 Reddit account protection',
+    '3 Reddit account protection',
+    '25 subreddit analyses monthly',
+    '3 Reddit account protection',
+    'Advanced competitor intelligence',
+    '25 subreddit analyses monthly',
+    '3 Reddit account protection',
+    '3 Reddit account protection'
+  ];
+
   return (
     <>
       <style>{pricingStyles}</style>
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
         {/* Starter Plan */}
         <div className="pricing-card">
           <h2 className="text-2xl font-bold mb-2">Starter</h2>
-          <div className="text-4xl font-bold mb-2">$19.99<span className="text-gray-400 text-lg font-normal">/mo</span></div>
+          <div className="text-4xl font-bold mb-2">$19<span className="text-gray-400 text-lg font-normal">/mo</span></div>
           <p className="text-gray-400 mb-6">Essential features for getting started with Reddit marketing</p>
           <div className="flex-grow mb-6">
             <ul className="space-y-3">
-              <li className="flex items-start">
-                <Check className="h-5 w-5 text-[#C69B7B] shrink-0 mt-0.5" />
-                <span className="ml-3 text-gray-300">10 subreddit analyses per month</span>
-              </li>
-              <li className="flex items-start">
-                <Check className="h-5 w-5 text-[#C69B7B] shrink-0 mt-0.5" />
-                <span className="ml-3 text-gray-300">Unlimited competitor intelligence</span>
-              </li>
-              <li className="flex items-start">
-                <Check className="h-5 w-5 text-[#C69B7B] shrink-0 mt-0.5" />
-                <span className="ml-3 text-gray-300">50 opportunity finder subreddits</span>
-              </li>
+              {starterFeatures.map((feature, index) => (
+                <li key={index} className="flex items-start">
+                  <Check className="h-5 w-5 text-[#C69B7B] shrink-0 mt-0.5" />
+                  <span className="ml-3 text-gray-300">{feature}</span>
+                </li>
+              ))}
             </ul>
           </div>
           <button 
@@ -109,75 +156,92 @@ const PricingCards: React.FC<PricingCardsProps> = ({ onSelectPlan }) => {
           </button>
         </div>
 
-        {/* Professional Plan */}
+        {/* Creator Plan */}
         <div className="pricing-card-featured">
-          <div className="absolute -top-3 left-1/2 -translate-x-1/2">
-            <span className="bg-[#C69B7B] text-black px-4 py-1 rounded-full text-sm font-medium">
-              MOST POPULAR
-            </span>
+          <div className="absolute top-0 right-0 bg-[#C69B7B] text-black text-xs font-bold px-3 py-1 rounded-bl-lg rounded-tr-lg">
+            MOST POPULAR
           </div>
-          <h2 className="text-2xl font-bold mb-2">Professional</h2>
-          <div className="text-4xl font-bold mb-2">$47.99<span className="text-gray-400 text-lg font-normal">/mo</span></div>
-          <p className="text-gray-400 mb-6">Advanced features for professional marketers</p>
+          <h2 className="text-2xl font-bold mb-2">Creator</h2>
+          <div className="text-4xl font-bold mb-2">$34<span className="text-gray-400 text-lg font-normal">/mo</span></div>
+          <p className="text-gray-400 mb-6">Perfect for content creators and growing brands</p>
           <div className="flex-grow mb-6">
             <ul className="space-y-3">
-              <li className="flex items-start">
-                <Check className="h-5 w-5 text-[#C69B7B] shrink-0 mt-0.5" />
-                <span className="ml-3 text-gray-300">50 subreddit analyses monthly</span>
-              </li>
-              <li className="flex items-start">
-                <Check className="h-5 w-5 text-[#C69B7B] shrink-0 mt-0.5" />
-                <span className="ml-3 text-gray-300">Advanced competitor intelligence dashboard</span>
-              </li>
-              <li className="flex items-start">
-                <Check className="h-5 w-5 text-[#C69B7B] shrink-0 mt-0.5" />
-                <span className="ml-3 text-gray-300">Unlimited opportunity finder subreddits</span>
-              </li>
-              <li className="flex items-start">
-                <Check className="h-5 w-5 text-[#C69B7B] shrink-0 mt-0.5" />
-                <span className="ml-3 text-gray-300">5 Reddit account protection system</span>
-              </li>
+              {creatorFeatures.map((feature, index) => (
+                <li key={index} className="flex items-start">
+                  <Check className="h-5 w-5 text-[#C69B7B] shrink-0 mt-0.5" />
+                  <span className="ml-3 text-gray-300">{feature}</span>
+                </li>
+              ))}
             </ul>
           </div>
           <button 
             className="pricing-button button-primary"
-            onClick={() => handleSelectPlan('professional')}
+            onClick={() => handleSelectPlan('creator')}
           >
             Get Started
           </button>
         </div>
 
-        {/* Agency Plan */}
+        {/* Pro Plan */}
         <div className="pricing-card">
-          <h2 className="text-2xl font-bold mb-2">Agency</h2>
-          <div className="text-4xl font-bold mb-2">$97.99<span className="text-gray-400 text-lg font-normal">/mo</span></div>
-          <p className="text-gray-400 mb-6">Full platform access for marketing teams and agencies</p>
+          <h2 className="text-2xl font-bold mb-2">Pro</h2>
+          <div className="text-4xl font-bold mb-2">$49<span className="text-gray-400 text-lg font-normal">/mo</span></div>
+          <p className="text-gray-400 mb-6">Advanced features for professional marketers</p>
           <div className="flex-grow mb-6">
             <ul className="space-y-3">
-              <li className="flex items-start">
-                <Check className="h-5 w-5 text-[#C69B7B] shrink-0 mt-0.5" />
-                <span className="ml-3 text-gray-300">Unlimited subreddit analysis</span>
-              </li>
-              <li className="flex items-start">
-                <Check className="h-5 w-5 text-[#C69B7B] shrink-0 mt-0.5" />
-                <span className="ml-3 text-gray-300">Premium content strategy AI assistant</span>
-              </li>
-              <li className="flex items-start">
-                <Check className="h-5 w-5 text-[#C69B7B] shrink-0 mt-0.5" />
-                <span className="ml-3 text-gray-300">Unlimited subreddit targeting</span>
-              </li>
-              <li className="flex items-start">
-                <Check className="h-5 w-5 text-[#C69B7B] shrink-0 mt-0.5" />
-                <span className="ml-3 text-gray-300">Unlimited Reddit account management</span>
-              </li>
+              {proFeatures.map((feature, index) => (
+                <li key={index} className="flex items-start">
+                  <Check className="h-5 w-5 text-[#C69B7B] shrink-0 mt-0.5" />
+                  <span className="ml-3 text-gray-300">{feature}</span>
+                </li>
+              ))}
             </ul>
           </div>
           <button 
             className="pricing-button button-outline"
-            onClick={() => handleSelectPlan('agency')}
+            onClick={() => handleSelectPlan('pro')}
           >
             Get Started
           </button>
+        </div>
+      </div>
+
+      {/* Agency Plan - Wide box at the bottom */}
+      <div className="mb-12">
+        <div className="pricing-card-wide border border-gray-800 rounded-lg bg-gray-900/50">
+          <div className="grid md:grid-cols-2 gap-8">
+            <div>
+              <h2 className="text-2xl font-bold mb-2">Agency</h2>
+              <div className="text-4xl font-bold mb-2">$199<span className="text-gray-400 text-lg font-normal">/mo</span></div>
+              <p className="text-gray-400 mb-6">Perfect for content creators and growing brands</p>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <ul className="space-y-3">
+                {agencyFeatures.slice(0, Math.ceil(agencyFeatures.length / 2)).map((feature, index) => (
+                  <li key={index} className="flex items-start">
+                    <Check className="h-5 w-5 text-[#C69B7B] shrink-0 mt-0.5" />
+                    <span className="ml-3 text-gray-300">{feature}</span>
+                  </li>
+                ))}
+              </ul>
+              <ul className="space-y-3">
+                {agencyFeatures.slice(Math.ceil(agencyFeatures.length / 2)).map((feature, index) => (
+                  <li key={index} className="flex items-start">
+                    <Check className="h-5 w-5 text-[#C69B7B] shrink-0 mt-0.5" />
+                    <span className="ml-3 text-gray-300">{feature}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+          <div className="mt-6 flex justify-center">
+            <button 
+              className="pricing-button button-outline max-w-xs"
+              onClick={() => handleSelectPlan('agency')}
+            >
+              Get Started
+            </button>
+          </div>
         </div>
       </div>
     </>

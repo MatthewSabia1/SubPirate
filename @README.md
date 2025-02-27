@@ -4,6 +4,11 @@ A comprehensive Reddit marketing analysis tool that helps users discover, analyz
 
 ## Recent Updates
 
+### User Registration Fix
+- Automatic Profile Creation: Added database trigger to create user profiles automatically upon signup
+- Registration Error Resolution: Fixed "Database error saving new user" issue during account creation
+- Database Trigger Function: Implemented SQL function that connects auth.users table with public.profiles table
+
 ### Admin Panel
 - Comprehensive admin dashboard with key metrics and insights
 - Complete user management interface with role assignment
