@@ -5,7 +5,7 @@ import Stripe from 'stripe';
 
 const supabase = createClient<Database>(
   import.meta.env.VITE_SUPABASE_URL || '',
-  import.meta.env.VITE_SUPABASE_ANON_KEY || ''
+  import.meta.env.VITE_SUPABASE_SERVICE_ROLE_KEY || ''
 );
 
 // Helper function to update subscription status in database
@@ -415,6 +415,12 @@ async function handleCheckoutSessionCompleted(session: any) {
       // First try to get user_id from customer metadata (most reliable)
       let userId = customer.metadata?.user_id;
       
+      if (userId) {
+        console.log(`Found user_id ${userId} in customer metadata - this is the preferred source`);
+      } else {
+        console.log('No user_id found in customer metadata, checking alternate sources');
+      }
+      
       // If not found, try session metadata
       if (!userId && session.metadata?.user_id) {
         userId = session.metadata.user_id;
@@ -427,39 +433,63 @@ async function handleCheckoutSessionCompleted(session: any) {
         console.log(`Using client_reference_id ${userId} as user_id`);
       }
       
+      // Final check - do we have a userId?
       if (!userId) {
-        console.error(`No user_id found for customer ${customerId}`);
-        return;
+        console.error('CRITICAL: No user_id could be determined from any source');
+        console.error('Session data:', JSON.stringify(session, null, 2));
+        throw new Error('Cannot create subscription: No user_id found');
+      } else {
+        console.log(`Proceeding with user_id: ${userId}`);
       }
-
-      console.log(`Using user_id ${userId} for customer ${customerId}`);
       
       // Check if subscription record already exists
-      const { data: existingSubscription } = await supabase
+      const { data: existingSubscription, error: userSubError } = await supabase
         .from('customer_subscriptions')
         .select('*')
         .eq('user_id', userId)
         .order('created_at', { ascending: false })
         .maybeSingle();
       
+      if (userSubError) {
+        console.error('Error looking up existing subscription by user_id:', userSubError);
+      } else {
+        console.log(`Existing subscription lookup by user_id result: ${existingSubscription ? 'Found' : 'Not found'}`);
+      }
+      
       // Also check if there's an existing subscription with the same customer ID
-      const { data: existingCustomerSubscription } = await supabase
+      const { data: existingCustomerSubscription, error: custSubError } = await supabase
         .from('customer_subscriptions')
         .select('*')
         .eq('stripe_customer_id', customerId)
         .maybeSingle();
       
+      if (custSubError) {
+        console.error('Error looking up existing subscription by customer_id:', custSubError);
+      } else {
+        console.log(`Existing subscription lookup by customer_id result: ${existingCustomerSubscription ? 'Found' : 'Not found'}`);
+      }
+      
       // Check if price exists in our database
-      const { data: existingPrice } = await supabase
+      const { data: existingPrice, error: priceError } = await supabase
         .from('stripe_prices')
         .select('*')
         .eq('id', priceId)
         .maybeSingle();
       
+      if (priceError) {
+        console.error('Error looking up price:', priceError);
+      }
+      
       // If price doesn't exist, create it
       if (!existingPrice) {
         console.log(`Creating new price record for ${priceId}`);
-        await syncPriceData(price);
+        try {
+          await syncPriceData(price);
+          console.log(`Successfully created price record for ${priceId}`);
+        } catch (syncError) {
+          console.error(`Failed to create price record for ${priceId}:`, syncError);
+          // Continue execution - subscription can still be created even if price sync fails
+        }
       }
       
       // Prepare subscription data
@@ -482,26 +512,45 @@ async function handleCheckoutSessionCompleted(session: any) {
       if (existingCustomerSubscription) {
         console.log(`Updating existing customer subscription for ${customerId}`);
         // Update existing subscription by customer ID
-        await supabase
+        const { error: updateError } = await supabase
           .from('customer_subscriptions')
           .update(subscriptionData)
           .eq('stripe_customer_id', customerId);
+          
+        if (updateError) {
+          console.error('Error updating existing customer subscription:', updateError);
+        } else {
+          console.log('Successfully updated existing customer subscription');
+        }
       } else if (existingSubscription) {
         console.log(`Updating existing user subscription for user ${userId}`);
         // Update existing subscription by user ID
-        await supabase
+        const { error: updateError } = await supabase
           .from('customer_subscriptions')
           .update(subscriptionData)
           .eq('id', existingSubscription.id);
+          
+        if (updateError) {
+          console.error('Error updating existing user subscription:', updateError);
+        } else {
+          console.log('Successfully updated existing user subscription');
+        }
       } else {
         console.log(`Creating new subscription for customer ${customerId} and user ${userId}`);
         
         // Create new subscription
-        await supabase.from('customer_subscriptions').insert({
+        const { data, error } = await supabase.from('customer_subscriptions').insert({
           ...subscriptionData,
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
         });
+        
+        if (error) {
+          console.error('Error creating new subscription:', error);
+          throw error;
+        } else {
+          console.log('Successfully created new subscription in Supabase');
+        }
       }
     }
   } catch (error) {
