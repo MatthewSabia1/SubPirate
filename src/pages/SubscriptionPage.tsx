@@ -55,14 +55,14 @@ const FALLBACK_FEATURES = {
     '<span class="font-bold text-white">Priority</span> support',
   ],
   Agency: [
-    '<span class="font-bold text-white">Everything</span> in Pro plan',
-    '<span class="font-bold text-white">Unlimited</span> opportunity finder',
-    '<span class="font-bold text-white">10</span> team members',
-    '<span class="font-bold text-white">10</span> Reddit account protection',
-    '<span class="font-bold text-white">20</span> marketing campaigns',
-    '<span class="font-bold text-white">White-label</span> reports',
-    '<span class="font-bold text-white">Enterprise</span> support',
-    '<span class="font-bold text-white">API</span> access',
+    '<span class="font-bold text-white">3</span> Reddit account protection',
+    '<span class="font-bold text-white">3</span> Reddit account protection',
+    '<span class="font-bold text-white">25</span> subreddit analyses monthly',
+    '<span class="font-bold text-white">3</span> Reddit account protection',
+    '<span class="font-bold text-white">Advanced</span> competitor intelligence',
+    '<span class="font-bold text-white">25</span> subreddit analyses monthly',
+    '<span class="font-bold text-white">3</span> Reddit account protection',
+    '<span class="font-bold text-white">3</span> Reddit account protection',
   ],
 };
 
@@ -71,7 +71,7 @@ const DEFAULT_DESCRIPTIONS = {
   Starter: 'Essential features for getting started with Reddit marketing',
   Creator: 'Perfect for content creators and growing brands',
   Pro: 'Advanced features for professional marketers',
-  Agency: 'Full platform access for marketing teams and agencies'
+  Agency: 'Perfect for content creators and growing brands'
 };
 
 export default function SubscriptionPage() {
@@ -161,10 +161,10 @@ export default function SubscriptionPage() {
 
   // Fallback price IDs if the real ones can't be found
   const priceFallbacks = {
-    Starter: 'price_starter_monthly',
-    Creator: 'price_creator_monthly',
-    Pro: 'price_pro_monthly',
-    Agency: 'price_agency_monthly'
+    Starter: 'price_1Qvz1UCtsTY6FiiZTyGPNs1F',
+    Creator: 'price_1Qvz3GCtsTY6FiiZtiU2XiAq',
+    Pro: 'price_1Qvz2WCtsTY6FiiZ4uiEB7sk',
+    Agency: 'price_1Qvz27CtsTY6FiiZYbT6acEB'
   };
 
   // Function to get price for a specific product
@@ -429,7 +429,7 @@ export default function SubscriptionPage() {
           </p>
         </div>
 
-        <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8 max-w-5xl mx-auto">
+        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8 max-w-5xl mx-auto mb-8">
           {/* Starter Plan */}
           <div className="pricing-card">
             <h3 className="text-xl font-semibold mb-2">Starter</h3>
@@ -501,28 +501,44 @@ export default function SubscriptionPage() {
               Select Pro
             </button>
           </div>
+        </div>
 
-          {/* Agency Plan */}
-          <div className="pricing-card">
-            <h3 className="text-xl font-semibold mb-2">Agency</h3>
-            <div className="text-[#C69B7B] text-4xl font-bold mb-2">{getFormattedPrice('Agency')}<span className="text-lg text-gray-400">/mo</span></div>
-            <p className="text-gray-400 mb-6">{getProductDescription('Agency')}</p>
-            
-            <ul className="space-y-3 mb-8 flex-grow">
-              {getFeatures('Agency').map((feature, index) => (
-                <li key={index} className="flex items-start gap-2">
-                  <Check size={18} className="text-[#C69B7B] shrink-0 mt-0.5" />
-                  <span dangerouslySetInnerHTML={{ __html: feature }}></span>
-                </li>
-              ))}
-            </ul>
-            
-            <button 
-              onClick={() => handleSelectPlan('Agency')} 
-              className="pricing-button button-outline"
-            >
-              Select Agency
-            </button>
+        {/* Agency Plan - Wide box at the bottom */}
+        <div className="max-w-5xl mx-auto">
+          <div className="pricing-card border border-gray-800 rounded-lg bg-gray-900/50">
+            <div className="grid md:grid-cols-2 gap-8">
+              <div>
+                <h3 className="text-xl font-semibold mb-2">Agency</h3>
+                <div className="text-[#C69B7B] text-4xl font-bold mb-2">{getFormattedPrice('Agency')}<span className="text-lg text-gray-400">/mo</span></div>
+                <p className="text-gray-400 mb-6">{getProductDescription('Agency')}</p>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <ul className="space-y-3">
+                  {getFeatures('Agency').slice(0, Math.ceil(getFeatures('Agency').length / 2)).map((feature, index) => (
+                    <li key={index} className="flex items-start gap-2">
+                      <Check size={18} className="text-[#C69B7B] shrink-0 mt-0.5" />
+                      <span dangerouslySetInnerHTML={{ __html: feature }}></span>
+                    </li>
+                  ))}
+                </ul>
+                <ul className="space-y-3">
+                  {getFeatures('Agency').slice(Math.ceil(getFeatures('Agency').length / 2)).map((feature, index) => (
+                    <li key={index} className="flex items-start gap-2">
+                      <Check size={18} className="text-[#C69B7B] shrink-0 mt-0.5" />
+                      <span dangerouslySetInnerHTML={{ __html: feature }}></span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+            <div className="mt-6 flex justify-center">
+              <button 
+                onClick={() => handleSelectPlan('Agency')} 
+                className="pricing-button button-outline max-w-xs"
+              >
+                Select Agency
+              </button>
+            </div>
           </div>
         </div>
       </div>

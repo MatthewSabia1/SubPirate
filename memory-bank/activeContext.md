@@ -108,6 +108,22 @@ The application now includes a comprehensive admin panel accessible only to user
 - Clear error states and loading indicators
 
 ## Recent Changes
+- Improved "Connect a Reddit Account" modal behavior:
+  - Updated modal to only display after users have signed up, signed in, and have an active subscription
+  - Prevented modal from appearing on public pages (landing, pricing, login, subscription, auth)
+  - Added subscription status check before showing the modal
+  - Enhanced path checking logic to determine if user is on a backend/dashboard page
+  - Improved state management to prevent unnecessary modal displays
+  - Added better logging for modal visibility conditions and state changes
+  - Fixed modal display to only show once per page load in backend areas
+
+- Fixed Stripe checkout session errors with price IDs:
+  - Updated fallback price IDs in SubscriptionPage.tsx to match actual IDs in Stripe account
+  - Replaced placeholder IDs (e.g., price_starter_monthly) with actual Stripe price IDs
+  - Ensured consistent price ID usage across the application
+  - Fixed the issue causing checkout session creation failures
+  - Verified proper integration with Stripe API using correct price IDs
+
 - Implemented comprehensive user role system with admin and gift roles:
   - Added a "gift" role to complement the existing "admin" role
   - Created a robust role management system with database functions and triggers

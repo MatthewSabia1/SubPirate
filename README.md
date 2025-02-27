@@ -4,6 +4,23 @@ SubPirate is a sophisticated Reddit marketing analysis tool designed to identify
 
 ## Recent Updates
 
+### Improved Reddit Account Connection Flow
+- **Enhanced Modal Behavior**: Updated Reddit account connection modal to only appear after users have authenticated and have an active subscription
+- **Context-Aware Display**: Prevented modal from appearing on public pages (landing, pricing, login)
+- **Improved User Experience**: Modal now only displays once per page load in backend/dashboard areas
+- **Better State Management**: Enhanced modal dismissal and page navigation tracking
+
+### Stripe Price ID Fix
+- **Checkout Session Fix**: Updated fallback price IDs to match actual IDs in Stripe account
+- **Consistent Integration**: Ensured proper price ID usage across the application
+- **Error Prevention**: Fixed checkout session creation failures caused by invalid price IDs
+- **Reliable Payment Flow**: Verified working integration with Stripe API using correct price IDs
+
+### User Registration Fix
+- **Automatic Profile Creation**: Added database trigger to create user profiles automatically upon signup
+- **Registration Error Resolution**: Fixed "Database error saving new user" issue during account creation
+- **Database Trigger Function**: Implemented SQL function that connects auth.users table with public.profiles table
+
 ### Subscription Requirement on Signup (NEW)
 - **Mandatory subscription for new users**: All new users are now required to select and subscribe to a plan immediately after signup
 - **Enhanced subscription verification**: Improved checks across multiple database tables for consistent subscription status verification

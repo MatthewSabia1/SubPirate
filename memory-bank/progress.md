@@ -9,6 +9,7 @@
   - Email/password authentication
   - Google OAuth authentication
   - Dedicated authentication callback handling
+  - ✅ Database trigger for automatic profile creation upon signup
 - Save/bookmark subreddits
 - Progress tracking for analysis
 - User usage tracking and statistics
@@ -26,6 +27,24 @@
 - ✅ Calendar view for scheduling
 - ✅ Modqueue monitoring
 - ✅ User role management system with admin and gift roles
+- ✅ Improved Reddit account connection modal flow
+- ✅ Fixed Stripe checkout session creation with proper price IDs
+
+### User Experience Improvements
+- ✅ Reddit account connection modal improvements:
+  - ✅ Modal only appears after authentication and subscription
+  - ✅ No modal display on public pages
+  - ✅ Single modal per page load in dashboard areas
+  - ✅ Improved state management for modal visibility
+  - ✅ Enhanced path-based display logic
+  - ✅ Better handling of modal dismissal state
+
+### Stripe Integration Fixes
+- ✅ Fixed checkout session creation with proper price IDs
+- ✅ Updated fallback pricing IDs to match actual Stripe account
+- ✅ Consistent price ID usage across the application
+- ✅ Improved error handling for missing price IDs
+- ✅ Verified proper integration with Stripe API
 
 ### User Role Management System
 - ✅ Admin role for special administrative access

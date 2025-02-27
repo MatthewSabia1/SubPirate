@@ -108,18 +108,51 @@ flowchart TD
 
 SubPirate offers a comprehensive suite of powerful features designed to enhance Reddit marketing strategies:
 
+### Recent Improvements
+
+#### Enhanced Reddit Account Connection Flow
+The application now features an improved Reddit account connection experience:
+
+- **Contextual Modal Display**: The "Connect a Reddit Account" modal only appears:
+  - After users have completed authentication
+  - After users have an active subscription
+  - When users are in backend/dashboard areas (not on public pages)
+  - Once per page load, respecting user dismissals
+
+- **Technical Implementation**:
+  - Path-based checks prevent modal display on public routes
+  - Subscription status verification before modal display
+  - Improved state management to track modal dismissals
+  - Enhanced navigation tracking to reset modal state between pages
+  - Better logging for visibility conditions and state changes
+
+#### Stripe Integration Fixes
+The application includes fixes for Stripe checkout session creation:
+
+- **Price ID Consistency**: Updated fallback price IDs to match actual IDs in the Stripe account
+- **Error Prevention**: Fixed issues causing checkout session creation failures
+- **Reliable Integration**: Ensured proper price ID usage across the application
+- **Technical Implementation**:
+  - Updated hardcoded fallback price IDs in `SubscriptionPage.tsx`
+  - Replaced placeholder IDs with actual Stripe price IDs
+  - Verified proper integration with the Stripe API
+  - Enhanced error handling for checkout session creation
+
+### Subscriptions & Payments
+- **Mandatory subscription requirement**: New users must select a subscription plan to access the application
+- **Seamless Stripe integration**: Secure payment processing with subscription management
+- **Multiple subscription tiers**: Options for different user needs
+- **Checkout session creation**: Easy payment process with secure handling
+- **Customer portal access**: Self-service subscription management
+- **Environment detection**: Automatic test/live mode detection based on domain
+- **Error recovery**: Robust handling of customer ID mismatches between environments
+
 ### Subreddit Analysis
-- **AI-powered Deep Analysis**: Uses the OpenRouter AI API (deepseek model) to analyze subreddit rules, content patterns, and posting behavior.
-- **Marketing Friendliness Score**: Sophisticated algorithm that evaluates how receptive a subreddit is to marketing content, with detailed scoring visualized from 0-100.
-- **Rule Impact Assessment**: Analyzes each subreddit rule and categorizes its marketing impact as high, medium, or low with specific explanations.
-- **Content Type Analysis**: Identifies allowed content types (text, image, video, link) with visual indicators and recommendations for which perform best.
-- **Posting Schedule Optimization**: Identifies ideal posting times and frequencies based on historical engagement data.
-- **Title Pattern Recognition**: Extracts common title patterns that succeed in each subreddit and provides customized templates.
-- **Strategic Recommendations**: Provides actionable recommendations for content strategy including dos and don'ts.
-- **SWOT Analysis**: Comprehensive strengths, weaknesses, opportunities, and threats analysis for marketing in each subreddit.
-- **Marketing Game Plan**: Structured immediate, short-term, and long-term action items for successful engagement.
-- **User-friendly Visualization**: Presents complex analysis data in an easy-to-understand format with progress tracking during analysis.
-- **Save & Compare**: Ability to save analyses for later reference and comparison.
+- **Marketing friendliness score**: Analyze whether a subreddit is conducive to marketing
+- **Rule analysis**: Identify exploitable gaps in subreddit rules
+- **Moderator activity patterns**: Evaluate mod presence and enforcement
+- **Content engagement metrics**: Understand what performs well
+- **Marketing strategy recommendations**: Tailored advice for marketing approach
 
 ### SpyGlass
 - **Competitor Research Tool**: Analyze any Reddit user's posting patterns and subreddit engagement.

@@ -26,6 +26,9 @@ export const RedditAccountProvider: React.FC<{ children: React.ReactNode }> = ({
   const [hasRedditAccounts, setHasRedditAccounts] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [showRedditConnectModal, setShowRedditConnectModal] = useState(false);
+  const [hasSubscription, setHasSubscription] = useState(false);
+  const [subscriptionLoading, setSubscriptionLoading] = useState(true);
+  
   // Track if modal has been dismissed on the current page
   const [modalDismissedOnCurrentPage, setModalDismissedOnCurrentPage] = useState(false);
   // Ref to track if we've checked for accounts on this page load
@@ -35,6 +38,112 @@ export const RedditAccountProvider: React.FC<{ children: React.ReactNode }> = ({
   // Track if user is authenticated to avoid unnecessary checks
   const isAuthenticatedRef = useRef(false);
   
+  // List of public paths where we should never show the Reddit connect modal
+  const publicPaths = ['/', '/login', '/pricing', '/subscription', '/auth/callback'];
+  
+  // Check if current path is a public path
+  const isPublicPath = () => {
+    return publicPaths.some(path => location.pathname === path || location.pathname.startsWith(path));
+  };
+  
+  // Check if user has an active subscription
+  const checkSubscription = async () => {
+    if (!user) {
+      setSubscriptionLoading(false);
+      setHasSubscription(false);
+      return false;
+    }
+    
+    try {
+      console.log(`RedditAccountContext: Checking subscription for user ${user.id}...`);
+      setSubscriptionLoading(true);
+      
+      // Check both subscription tables
+      let hasActiveSubscription = false;
+      
+      // 1. Check the subscriptions table
+      const { data: subscriptionData, error: subscriptionError } = await supabase
+        .from('subscriptions')
+        .select('*')
+        .eq('user_id', user.id)
+        .eq('status', 'active')
+        .single();
+
+      if (subscriptionError) {
+        if (subscriptionError.code === 'PGRST116') {
+          console.log('RedditAccountContext: No active subscription found in subscriptions table');
+        } else {
+          console.error('RedditAccountContext: Error checking subscriptions table:', subscriptionError);
+        }
+      }
+      
+      if (subscriptionData) {
+        console.log('RedditAccountContext: Found active subscription in subscriptions table');
+        hasActiveSubscription = true;
+      } else {
+        // 2. Check the customer_subscriptions table
+        console.log('RedditAccountContext: Checking customer_subscriptions table...');
+        
+        let { data: customerSubscriptionData, error: customerSubscriptionError } = await supabase
+          .from('customer_subscriptions')
+          .select('*')
+          .eq('user_id', user.id)
+          .or('status.eq.active,status.eq.trialing')
+          .single();
+
+        if (customerSubscriptionError) {
+          if (customerSubscriptionError.code === 'PGRST116') {
+            console.log('RedditAccountContext: No subscription found with OR condition, trying individual queries');
+            
+            // Try active status
+            const { data: activeData, error: activeError } = await supabase
+              .from('customer_subscriptions')
+              .select('*')
+              .eq('user_id', user.id)
+              .eq('status', 'active')
+              .single();
+              
+            if (!activeError && activeData) {
+              console.log('RedditAccountContext: Found active subscription in customer_subscriptions table');
+              customerSubscriptionData = activeData;
+              customerSubscriptionError = null;
+            } else {
+              // Try trialing status
+              const { data: trialingData, error: trialingError } = await supabase
+                .from('customer_subscriptions')
+                .select('*')
+                .eq('user_id', user.id)
+                .eq('status', 'trialing')
+                .single();
+                
+              if (!trialingError && trialingData) {
+                console.log('RedditAccountContext: Found trialing subscription in customer_subscriptions table');
+                customerSubscriptionData = trialingData;
+                customerSubscriptionError = null;
+              }
+            }
+          } else {
+            console.error('RedditAccountContext: Error checking customer_subscriptions table:', customerSubscriptionError);
+          }
+        }
+        
+        if (customerSubscriptionData) {
+          console.log('RedditAccountContext: Found subscription in customer_subscriptions table');
+          hasActiveSubscription = true;
+        }
+      }
+
+      console.log('RedditAccountContext: Setting hasSubscription to:', hasActiveSubscription);
+      setHasSubscription(hasActiveSubscription);
+      return hasActiveSubscription;
+    } catch (error) {
+      console.error('RedditAccountContext: Exception checking subscription:', error);
+      return false;
+    } finally {
+      setSubscriptionLoading(false);
+    }
+  };
+  
   // Check if the user has any Reddit accounts
   const checkForRedditAccounts = async () => {
     if (!user) {
@@ -43,8 +152,22 @@ export const RedditAccountProvider: React.FC<{ children: React.ReactNode }> = ({
       return;
     }
     
+    // Don't check if we're on a public path
+    if (isPublicPath()) {
+      console.log('RedditAccountContext: On public path, not showing Reddit connect modal');
+      setShowRedditConnectModal(false);
+      return;
+    }
+    
     // Don't check if we've already checked on this page and the modal was dismissed
     if (checkedOnCurrentPageRef.current && modalDismissedOnCurrentPage) {
+      return;
+    }
+    
+    // Don't show modal if user doesn't have a subscription
+    if (!hasSubscription) {
+      console.log('RedditAccountContext: User has no subscription, not showing Reddit connect modal');
+      setShowRedditConnectModal(false);
       return;
     }
     
@@ -61,21 +184,21 @@ export const RedditAccountProvider: React.FC<{ children: React.ReactNode }> = ({
       const hasAccounts = data && data.length > 0;
       setHasRedditAccounts(hasAccounts);
       
-      console.log('Reddit accounts check:', hasAccounts ? 'Has accounts' : 'No accounts');
+      console.log('RedditAccountContext: Reddit accounts check:', hasAccounts ? 'Has accounts' : 'No accounts');
       
-      // Show modal if user has no Reddit accounts and hasn't dismissed it on this page
-      if (!hasAccounts && !modalDismissedOnCurrentPage) {
-        console.log('Showing Reddit connect modal');
+      // Show modal if user has no Reddit accounts, has a subscription, isn't on a public page, and hasn't dismissed it
+      if (!hasAccounts && !modalDismissedOnCurrentPage && hasSubscription && !isPublicPath()) {
+        console.log('RedditAccountContext: Showing Reddit connect modal');
         setShowRedditConnectModal(true);
-      } else if (hasAccounts) {
-        console.log('User has Reddit accounts, hiding modal');
+      } else {
+        console.log('RedditAccountContext: Not showing Reddit connect modal');
         setShowRedditConnectModal(false);
       }
       
       // Mark that we've checked on this page
       checkedOnCurrentPageRef.current = true;
     } catch (err) {
-      console.error('Error checking for Reddit accounts:', err);
+      console.error('RedditAccountContext: Error checking for Reddit accounts:', err);
     } finally {
       setIsLoading(false);
     }
@@ -83,9 +206,12 @@ export const RedditAccountProvider: React.FC<{ children: React.ReactNode }> = ({
   
   // Public function to refresh account status
   const refreshAccountStatus = async () => {
-    console.log('Manually refreshing account status');
+    console.log('RedditAccountContext: Manually refreshing account status');
     // Reset the checked flag when manually refreshing
     checkedOnCurrentPageRef.current = false;
+    // Check subscription status first
+    await checkSubscription();
+    // Then check for Reddit accounts
     await checkForRedditAccounts();
   };
   
@@ -126,28 +252,33 @@ export const RedditAccountProvider: React.FC<{ children: React.ReactNode }> = ({
   
   // Handle modal close - track dismissal for current page only
   const handleModalClose = () => {
-    console.log('Modal dismissed for current page');
+    console.log('RedditAccountContext: Modal dismissed for current page');
     setShowRedditConnectModal(false);
     setModalDismissedOnCurrentPage(true);
   };
   
-  // Check for Reddit accounts when the component mounts and when the user changes
+  // Check for subscription status when the component mounts and when the user changes
   useEffect(() => {
     if (user) {
       if (!isAuthenticatedRef.current) {
-        console.log('User authenticated, initial account check');
+        console.log('RedditAccountContext: User authenticated, checking subscription');
         isAuthenticatedRef.current = true;
         
-        // Only check once on initial authentication
+        // Check subscription status first
         const timer = setTimeout(() => {
-          checkForRedditAccounts();
+          checkSubscription().then(() => {
+            // Only check for Reddit accounts after subscription check completes
+            checkForRedditAccounts();
+          });
         }, 100);
         return () => clearTimeout(timer);
       }
     } else {
       isAuthenticatedRef.current = false;
       setHasRedditAccounts(false);
+      setHasSubscription(false);
       setIsLoading(false);
+      setSubscriptionLoading(false);
       setShowRedditConnectModal(false);
       checkedOnCurrentPageRef.current = false;
     }
@@ -155,11 +286,15 @@ export const RedditAccountProvider: React.FC<{ children: React.ReactNode }> = ({
   
   // Reset modal dismissed state when location changes (navigating to a new page)
   useEffect(() => {
-    // Only reset dismissed state and check for accounts if user is authenticated
-    // and the path has actually changed
-    if (user && lastPathCheckedRef.current !== location.pathname) {
-      console.log('Location changed to:', location.pathname);
-      console.log('Resetting modal dismissed state');
+    // Only reset dismissed state and check if:
+    // 1. User is authenticated
+    // 2. The path has actually changed
+    // 3. We're not on a public path
+    if (user && 
+        lastPathCheckedRef.current !== location.pathname && 
+        !isPublicPath()) {
+      console.log('RedditAccountContext: Location changed to:', location.pathname);
+      console.log('RedditAccountContext: Resetting modal dismissed state');
       
       // Update our ref to the current path
       lastPathCheckedRef.current = location.pathname;
@@ -168,15 +303,15 @@ export const RedditAccountProvider: React.FC<{ children: React.ReactNode }> = ({
       setModalDismissedOnCurrentPage(false);
       checkedOnCurrentPageRef.current = false;
       
-      // Check for accounts with a small delay to ensure the page has fully loaded
+      // Check subscription status first, then check for Reddit accounts
       const timer = setTimeout(() => {
-        checkForRedditAccounts();
+        if (hasSubscription) {
+          checkForRedditAccounts();
+        }
       }, 100);
       return () => clearTimeout(timer);
     }
-  }, [location.pathname, user]);
-  
-  // No periodic check - it's causing too many state updates and console logs
+  }, [location.pathname, user, hasSubscription]);
   
   return (
     <RedditAccountContext.Provider
@@ -189,7 +324,7 @@ export const RedditAccountProvider: React.FC<{ children: React.ReactNode }> = ({
     >
       {children}
       
-      {/* Global Reddit Connect Modal */}
+      {/* Global Reddit Connect Modal - Only show on backend pages after subscription check */}
       <RedditConnectModal
         isOpen={showRedditConnectModal}
         onClose={handleModalClose}
