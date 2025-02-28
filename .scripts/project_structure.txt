@@ -25,12 +25,12 @@
 ./dist/assets/analysis.worker-DWzU_fWM.js
 ./dist/assets/analysisWorker-Bm5CuDrv.js
 ./dist/assets/apple-touch-icon-B94NjudY.png
-./dist/assets/browser-DfVhOYd3.js
+./dist/assets/browser-Cen6oKcr.js
 ./dist/assets/favicon-16x16-CiyT-7YN.png
 ./dist/assets/favicon-32x32-BtB7lBsX.png
 ./dist/assets/favicon-DD5Mp9dT.ico
+./dist/assets/main-BG4FXLct.js
 ./dist/assets/main-BQU1kN3c.css
-./dist/assets/main-Cz_-K1Wm.js
 ./dist/assets/openRouter-Bm3EoEWG.js
 ./dist/assets/site-BQAaH04b.webmanifest
 ./dist/assets/SubPirate_light_icon_logo-B86N2FHX.svg
